@@ -32,17 +32,18 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold text-white mb-6 text-center">Accesso Gestionale</h1>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Email</label>
+            <label className="text-xs font-bold text-zinc-400 uppercase ml-1">Email</label>
             <input 
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-zinc-800 border-zinc-700 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-zinc-800/50 border-zinc-700/50 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-blue-500 placeholder-zinc-500"
+              placeholder="admin@example.com"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-zinc-500 uppercase ml-1">Password</label>
+            <label className="text-xs font-bold text-zinc-400 uppercase ml-1">Password</label>
             <input 
               type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-800 border-zinc-700 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-zinc-800/50 border-zinc-700/50 rounded-xl p-3 text-white outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
