@@ -12,7 +12,9 @@ const BottomNav = () => {
   const pathname = usePathname();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  if (pathname === '/login') return null;
+  if (pathname === '/login') {
+    return null;
+  }
 
   const navItems = [
     { name: 'Home',      href: '/',         icon: Home },

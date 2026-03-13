@@ -35,6 +35,13 @@ export default function CalendarPage() {
   const [showCancelReason, setShowCancelReason] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
+  const [viewDays, setViewDays] = useState<1 | 3 | 5 | 7>(7);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewDays(3);
+    }
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -45,7 +52,8 @@ export default function CalendarPage() {
   );
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const displayStart = viewDays === 7 ? weekStart : currentDate;
+  const displayDays = Array.from({ length: viewDays }, (_, i) => addDays(displayStart, i));
 
   // Generate 15-minute intervals from 08:00 to 20:00
   const timeSlots = Array.from({ length: 12 * 4 + 1 }, (_, i) => {
@@ -57,7 +65,7 @@ export default function CalendarPage() {
 
   const fetchWeekAppointments = async () => {
     setLoading(true);
-    const endOfWeekDate = addDays(weekStart, 7);
+    const fetchEndDate = addDays(displayStart, viewDays);
 
     try {
       const [{ data: dbData, error: dbError }, { data: patentiData }] = await Promise.all([
@@ -69,8 +77,8 @@ export default function CalendarPage() {
             istruttori ( nome, cognome ),
             veicoli ( targa, nome )
           `)
-          .gte('data', weekStart.toISOString())
-          .lt('data', endOfWeekDate.toISOString()),
+          .gte('data', displayStart.toISOString())
+          .lt('data', fetchEndDate.toISOString()),
         supabase.from('patenti').select('id, tipo')
       ]);
 
@@ -114,7 +122,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     fetchWeekAppointments();
-  }, [currentDate]);
+  }, [currentDate, viewDays]);
 
   const handleDragStart = (event: any) => {
     setActiveId(event.active.id);
@@ -163,7 +171,7 @@ export default function CalendarPage() {
 
   const navigateWeek = (direction: number) => {
     const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + (direction * 7));
+    newDate.setDate(newDate.getDate() + (direction * (viewDays === 7 ? 7 : viewDays)));
     setCurrentDate(newDate);
   };
 
@@ -228,33 +236,57 @@ export default function CalendarPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
-            <button
-              onClick={() => navigateWeek(-1)}
-              className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={() => setCurrentDate(new Date())}
-              className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-zinc-100"
-            >
-              Oggi
-            </button>
-            <button
-              onClick={() => navigateWeek(1)}
-              className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
-            >
-              <ChevronRight size={20} />
-            </button>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
+              {[1, 3, 5, 7].map((days) => (
+                <button
+                  key={days}
+                  onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-sm font-bold transition-all",
+                    viewDays === days 
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" 
+                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  )}
+                >
+                  {days}G
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
+              <button
+                onClick={() => navigateWeek(-1)}
+                className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                onClick={() => setCurrentDate(new Date())}
+                className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-zinc-100"
+              >
+                Oggi
+              </button>
+              <button
+                onClick={() => navigateWeek(1)}
+                className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
           </div>
         </header>
 
         <div className="bg-white dark:bg-zinc-900/80 rounded-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden">
           {/* Header Giorni */}
-          <div className="grid grid-cols-8 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
-            <div className="p-4 border-r border-zinc-100 dark:border-zinc-800"></div>
-            {weekDays.map(day => (
+          <div 
+            className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30"
+            style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` }}
+          >
+            <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
+              <Clock size={16} className="text-zinc-400" />
+            </div>
+            {displayDays.map(day => (
               <div key={day.toString()} className={cn(
                 "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
                 isSameDay(day, new Date()) ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
@@ -283,17 +315,21 @@ export default function CalendarPage() {
             {timeSlots.map((slot) => {
               const isFullHour = slot.endsWith(':00');
               return (
-                <div key={slot} className={cn(
-                  "grid grid-cols-8 border-b last:border-0 h-10 transition-colors",
-                  isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
-                )}>
+                <div 
+                  key={slot} 
+                  className={cn(
+                    "grid border-b last:border-0 h-10 transition-colors",
+                    isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
+                  )}
+                  style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` }}
+                >
                   <div className={cn(
-                    "p-2 text-[10px] font-mono text-right pr-4 border-r border-zinc-100 dark:border-zinc-800",
-                    isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-400 font-medium"
+                    "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
+                    isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
                   )}>
                     {isFullHour ? slot : slot.split(':')[1]}
                   </div>
-                  {weekDays.map((day) => {
+                  {displayDays.map((day) => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const cellId = `${dateStr}|${slot}`;
                     const cellAppointments = appointments.filter(a =>
@@ -302,19 +338,26 @@ export default function CalendarPage() {
 
                     return (
                       <DroppableCell key={cellId} id={cellId}>
-                        {cellAppointments.map(apt => (
-                          <div
-                            key={apt.id}
-                            className={cn(
-                              (apt as any).stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
-                            )}
-                          >
-                            <DraggableAppointment
-                              appointment={apt}
-                              onClick={setSelectedAppointment}
-                            />
-                          </div>
-                        ))}
+                        <div className="h-full w-full flex gap-0.5 p-0.5">
+                          {cellAppointments.map((apt, idx) => (
+                            <div
+                              key={apt.id}
+                              className={cn(
+                                "relative flex-1 min-w-[30px]",
+                                (apt as any).stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
+                              )}
+                              style={{
+                                zIndex: cellAppointments.length - idx
+                              }}
+                            >
+                              <DraggableAppointment
+                                appointment={apt}
+                                isOverlapping={cellAppointments.length > 1}
+                                onClick={setSelectedAppointment}
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </DroppableCell>
                     );
                   })}
