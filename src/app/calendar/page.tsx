@@ -37,10 +37,20 @@ export default function CalendarPage() {
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
   const [viewDays, setViewDays] = useState<1 | 3 | 5 | 7>(7);
 
+  // Usa l'hook per gestire responsive in modo solido dopo l'idratazione
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setViewDays(3);
-    }
+    setMounted(true);
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setViewDays(3);
+      } else {
+        setViewDays(7);
+      }
+    };
+    handleResize(); // Chiamata iniziale
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const sensors = useSensors(
@@ -52,8 +62,10 @@ export default function CalendarPage() {
   );
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const displayStart = viewDays === 7 ? weekStart : currentDate;
-  const displayDays = Array.from({ length: viewDays }, (_, i) => addDays(displayStart, i));
+  // Per evitare scatti in fase di caricamento dal server
+  const effectiveViewDays = mounted ? viewDays : 7; 
+  const displayStart = effectiveViewDays === 7 ? weekStart : currentDate;
+  const displayDays = Array.from({ length: effectiveViewDays }, (_, i) => addDays(displayStart, i));
 
   // Generate 15-minute intervals from 08:00 to 20:00
   const timeSlots = Array.from({ length: 12 * 4 + 1 }, (_, i) => {
@@ -65,7 +77,7 @@ export default function CalendarPage() {
 
   const fetchWeekAppointments = async () => {
     setLoading(true);
-    const fetchEndDate = addDays(displayStart, viewDays);
+    const fetchEndDate = addDays(displayStart, effectiveViewDays);
 
     try {
       const [{ data: dbData, error: dbError }, { data: patentiData }] = await Promise.all([
@@ -121,8 +133,8 @@ export default function CalendarPage() {
   };
 
   useEffect(() => {
-    fetchWeekAppointments();
-  }, [currentDate, viewDays]);
+    if (mounted) fetchWeekAppointments();
+  }, [currentDate, effectiveViewDays, mounted]);
 
   const handleDragStart = (event: any) => {
     setActiveId(event.active.id);
@@ -164,14 +176,14 @@ export default function CalendarPage() {
 
       if (error) {
         console.error('Error updating appointment position:', error);
-        fetchWeekAppointments(); // Revert on error
+        if (mounted) fetchWeekAppointments(); // Revert on error
       }
     }
   };
 
   const navigateWeek = (direction: number) => {
     const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + (direction * (viewDays === 7 ? 7 : viewDays)));
+    newDate.setDate(newDate.getDate() + (direction * (effectiveViewDays === 7 ? 7 : effectiveViewDays)));
     setCurrentDate(newDate);
   };
 
@@ -187,7 +199,7 @@ export default function CalendarPage() {
 
       if (!error) {
         setSelectedAppointment(null);
-        fetchWeekAppointments();
+        if (mounted) fetchWeekAppointments();
         setToast({ message: 'Appuntamento eliminato', type: 'success' });
       } else {
         setToast({ message: 'Errore durante l\'eliminazione', type: 'error' });
@@ -212,7 +224,7 @@ export default function CalendarPage() {
       setSelectedAppointment(null);
       setShowCancelReason(false);
       setCancelReason('');
-      fetchWeekAppointments();
+      if (mounted) fetchWeekAppointments();
       setToast({ message: 'Appuntamento annullato', type: 'success' });
     } else {
       setToast({ message: 'Errore durante l\'annullamento', type: 'error' });
@@ -227,29 +239,29 @@ export default function CalendarPage() {
       onDragEnd={handleDragEnd}
       modifiers={[snapCenterToCursor]}
     >
-      <div className="p-6 md:p-10 animate-fade-in max-w-7xl mx-auto">
-        <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="p-4 sm:p-6 md:p-10 animate-fade-in max-w-7xl mx-auto">
+        <header className="mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
             <p className="text-zinc-500 dark:text-zinc-400 mt-1 capitalize">
               {format(weekStart, 'MMMM yyyy', { locale: it })}
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
-            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
+          <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
+            <div className="flex flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl shadow-inner overflow-x-auto scrollbar-hide">
               {[1, 3, 5, 7].map((days) => (
                 <button
                   key={days}
                   onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
                   className={cn(
-                    "px-3 py-1.5 rounded-xl text-sm font-bold transition-all",
+                    "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap",
                     viewDays === days 
                       ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" 
                       : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                   )}
                 >
-                  {days}G
+                  {days} G
                 </button>
               ))}
             </div>
