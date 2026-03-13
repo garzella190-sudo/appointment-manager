@@ -1,0 +1,510 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  defaultDropAnimationSideEffects
+} from '@dnd-kit/core';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
+import { startOfWeek, addDays, format, isSameDay, parseISO, startOfDay, addMinutes } from 'date-fns';
+import { it } from 'date-fns/locale';
+import { supabase } from '@/lib/supabase';
+import { Appointment } from '@/types';
+import { DroppableCell } from '@/components/DroppableCell';
+import { DraggableAppointment } from '@/components/DraggableAppointment';
+import { cn } from '@/lib/utils';
+import { Toast } from '@/components/Toast';
+import { Modal } from '@/components/Modal';
+import { AppointmentForm } from '@/components/forms/AppointmentForm';
+import { User, Car, Clock, FileText, Phone, Calendar as CalendarIconSmall } from 'lucide-react';
+
+export default function CalendarPage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [showCancelReason, setShowCancelReason] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Generate 15-minute intervals from 08:00 to 20:00
+  const timeSlots = Array.from({ length: 12 * 4 + 1 }, (_, i) => {
+    const totalMinutes = i * 15;
+    const h = Math.floor(totalMinutes / 60) + 8;
+    const m = totalMinutes % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  });
+
+  const fetchWeekAppointments = async () => {
+    setLoading(true);
+    const endOfWeekDate = addDays(weekStart, 7);
+
+    try {
+      const [{ data: dbData, error: dbError }, { data: patentiData }] = await Promise.all([
+        supabase
+          .from('appuntamenti')
+          .select(`
+            id, data, durata, stato, note, importo,
+            clienti ( nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
+            istruttori ( nome, cognome ),
+            veicoli ( targa, nome )
+          `)
+          .gte('data', weekStart.toISOString())
+          .lt('data', endOfWeekDate.toISOString()),
+        supabase.from('patenti').select('id, tipo')
+      ]);
+
+      if (dbError) throw dbError;
+
+      const patentiMap = new Map((patentiData || []).map((p: any) => [p.id, p.tipo]));
+
+      const mappedAppointments = (dbData || []).map((row: any) => {
+        const rowDate = new Date(row.data);
+        const patenteId = row.clienti?.patente_richiesta_id;
+        
+        return {
+          id: row.id,
+          appointment_date: format(rowDate, 'yyyy-MM-dd'),
+          appointment_time: format(rowDate, 'HH:mm'),
+          client_name: row.clienti ? `${row.clienti.cognome} ${row.clienti.nome}` : 'Sconosciuto',
+          phone: row.clienti?.telefono || '',
+          trainer_id: row.istruttore_id,
+          vehicle_id: row.veicoli ? `${row.veicoli.nome} (${row.veicoli.targa})` : 'Nessuno',
+          duration: row.durata,
+          notes: row.note,
+          status: row.stato,
+          stato: row.stato,
+          cost: row.importo || 0,
+          license_type: patenteId ? (patentiMap.get(patenteId) || 'B') : 'B',
+          gearbox_type: row.clienti?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
+          trainers: {
+            name: row.istruttori ? `${row.istruttori.cognome} ${row.istruttori.nome}` : 'Non ass.',
+            color: '#3b82f6'
+          }
+        };
+      });
+
+      setAppointments(mappedAppointments as Appointment[]);
+    } catch (error) {
+      console.error('Error fetching calendar data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeekAppointments();
+  }, [currentDate]);
+
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragOver = (event: any) => {
+    setOverId(event.over?.id || null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setOverId(null);
+
+    if (over && active.id !== over.id) {
+      const [dateStr, timeStr] = (over.id as string).split('|');
+      const formattedDate = format(parseISO(dateStr), 'dd/MM/yyyy');
+
+      // Show move info
+      setToast({
+        message: `Spostato al ${formattedDate} alle ore ${timeStr}`,
+        type: 'success'
+      });
+
+      // Update local state immediately for snappy feel
+      setAppointments(prev => prev.map(apt => {
+        if (apt.id === active.id) {
+          return { ...apt, appointment_date: dateStr, appointment_time: timeStr };
+        }
+        return apt;
+      }));
+
+      // Update Supabase
+      const startDateTime = new Date(`${dateStr}T${timeStr}`).toISOString();
+      const { error } = await supabase
+        .from('appuntamenti')
+        .update({ data: startDateTime })
+        .eq('id', active.id);
+
+      if (error) {
+        console.error('Error updating appointment position:', error);
+        fetchWeekAppointments(); // Revert on error
+      }
+    }
+  };
+
+  const navigateWeek = (direction: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + (direction * 7));
+    setCurrentDate(newDate);
+  };
+
+  const activeAppointment = appointments.find(a => a.id === activeId);
+
+  const handleDeleteAppointment = async () => {
+    if (!selectedAppointment) return;
+    if (window.confirm('Sei sicuro di voler eliminare questo appuntamento?')) {
+      const { error } = await supabase
+        .from('appuntamenti')
+        .delete()
+        .eq('id', selectedAppointment.id);
+
+      if (!error) {
+        setSelectedAppointment(null);
+        fetchWeekAppointments();
+        setToast({ message: 'Appuntamento eliminato', type: 'success' });
+      } else {
+        setToast({ message: 'Errore durante l\'eliminazione', type: 'error' });
+      }
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!selectedAppointment) return;
+
+    const { error } = await supabase
+      .from('appuntamenti')
+      .update({ 
+        stato: 'annullato', 
+        note: cancelReason 
+          ? `${selectedAppointment.notes || ''}\n\nMotivo annullamento: ${cancelReason}`.trim() 
+          : selectedAppointment.notes 
+      })
+      .eq('id', selectedAppointment.id);
+
+    if (!error) {
+      setSelectedAppointment(null);
+      setShowCancelReason(false);
+      setCancelReason('');
+      fetchWeekAppointments();
+      setToast({ message: 'Appuntamento annullato', type: 'success' });
+    } else {
+      setToast({ message: 'Errore durante l\'annullamento', type: 'error' });
+    }
+  };
+
+  return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      modifiers={[snapCenterToCursor]}
+    >
+      <div className="p-6 md:p-10 animate-fade-in max-w-7xl mx-auto">
+        <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 mt-1 capitalize">
+              {format(weekStart, 'MMMM yyyy', { locale: it })}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
+            <button
+              onClick={() => navigateWeek(-1)}
+              className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={() => setCurrentDate(new Date())}
+              className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-zinc-100"
+            >
+              Oggi
+            </button>
+            <button
+              onClick={() => navigateWeek(1)}
+              className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </header>
+
+        <div className="bg-white dark:bg-zinc-900/80 rounded-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+          {/* Header Giorni */}
+          <div className="grid grid-cols-8 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
+            <div className="p-4 border-r border-zinc-100 dark:border-zinc-800"></div>
+            {weekDays.map(day => (
+              <div key={day.toString()} className={cn(
+                "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
+                isSameDay(day, new Date()) ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
+              )}>
+                <span className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">
+                  {format(day, 'eee', { locale: it })}
+                </span>
+                <span className={cn(
+                  "text-lg font-black mt-1 inline-flex w-10 h-10 items-center justify-center rounded-full transition-all",
+                  isSameDay(day, new Date()) ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "text-zinc-900 dark:text-zinc-50"
+                )}>
+                  {format(day, 'd')}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Griglia Oraria */}
+          <div className="overflow-y-auto max-h-[700px] relative scrollbar-hide">
+            {loading && (
+              <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
+                <Loader2 className="animate-spin text-blue-600" size={40} />
+              </div>
+            )}
+
+            {timeSlots.map((slot) => {
+              const isFullHour = slot.endsWith(':00');
+              return (
+                <div key={slot} className={cn(
+                  "grid grid-cols-8 border-b last:border-0 h-10 transition-colors",
+                  isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
+                )}>
+                  <div className={cn(
+                    "p-2 text-[10px] font-mono text-right pr-4 border-r border-zinc-100 dark:border-zinc-800",
+                    isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-400 font-medium"
+                  )}>
+                    {isFullHour ? slot : slot.split(':')[1]}
+                  </div>
+                  {weekDays.map((day) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const cellId = `${dateStr}|${slot}`;
+                    const cellAppointments = appointments.filter(a =>
+                      a.appointment_date === dateStr && a.appointment_time.slice(0, 5) === slot
+                    );
+
+                    return (
+                      <DroppableCell key={cellId} id={cellId}>
+                        {cellAppointments.map(apt => (
+                          <div
+                            key={apt.id}
+                            className={cn(
+                              (apt as any).stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
+                            )}
+                          >
+                            <DraggableAppointment
+                              appointment={apt}
+                              onClick={setSelectedAppointment}
+                            />
+                          </div>
+                        ))}
+                      </DroppableCell>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <DragOverlay adjustScale={false} zIndex={100}>
+          {activeId && activeAppointment ? (
+            <div className="relative pointer-events-none">
+              {/* Draggable Preview */}
+              <div
+                className="w-48 p-4 rounded-2xl text-white shadow-2xl border border-white/20 ring-4 ring-black/5"
+                style={{
+                  backgroundColor: activeAppointment.trainers?.color || '#3b82f6',
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[9px] font-black bg-black/20 px-1.5 py-0.5 rounded uppercase">
+                    {activeAppointment.license_type}
+                  </span>
+                  <span className="text-[10px] font-bold opacity-80">
+                    {activeAppointment.appointment_time.slice(0, 5)}
+                  </span>
+                </div>
+                <p className="text-sm font-black leading-tight truncate">{activeAppointment.client_name}</p>
+              </div>
+
+              {/* Real-time Indicator Tooltip - Perfectly centered over the 48w (192px) container */}
+              {overId && (
+                <div className="absolute -top-14 left-0 w-48 flex justify-center pointer-events-none">
+                  <div className="bg-blue-600 text-white text-[11px] font-black py-2 px-4 rounded-2xl shadow-2xl whitespace-nowrap animate-bounce-subtle border border-white/20 flex items-center gap-2 ring-4 ring-blue-500/10">
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    {format(parseISO(overId.split('|')[0]), 'dd MMMM', { locale: it })} • {overId.split('|')[1]}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </DragOverlay>
+
+        {selectedAppointment && (
+          <Modal
+            isOpen={!!selectedAppointment}
+            onClose={() => {
+              setSelectedAppointment(null);
+              setShowCancelReason(false);
+              setCancelReason('');
+              setIsEditingAppointment(false);
+            }}
+            title={isEditingAppointment ? "Modifica Appuntamento" : "Dettagli Appuntamento"}
+          >
+            {isEditingAppointment ? (
+              <div className="p-2 sm:p-4 bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 shadow-sm mt-2">
+                <AppointmentForm
+                  appointmentId={selectedAppointment.id}
+                  onSuccess={() => {
+                    setIsEditingAppointment(false);
+                    setSelectedAppointment(null);
+                    fetchWeekAppointments();
+                    setToast({ message: 'Appuntamento aggiornato', type: 'success' });
+                  }}
+                  onCancel={() => setIsEditingAppointment(false)}
+                />
+              </div>
+            ) : (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                  style={{ backgroundColor: selectedAppointment.trainers?.color || '#3b82f6' }}
+                >
+                  <User size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-zinc-900 dark:text-zinc-50">{selectedAppointment.client_name}</h3>
+                  <p className="text-sm text-zinc-500 flex items-center gap-1">
+                    <Phone size={14} /> {selectedAppointment.phone || 'Nessun numero'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
+                  <p className="text-[10px] uppercase font-bold text-zinc-400 mb-1 flex items-center gap-1">
+                    <CalendarIconSmall size={12} /> Data e Ora
+                  </p>
+                  <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    {format(parseISO(selectedAppointment.appointment_date), 'dd MMMM yyyy', { locale: it })}
+                  </p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400 font-black mt-0.5">
+                    {selectedAppointment.appointment_time.slice(0, 5)} ({selectedAppointment.duration} min)
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
+                  <p className="text-[10px] uppercase font-bold text-zinc-400 mb-1 flex items-center gap-1">
+                    <Car size={12} /> Veicolo e Patente
+                  </p>
+                  <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    {selectedAppointment.license_type} - {selectedAppointment.gearbox_type}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">
+                    ID Veicolo: {selectedAppointment.vehicle_id.slice(0, 8)}...
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
+                <p className="text-[10px] uppercase font-bold text-zinc-400 mb-2 flex items-center gap-1">
+                  <FileText size={12} /> Note
+                </p>
+                <p className="text-sm italic text-zinc-600 dark:text-zinc-400">
+                  {selectedAppointment.notes || 'Nessuna nota aggiuntiva.'}
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2 mt-4">
+                {!showCancelReason ? (
+                  <>
+                    <button
+                      onClick={() => setIsEditingAppointment(true)}
+                      className="flex-1 py-3 px-4 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 font-bold hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all text-sm"
+                    >
+                      Modifica
+                    </button>
+                    <button
+                      onClick={() => setShowCancelReason(true)}
+                      className="flex-1 py-3 px-4 rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400 font-bold hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all text-sm"
+                    >
+                      Annulla Guida
+                    </button>
+                    <button
+                      onClick={handleDeleteAppointment}
+                      className="flex-1 py-3 px-4 rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold hover:bg-red-100 dark:hover:bg-red-500/20 transition-all text-sm"
+                    >
+                      Elimina
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedAppointment(null);
+                        setShowCancelReason(false);
+                        setCancelReason('');
+                      }}
+                      className="flex-[0.5] py-3 px-4 rounded-xl bg-zinc-900 dark:bg-zinc-50 dark:text-zinc-900 text-white font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg text-sm"
+                    >
+                      Chiudi
+                    </button>
+                  </>
+                ) : (
+                  <div className="w-full space-y-4">
+                    <textarea
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder="Motivo dell'annullamento (opzionale)..."
+                      className="w-full p-3 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-red-500/20 outline-none resize-none"
+                      rows={3}
+                    />
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowCancelReason(false)}
+                        className="flex-1 py-3 px-4 rounded-xl bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-sm"
+                      >
+                        Indietro
+                      </button>
+                      <button
+                        onClick={handleConfirmCancel}
+                        className="flex-1 py-3 px-4 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 text-sm"
+                      >
+                        Conferma Annullamento
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            )}
+          </Modal>
+        )}
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </div>
+    </DndContext>
+  );
+}
