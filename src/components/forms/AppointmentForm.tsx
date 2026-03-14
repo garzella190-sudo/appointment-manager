@@ -84,6 +84,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             patente_id: '', // Non salviamo più il patente_id direttamente, va ricavato se serve
             cambio: 'manuale', // Da recuperare dal cliente se necessario in futuro
             note: apt.note || '',
+            send_email: true,
+            send_whatsapp: true,
           });
         }
       }
@@ -338,6 +340,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         </div>
       </div>
 
+      {/* Note */}
+      <div className="space-y-1.5">
+        <label className={LABEL_CLS}>Note / Obiettivi Lezione</label>
+        <textarea
+          rows={2}
+          value={form.note}
+          onChange={(e) => setForm(prev => ({ ...prev, note: e.target.value }))}
+          className={cn(INPUT_CLS, 'resize-none')}
           placeholder="Esercizi parcheggio, prima guida..."
         />
       </div>

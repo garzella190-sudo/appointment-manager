@@ -167,6 +167,13 @@ export const SchedaClienteForm = ({
         </div>
 
         <div className="space-y-1.5">
+          <label className={LABEL_CLS}>Tipo Cambio</label>
+          <select
+            value={form.preferenza_cambio}
+            onChange={set('preferenza_cambio')}
+            className={INPUT_CLS}
+          >
+            <option value="">— Indifferente —</option>
             <option value="manuale">Manuale</option>
             <option value="automatico">Automatico</option>
           </select>
