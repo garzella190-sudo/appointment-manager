@@ -41,6 +41,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     patente_id: '', // ID della configurazione patente scelta
     cambio: 'manuale' as 'manuale' | 'automatico',
     note: '',
+    send_email: true,
+    send_whatsapp: true,
   });
 
   const [selectedPatente, setSelectedPatente] = useState<Patente | null>(null);
@@ -98,7 +100,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       ...prev, 
       cliente_id: clientId,
       // Se il cliente ha una preferenza, applicala subito
-      cambio: (cliente?.preferenza_cambio as 'manuale' | 'automatico') || prev.cambio
+      cambio: (cliente?.preferenza_cambio as 'manuale' | 'automatico') || prev.cambio,
+      send_email: cliente?.riceve_email ?? true,
+      send_whatsapp: cliente?.riceve_whatsapp ?? true,
     }));
 
     if (cliente?.patente_richiesta_id && !appointmentId) {
@@ -145,6 +149,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       stato: 'programmato' as StatoAppuntamento,
       note: form.note || null,
       importo: null,
+      send_email: form.send_email,
+      send_whatsapp: form.send_whatsapp,
     };
 
     let error;
@@ -332,16 +338,34 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         </div>
       </div>
 
-      {/* Note */}
-      <div className="space-y-1.5">
-        <label className={LABEL_CLS}>Note / Obiettivi Lezione</label>
-        <textarea
-          rows={2}
-          value={form.note}
-          onChange={(e) => setForm(prev => ({ ...prev, note: e.target.value }))}
-          className={cn(INPUT_CLS, 'resize-none')}
           placeholder="Esercizi parcheggio, prima guida..."
         />
+      </div>
+
+      {/* Manual Notification Overrides */}
+      <div className="flex items-center gap-6 px-1">
+        <label className="flex items-center gap-2.5 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={form.send_email}
+            onChange={(e) => setForm(prev => ({ ...prev, send_email: e.target.checked }))}
+            className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500/20"
+          />
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 transition-colors">Invia Email</span>
+          </div>
+        </label>
+        <label className="flex items-center gap-2.5 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={form.send_whatsapp}
+            onChange={(e) => setForm(prev => ({ ...prev, send_whatsapp: e.target.checked }))}
+            className="w-4 h-4 rounded border-zinc-300 text-green-600 focus:ring-green-500/20"
+          />
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 group-hover:text-green-600 transition-colors">Invia WhatsApp</span>
+          </div>
+        </label>
       </div>
 
       {/* Actions */}

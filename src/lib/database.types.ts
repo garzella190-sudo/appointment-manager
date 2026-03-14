@@ -42,6 +42,8 @@ export interface Cliente {
   email: string | null;
   patente_richiesta_id: string | null; // FK → patenti.id
   preferenza_cambio: TipoCambio | null; // manuale, automatico
+  riceve_email: boolean;
+  riceve_whatsapp: boolean;
   created_at: string;
   updated_at: string;
 }

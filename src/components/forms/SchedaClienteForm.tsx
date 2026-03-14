@@ -14,6 +14,8 @@ interface SchedaClienteFormProps {
     email: string;
     patente_richiesta_id: string | null;
     preferenza_cambio: string | null;
+    riceve_email?: boolean;
+    riceve_whatsapp?: boolean;
   };
   patenti: Patente[];
   onSuccess: (id: string) => void;
@@ -40,6 +42,8 @@ export const SchedaClienteForm = ({
     email:                defaultValues?.email ?? '',
     patente_richiesta_id: defaultValues?.patente_richiesta_id ?? '',
     preferenza_cambio:    defaultValues?.preferenza_cambio ?? '',
+    riceve_email:         defaultValues?.riceve_email ?? true,
+    riceve_whatsapp:      defaultValues?.riceve_whatsapp ?? true,
   });
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -60,6 +64,8 @@ export const SchedaClienteForm = ({
       email:                payloadEmail,
       patente_richiesta_id: form.patente_richiesta_id || null,
       preferenza_cambio:    form.preferenza_cambio || null,
+      riceve_email:         form.riceve_email,
+      riceve_whatsapp:      form.riceve_whatsapp,
     };
 
     const { data, error } = await supabase
@@ -161,16 +167,34 @@ export const SchedaClienteForm = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className={LABEL_CLS}>Tipo Cambio</label>
-          <select
-            value={form.preferenza_cambio}
-            onChange={set('preferenza_cambio')}
-            className={INPUT_CLS}
-          >
-            <option value="">— Indifferente —</option>
             <option value="manuale">Manuale</option>
             <option value="automatico">Automatico</option>
           </select>
+        </div>
+      </div>
+
+      {/* Notification Preferences */}
+      <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-700/50 space-y-3">
+        <p className={LABEL_CLS}>Preferenze Notifiche</p>
+        <div className="grid grid-cols-2 gap-4">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={form.riceve_email}
+              onChange={(e) => setForm(prev => ({ ...prev, riceve_email: e.target.checked }))}
+              className="w-5 h-5 rounded-lg border-zinc-300 text-blue-600 focus:ring-blue-500/20"
+            />
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 transition-colors">Riceve Email</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={form.riceve_whatsapp}
+              onChange={(e) => setForm(prev => ({ ...prev, riceve_whatsapp: e.target.checked }))}
+              className="w-5 h-5 rounded-lg border-zinc-300 text-green-600 focus:ring-green-500/20"
+            />
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-green-600 transition-colors">Riceve WhatsApp</span>
+          </label>
         </div>
       </div>
 

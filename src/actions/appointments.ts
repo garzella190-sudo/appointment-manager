@@ -16,6 +16,8 @@ export async function createAppointmentAction(payload: {
   stato: string;
   note: string | null;
   importo: number | null;
+  send_email?: boolean;
+  send_whatsapp?: boolean;
 }) {
   const supabase = createClient();
 
@@ -43,8 +45,8 @@ export async function createAppointmentAction(payload: {
     return { error: appointmentError.message };
   }
 
-  // 3. Send confirmation email if client has email
-  if (cliente.email) {
+  // 3. Send confirmation email if client has email AND preference is enabled
+  if (cliente.email && payload.send_email !== false) {
     try {
       const startDate = parseISO(payload.data);
       const endDate = addMinutes(startDate, payload.durata);
