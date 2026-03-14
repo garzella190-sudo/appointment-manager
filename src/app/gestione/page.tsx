@@ -131,15 +131,6 @@ const TabVeicoli = () => {
         </div>
       )}
 
-      {/* FAB */}
-      <button
-        onClick={openAdd}
-        className="fixed bottom-28 right-6 w-14 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40"
-        aria-label="Aggiungi veicolo"
-      >
-        <Plus size={26} />
-      </button>
-
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -239,15 +230,6 @@ const TabIstruttori = () => {
         </div>
       )}
 
-      {/* FAB */}
-      <button
-        onClick={openAdd}
-        className="fixed bottom-28 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40"
-        aria-label="Aggiungi istruttore"
-      >
-        <Plus size={26} />
-      </button>
-
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -302,7 +284,13 @@ const PatenteCard = ({
   const [saving, setSaving] = useState(false);
   const isMoto = ['AM', 'A1', 'A2', 'A'].includes(pat.tipo);
   
-  const [edit, setEdit] = useState({
+  const [edit, setEdit] = useState<{
+    nome: string;
+    durata: number | '';
+    cambio: CambioAmmesso;
+    veicoli: string[];
+    nascosta: boolean;
+  }>({
     nome: pat.nome_visualizzato || `Patente ${pat.tipo}`,
     durata: pat.durata_default,
     cambio: pat.cambio_ammesso || (isMoto ? 'entrambi' : 'manuale'),
@@ -315,16 +303,26 @@ const PatenteCard = ({
 
   const handleSaveInternal = async () => {
     setSaving(true);
-    await onSave(pat.tipo, { ...edit, nascosta: edit.nascosta });
+    const { durata, ...rest } = edit;
+    await onSave(pat.tipo, { 
+      ...rest, 
+      durata: Number(durata) || 0 
+    });
     setSaving(false);
   };
 
   const toggleNascosta = async (e: React.MouseEvent) => {
     e.stopPropagation(); // prevent card open
     setSaving(true);
-    const upd = { ...edit, nascosta: !edit.nascosta };
-    setEdit(upd);
-    await onSave(pat.tipo, upd);
+    const nextNascosta = !edit.nascosta;
+    setEdit(prev => ({ ...prev, nascosta: nextNascosta }));
+    
+    const { durata, ...rest } = edit;
+    await onSave(pat.tipo, { 
+      ...rest, 
+      durata: Number(durata) || 0, 
+      nascosta: nextNascosta 
+    });
     setSaving(false);
   };
 
@@ -422,8 +420,8 @@ const PatenteCard = ({
                   max={240}
                   step={5}
                   value={edit.durata}
-                  onChange={e => setEdit(prev => ({ ...prev, durata: Number(e.target.value) }))}
-                  className="w-24 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 text-sm font-mono font-bold"
+                  onChange={e => setEdit(prev => ({ ...prev, durata: e.target.value === '' ? '' : Number(e.target.value) }))}
+                  className="w-24 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm font-mono font-bold"
                 />
                 <span className="text-xs text-zinc-400">minuti</span>
               </div>
