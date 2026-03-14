@@ -8,6 +8,7 @@ import { Modal } from '@/components/Modal';
 import { SchedaClienteForm } from '@/components/forms/SchedaClienteForm';
 import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PhoneActions } from '@/components/PhoneActions';
 
 export default function ClientiPage() {
   const router = useRouter();
@@ -122,6 +123,7 @@ export default function ClientiPage() {
                             {cliente.telefono}
                           </span>
                         )}
+                        {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
                         {cliente.email && (
                           <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
                             <Mail size={11} />

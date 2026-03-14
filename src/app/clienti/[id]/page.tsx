@@ -10,6 +10,7 @@ import {
   Pencil, CheckCheck, History, Car,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PhoneActions } from '@/components/PhoneActions';
 
 // ── Tipi interni ─────────────────────────────────────────────
 type PageData = {
@@ -211,6 +212,7 @@ export default function SchedaClientePage() {
                 <Phone size={12} /> {cliente.telefono}
               </a>
             )}
+            {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
             {cliente.email && (
               <a
                 href={`mailto:${cliente.email}`}

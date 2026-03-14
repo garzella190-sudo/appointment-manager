@@ -23,6 +23,7 @@ import { Toast } from '@/components/Toast';
 import { Modal } from '@/components/Modal';
 import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { User, Car, Clock, FileText, Phone, Calendar as CalendarIconSmall } from 'lucide-react';
+import { AppointmentDetails } from '@/components/calendar/AppointmentDetails';
 
 export default function CalendarPage() {
   const supabase = createClient();
@@ -439,116 +440,19 @@ export default function CalendarPage() {
                 />
               </div>
             ) : (
-            <div className="space-y-6">
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-white"
-                  style={{ backgroundColor: selectedAppointment.trainers?.color || '#3b82f6' }}
-                >
-                  <User size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-zinc-900 dark:text-zinc-50">{selectedAppointment.client_name}</h3>
-                  <p className="text-sm text-zinc-500 flex items-center gap-1">
-                    <Phone size={14} /> {selectedAppointment.phone || 'Nessun numero'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
-                  <p className="text-[10px] uppercase font-bold text-zinc-400 mb-1 flex items-center gap-1">
-                    <CalendarIconSmall size={12} /> Data e Ora
-                  </p>
-                  <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    {format(parseISO(selectedAppointment.appointment_date), 'dd MMMM yyyy', { locale: it })}
-                  </p>
-                  <p className="text-sm text-blue-600 dark:text-blue-400 font-black mt-0.5">
-                    {selectedAppointment.appointment_time.slice(0, 5)} ({selectedAppointment.duration} min)
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
-                  <p className="text-[10px] uppercase font-bold text-zinc-400 mb-1 flex items-center gap-1">
-                    <Car size={12} /> Veicolo e Patente
-                  </p>
-                  <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    {selectedAppointment.license_type} - {selectedAppointment.gearbox_type}
-                  </p>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">
-                    ID Veicolo: {selectedAppointment.vehicle_id.slice(0, 8)}...
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
-                <p className="text-[10px] uppercase font-bold text-zinc-400 mb-2 flex items-center gap-1">
-                  <FileText size={12} /> Note
-                </p>
-                <p className="text-sm italic text-zinc-600 dark:text-zinc-400">
-                  {selectedAppointment.notes || 'Nessuna nota aggiuntiva.'}
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-2 mt-4">
-                {!showCancelReason ? (
-                  <>
-                    <button
-                      onClick={() => setIsEditingAppointment(true)}
-                      className="flex-1 py-3 px-4 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 font-bold hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all text-sm"
-                    >
-                      Modifica
-                    </button>
-                    <button
-                      onClick={() => setShowCancelReason(true)}
-                      className="flex-1 py-3 px-4 rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400 font-bold hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all text-sm"
-                    >
-                      Annulla Guida
-                    </button>
-                    <button
-                      onClick={handleDeleteAppointment}
-                      className="flex-1 py-3 px-4 rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-bold hover:bg-red-100 dark:hover:bg-red-500/20 transition-all text-sm"
-                    >
-                      Elimina
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedAppointment(null);
-                        setShowCancelReason(false);
-                        setCancelReason('');
-                      }}
-                      className="flex-[0.5] py-3 px-4 rounded-xl bg-zinc-900 dark:bg-zinc-50 dark:text-zinc-900 text-white font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg text-sm"
-                    >
-                      Chiudi
-                    </button>
-                  </>
-                ) : (
-                  <div className="w-full space-y-4">
-                    <textarea
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      placeholder="Motivo dell'annullamento (opzionale)..."
-                      className="w-full p-3 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-red-500/20 outline-none resize-none"
-                      rows={3}
-                    />
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => setShowCancelReason(false)}
-                        className="flex-1 py-3 px-4 rounded-xl bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-sm"
-                      >
-                        Indietro
-                      </button>
-                      <button
-                        onClick={handleConfirmCancel}
-                        className="flex-1 py-3 px-4 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 text-sm"
-                      >
-                        Conferma Annullamento
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+              <AppointmentDetails
+                appointment={selectedAppointment}
+                onRefresh={fetchWeekAppointments}
+                onEdit={() => setIsEditingAppointment(true)}
+                onCancel={() => setShowCancelReason(true)}
+                onDelete={handleDeleteAppointment}
+                onClose={() => {
+                  setSelectedAppointment(null);
+                  setShowCancelReason(false);
+                  setCancelReason('');
+                  setIsEditingAppointment(false);
+                }}
+              />
             )}
           </Modal>
         )}

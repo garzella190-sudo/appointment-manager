@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { User as AuthUser } from '@supabase/supabase-js';
+import { PhoneActions } from '@/components/PhoneActions';
 
 // ── Helper per badge scadenza revisione ───────────────────────
 const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
@@ -204,6 +205,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                           <Phone size={11} /> {i.telefono}
                         </a>
                       )}
+                      {i.telefono && <PhoneActions phone={i.telefono} secondary />}
                       {i.telefono && i.email && <span className="text-zinc-300">·</span>}
                       {i.email && (
                         <a href={`mailto:${i.email}`} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-blue-600 transition-colors">
