@@ -18,6 +18,7 @@ export async function createAppointmentAction(payload: {
   importo: number | null;
   send_email?: boolean;
   send_whatsapp?: boolean;
+  email_fallback?: string | null;
 }) {
   const supabase = createClient();
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -39,8 +40,24 @@ export async function createAppointmentAction(payload: {
     riceve_whatsapp: true 
   };
 
-  // 2. Insert appointment (exclude notification flags from DB payload)
-  const { send_email, send_whatsapp, ...dbPayload } = payload;
+  // 1.5 Update client email if fallback provided
+  let finalEmail = clientData.email;
+  if (payload.email_fallback && !clientData.email) {
+    const { error: updateError } = await (await supabase)
+      .from('clienti')
+      .update({ email: payload.email_fallback })
+      .eq('id', payload.cliente_id);
+    
+    if (!updateError) {
+      finalEmail = payload.email_fallback;
+    } else {
+      console.error('Error updating client email:', updateError);
+    }
+  }
+
+  // 2. Insert appointment (now including notification flags as requested)
+  // We remove email_fallback from the DB insert payload
+  const { email_fallback, ...dbPayload } = payload;
   
   const { data: appointment, error: appointmentError } = await (await supabase)
     .from('appuntamenti')
@@ -55,9 +72,9 @@ export async function createAppointmentAction(payload: {
 
   // 3. Send confirmation email if client has email AND preference is enabled
   // prioritize form override, fallback to client preference
-  const shouldSendEmail = send_email !== undefined ? send_email : clientData.riceve_email;
+  const shouldSendEmail = payload.send_email !== undefined ? payload.send_email : clientData.riceve_email;
 
-  if (clientData.email && shouldSendEmail && resendApiKey) {
+  if (finalEmail && shouldSendEmail && resendApiKey) {
     try {
       const resend = new Resend(resendApiKey);
       const startDate = parseISO(payload.data);
@@ -68,8 +85,6 @@ export async function createAppointmentAction(payload: {
       const timeStr = format(startDate, 'HH:mm', { locale: it });
 
       // Format for Google Calendar (YYYYMMDDTHHMMSSZ)
-      // Using toISOString and then stripping non-numeric characters for the 'dates' parameter.
-      // This ensures the time is in UTC and correctly formatted for Google Calendar.
       const formatGCal = (date: Date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
       const gcalStart = formatGCal(startDate);
       const gcalEnd = formatGCal(endDate);
@@ -98,18 +113,15 @@ export async function createAppointmentAction(payload: {
             <em>A presto!</em>
           </p>
         </div>
-      `;
-
       await resend.emails.send({
-        from: 'Autoscuola <onboarding@resend.dev>', // Should use verified domain in production
-        to: clientData.email,
+        from: 'Autoscuola <onboarding@resend.dev>',
+        to: finalEmail,
         subject: 'Conferma Prenotazione Guida',
         html: emailHtml,
       });
 
     } catch (emailErr) {
       console.error('Error sending email:', emailErr);
-      // We don't fail the whole action if only the email fails
     }
   }
 

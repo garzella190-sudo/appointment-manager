@@ -43,6 +43,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     note: '',
     send_email: true,
     send_whatsapp: true,
+    email_fallback: '',
   });
 
   const [selectedPatente, setSelectedPatente] = useState<Patente | null>(null);
@@ -86,6 +87,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             note: apt.note || '',
             send_email: true,
             send_whatsapp: true,
+            email_fallback: '',
           });
         }
       }
@@ -153,6 +155,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       importo: null,
       send_email: form.send_email,
       send_whatsapp: form.send_whatsapp,
+      email_fallback: form.email_fallback || null,
     };
 
     let error;
@@ -377,6 +380,21 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           </div>
         </label>
       </div>
+
+      {/* Dynamic Email Input for missing email */}
+      {form.send_email && form.cliente_id && !clienti.find(c => c.id === form.cliente_id)?.email && (
+        <div className="space-y-1.5 px-1 animate-in fade-in slide-in-from-top-2 duration-300">
+          <label className={LABEL_CLS}>Email cliente mancante. Inseriscila qui:</label>
+          <input
+            type="email"
+            placeholder="Esempio: nome@email.it"
+            value={form.email_fallback}
+            onChange={(e) => setForm(prev => ({ ...prev, email_fallback: e.target.value }))}
+            className={cn(INPUT_CLS, "border-blue-200 dark:border-blue-900/30 bg-blue-50/30 dark:bg-blue-900/10")}
+          />
+          <p className="text-[10px] text-zinc-500 italic">L'email verrà salvata permanentemente nel profilo del cliente.</p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">

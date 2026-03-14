@@ -71,6 +71,8 @@ export interface Appuntamento {
   stato: StatoAppuntamento;
   importo: number | null;              // in centesimi o decimale
   note: string | null;
+  send_email: boolean;
+  send_whatsapp: boolean;
   created_at: string;
   updated_at: string;
 }
