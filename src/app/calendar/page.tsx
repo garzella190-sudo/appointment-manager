@@ -87,7 +87,7 @@ export default function CalendarPage() {
           .from('appuntamenti')
           .select(`
             id, data, durata, stato, note, importo,
-            clienti ( nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
+            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
             istruttori ( nome, cognome ),
             veicoli ( targa, nome )
           `)
@@ -106,6 +106,7 @@ export default function CalendarPage() {
         
         return {
           id: row.id,
+          cliente_id: row.clienti?.id || '',
           appointment_date: format(rowDate, 'yyyy-MM-dd'),
           appointment_time: format(rowDate, 'HH:mm'),
           client_name: row.clienti ? `${row.clienti.cognome} ${row.clienti.nome}` : 'Sconosciuto',

@@ -3,11 +3,12 @@
 import React, { useState } from 'react';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { User, Phone, Calendar as CalendarIcon, Car, FileText, Pencil, Save, X, Loader2 } from 'lucide-react';
+import { User, Phone, Calendar as CalendarIcon, Car, FileText, Pencil, Save, X, Loader2, ExternalLink } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
 import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
 interface AppointmentDetailsProps {
   appointment: Appointment;
@@ -62,9 +63,19 @@ export const AppointmentDetails = ({
           <User size={24} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className={cn("text-lg font-black text-zinc-900 dark:text-zinc-50 truncate", (appointment as any).stato === 'annullato' && "line-through opacity-70")}>
-            {appointment.client_name}
-          </h3>
+          <Link 
+            href={`/clienti/${appointment.cliente_id}`}
+            onClick={onClose}
+            className={cn(
+              "group inline-flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+              (appointment as any).stato === 'annullato' && "line-through opacity-70"
+            )}
+          >
+            <span className="truncate group-hover:underline decoration-2 underline-offset-4">
+              {appointment.client_name}
+            </span>
+            <ExternalLink size={16} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </Link>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-zinc-500 flex items-center gap-1">
               <Phone size={14} /> {appointment.phone || 'Nessun numero'}
