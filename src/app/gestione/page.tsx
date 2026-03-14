@@ -6,13 +6,16 @@ import { Veicolo, Patente, Istruttore, TipoPatente, CambioAmmesso } from '@/lib/
 import { Modal } from '@/components/Modal';
 import { VeicoloForm } from '@/components/forms/VeicoloForm';
 import { IstruttoreForm } from '@/components/forms/IstruttoreForm';
+import { UserForm } from '@/components/forms/UserForm';
+import { listUsersAction } from '@/actions/auth';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
   AlertTriangle, CheckCircle2, CalendarClock, Phone, Mail,
   School, Clock, ChevronDown, ChevronUp, ClipboardList, EyeOff, Eye,
-  Car, BadgeCheck, Users, Plus, Pencil, Loader2
+  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, UserPlus, Key, User as UserIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { User as AuthUser } from '@supabase/supabase-js';
 
 // ── Helper per badge scadenza revisione ───────────────────────
 const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
@@ -283,7 +286,7 @@ const PatenteCard = ({
 }) => {
   const [saving, setSaving] = useState(false);
   const isMoto = ['AM', 'A1', 'A2', 'A'].includes(pat.tipo);
-  
+
   const [edit, setEdit] = useState<{
     nome: string;
     durata: number | '';
@@ -298,15 +301,26 @@ const PatenteCard = ({
     nascosta: pat.nascosta || false,
   });
 
+  // Sync internal state when pat changes from database
+  useEffect(() => {
+    setEdit({
+      nome: pat.nome_visualizzato || `Patente ${pat.tipo}`,
+      durata: pat.durata_default,
+      cambio: pat.cambio_ammesso || (isMoto ? 'entrambi' : 'manuale'),
+      veicoli: pat.veicoli_abilitati || [],
+      nascosta: pat.nascosta || false,
+    });
+  }, [pat, isMoto]);
+
   const veicoliCompatibili = veicoli.filter(v => v.tipo_patente === pat.tipo);
   const c = CATEGORIA_COLOR[pat.tipo] ?? 'zinc';
 
   const handleSaveInternal = async () => {
     setSaving(true);
     const { durata, ...rest } = edit;
-    await onSave(pat.tipo, { 
-      ...rest, 
-      durata: Number(durata) || 0 
+    await onSave(pat.tipo, {
+      ...rest,
+      durata: Number(durata) || 0
     });
     setSaving(false);
   };
@@ -316,12 +330,12 @@ const PatenteCard = ({
     setSaving(true);
     const nextNascosta = !edit.nascosta;
     setEdit(prev => ({ ...prev, nascosta: nextNascosta }));
-    
+
     const { durata, ...rest } = edit;
-    await onSave(pat.tipo, { 
-      ...rest, 
-      durata: Number(durata) || 0, 
-      nascosta: nextNascosta 
+    await onSave(pat.tipo, {
+      ...rest,
+      durata: Number(durata) || 0,
+      nascosta: nextNascosta
     });
     setSaving(false);
   };
@@ -366,7 +380,7 @@ const PatenteCard = ({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button 
+          <button
             type="button"
             onClick={toggleNascosta}
             className={`p-2 rounded-xl transition-all font-bold ${edit.nascosta ? 'bg-red-50 text-red-500 border border-red-100 dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/30' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
@@ -516,15 +530,11 @@ const TabPatenti = () => {
       .from('patenti')
       .upsert({
         tipo: tipo,
-        // Commented out all these columns as they do not exist on the current Supabase instance
-        // nome_visualizzato: data.nome,
-        // durata_default: data.durata,
-        // cambio_ammesso: data.cambio,
-        // veicoli_abilitati: data.veicoli,
-        // Commented out to prevent schema cache errors se non presenti nel DB
-        // cambio_ammesso: data.cambio,
-        // veicoli_abilitati: data.veicoli,
-        // nascosta: data.nascosta, // commentato per evitare l'errore se la colonna non c'è ancora
+        nome_visualizzato: data.nome,
+        durata_default: data.durata,
+        cambio_ammesso: data.cambio,
+        veicoli_abilitati: data.veicoli,
+        nascosta: data.nascosta,
       }, { onConflict: 'tipo' });
 
     if (error) alert(error.message);
@@ -551,7 +561,7 @@ const TabPatenti = () => {
     return patenti.find(p => p.tipo === tipo) || {
       tipo,
       nome_visualizzato: `Patente ${tipo}`,
-      durata_default: 50,
+      durata_default: 60,
       cambio_ammesso: isMoto ? 'entrambi' : 'manuale',
       veicoli_abilitati: [],
       nascosta: false,
@@ -570,7 +580,7 @@ const TabPatenti = () => {
           </p>
         </div>
         {patentiNascosteCount > 0 && (
-          <button 
+          <button
             onClick={() => setMostraNascoste(prev => !prev)}
             className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
           >
@@ -615,13 +625,125 @@ const TabPatenti = () => {
   );
 };
 
+// ── Tab: Utenti ───────────────────────────────────────────────
+const TabUtenti = () => {
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<AuthUser[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    const result = await listUsersAction();
+    if (result.users) {
+      setUsers(result.users);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const onSuccess = () => {
+    setModalOpen(false);
+    fetchUsers();
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Gestione Account</h3>
+          <p className="text-sm text-zinc-500">Crea e gestisci gli accessi al sistema</p>
+        </div>
+        <button
+          onClick={() => setModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+        >
+          <UserPlus size={18} />
+          Nuovo Utente
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-20 flex items-center justify-center">
+          <Loader2 className="animate-spin text-blue-500" size={36} />
+        </div>
+      ) : users.length === 0 ? (
+        <div className="glass-card p-16 text-center">
+          <Users size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
+          <p className="text-zinc-400">Nessun utente trovato.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {users.map((user) => {
+            const role = user.user_metadata?.role || 'user';
+            const fullName = user.user_metadata?.full_name || 'Utente';
+            const initials = fullName
+              .split(' ')
+              .filter(Boolean)
+              .map((n: string) => n[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2);
+
+            return (
+              <div key={user.id} className="glass-card p-5 flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 font-bold text-xl",
+                    role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400" :
+                      role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" :
+                        "bg-zinc-100 text-zinc-600 dark:bg-zinc-900/20 dark:text-zinc-400"
+                  )}>
+                    {initials || <UserIcon size={24} />}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-zinc-900 dark:text-zinc-50">{fullName}</h4>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide",
+                        role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" :
+                          role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
+                            "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      )}>
+                        {role === 'admin' ? 'Amministratore' : role}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500">
+                      <span className="flex items-center gap-1"><Mail size={12} /> {user.email}</span>
+                      <span className="flex items-center gap-1"><Key size={12} /> ID: {user.id.slice(0, 8)}...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Crea Nuovo Utente"
+      >
+        <UserForm
+          onSuccess={onSuccess}
+          onCancel={() => setModalOpen(false)}
+        />
+      </Modal>
+    </div>
+  );
+};
+
 // ── Page principale ───────────────────────────────────────────
-type GestioneTab = 'veicoli' | 'istruttori' | 'patenti';
+type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti';
 
 const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'veicoli', label: 'Veicoli', icon: Car, color: 'emerald' },
   { id: 'istruttori', label: 'Istruttori', icon: Users, color: 'blue' },
   { id: 'patenti', label: 'Patenti', icon: BadgeCheck, color: 'purple' },
+  { id: 'utenti', label: 'Utenti', icon: ShieldCheck, color: 'indigo' },
 ];
 
 export default function GestionePage() {
@@ -638,7 +760,7 @@ export default function GestionePage() {
       </header>
 
       {/* Tab selector */}
-      <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl mb-8 w-fit">
+      <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl mb-8 w-fit overflow-x-auto max-w-full">
         {TABS.map(tab => {
           const TIcon = tab.icon;
           const isActive = active === tab.id;
@@ -647,12 +769,13 @@ export default function GestionePage() {
               key={tab.id}
               onClick={() => setActive(tab.id)}
               className={cn(
-                'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all',
+                'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap',
                 isActive
                   ? 'bg-white dark:bg-zinc-800 shadow-sm' +
                   (tab.color === 'emerald' ? ' text-emerald-600 dark:text-emerald-400' :
                     tab.color === 'blue' ? ' text-blue-600 dark:text-blue-400' :
-                      ' text-purple-600 dark:text-purple-400')
+                      tab.color === 'purple' ? ' text-purple-600 dark:text-purple-400' :
+                        ' text-indigo-600 dark:text-indigo-400')
                   : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
               )}
             >
@@ -667,6 +790,7 @@ export default function GestionePage() {
       {active === 'veicoli' && <TabVeicoli />}
       {active === 'istruttori' && <TabIstruttori />}
       {active === 'patenti' && <TabPatenti />}
+      {active === 'utenti' && <TabUtenti />}
     </div>
   );
 }

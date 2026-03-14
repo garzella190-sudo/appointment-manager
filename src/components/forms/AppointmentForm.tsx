@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Clock, Car, User, Search, Wrench, ShieldCheck, ChevronDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, addMinutes } from 'date-fns';
 import { Cliente, Istruttore, Veicolo, Patente, TipoPatente, CambioAmmesso, StatoAppuntamento } from '@/lib/database.types';
 import { cn } from '@/lib/utils';
 
@@ -179,6 +179,22 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     else alert(error.message);
   };
 
+  // Calcolo orario di fine
+  const calculateEndTime = () => {
+    if (!form.ora || isNaN(form.durata)) return '--:--';
+    try {
+      const [hours, minutes] = form.ora.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes, 0, 0);
+      const end = addMinutes(date, form.durata);
+      return format(end, 'HH:mm');
+    } catch {
+      return '--:--';
+    }
+  };
+
+  const oraFine = calculateEndTime();
+
   // Filtra veicoli in base alla patente selezionata E al tipo di cambio
   const veicoliFiltrati = (selectedPatente && selectedPatente.veicoli_abilitati?.length > 0
     ? veicoli.filter(v => selectedPatente.veicoli_abilitati.includes(v.id))
@@ -217,7 +233,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {/* Data */}
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Data</label>
@@ -229,9 +245,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             className={INPUT_CLS}
           />
         </div>
-        {/* Ora */}
+        {/* Ora Inizio */}
         <div className="space-y-1.5">
-          <label className={LABEL_CLS}>Ora Inizio</label>
+          <label className={LABEL_CLS}>Inizio</label>
           <input
             required
             type="time"
@@ -239,6 +255,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             onChange={(e) => setForm(prev => ({ ...prev, ora: e.target.value }))}
             className={INPUT_CLS}
           />
+        </div>
+        {/* Ora Fine (Calcolata) */}
+        <div className="space-y-1.5">
+          <label className={LABEL_CLS}>Fine</label>
+          <div className={cn(INPUT_CLS, 'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 font-medium flex items-center')}>
+            {oraFine}
+          </div>
         </div>
       </div>
 
