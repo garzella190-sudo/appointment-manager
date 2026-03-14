@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialized lazily inside the action
 
 export async function createAppointmentAction(payload: {
   cliente_id: string;
@@ -20,23 +20,31 @@ export async function createAppointmentAction(payload: {
   send_whatsapp?: boolean;
 }) {
   const supabase = createClient();
+  const resendApiKey = process.env.RESEND_API_KEY;
 
   // 1. Fetch customer details
   const { data: cliente, error: clienteError } = await (await supabase)
     .from('clienti')
-    .select('email, nome, cognome')
+    .select('email, nome, cognome, riceve_email, riceve_whatsapp')
     .eq('id', payload.cliente_id)
     .single();
 
-  if (clienteError || !cliente) {
-    console.error('Error fetching client:', clienteError);
-    return { error: 'Cliente non trovato' };
-  }
+  // If columns are missing or client not found, we still want to try creating the appointment
+  // but we might skip notifications or use defaults.
+  const clientData = cliente || { 
+    email: null, 
+    nome: '', 
+    cognome: '', 
+    riceve_email: true, 
+    riceve_whatsapp: true 
+  };
 
-  // 2. Insert appointment
+  // 2. Insert appointment (exclude notification flags from DB payload)
+  const { send_email, send_whatsapp, ...dbPayload } = payload;
+  
   const { data: appointment, error: appointmentError } = await (await supabase)
     .from('appuntamenti')
-    .insert(payload)
+    .insert(dbPayload)
     .select()
     .single();
 
@@ -46,8 +54,12 @@ export async function createAppointmentAction(payload: {
   }
 
   // 3. Send confirmation email if client has email AND preference is enabled
-  if (cliente.email && payload.send_email !== false) {
+  // prioritize form override, fallback to client preference
+  const shouldSendEmail = send_email !== undefined ? send_email : clientData.riceve_email;
+
+  if (clientData.email && shouldSendEmail && resendApiKey) {
     try {
+      const resend = new Resend(resendApiKey);
       const startDate = parseISO(payload.data);
       const endDate = addMinutes(startDate, payload.durata);
 
@@ -71,7 +83,7 @@ export async function createAppointmentAction(payload: {
       const emailHtml = `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
           <h2 style="color: #10b981;">Prenotazione Confermata</h2>
-          <p>Ciao <strong>${cliente.nome}</strong>,</p>
+          <p>Ciao <strong>${clientData.nome}</strong>,</p>
           <p>Ti confermo la prenotazione per il giorno <strong>${dateStr}</strong> alle ore <strong>${timeStr}</strong>.</p>
           
           <div style="margin: 30px 0; text-align: center;">
@@ -90,7 +102,7 @@ export async function createAppointmentAction(payload: {
 
       await resend.emails.send({
         from: 'Autoscuola <onboarding@resend.dev>', // Should use verified domain in production
-        to: cliente.email,
+        to: clientData.email,
         subject: 'Conferma Prenotazione Guida',
         html: emailHtml,
       });
