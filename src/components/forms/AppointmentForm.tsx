@@ -6,6 +6,7 @@ import { Loader2, Clock, Car, User, Search, Wrench, ShieldCheck, ChevronDown } f
 import { format, addMinutes } from 'date-fns';
 import { Cliente, Istruttore, Veicolo, Patente, TipoPatente, CambioAmmesso, StatoAppuntamento } from '@/lib/database.types';
 import { cn } from '@/lib/utils';
+import { createAppointmentAction } from '@/actions/appointments';
 
 interface FormProps {
   onSuccess: () => void;
@@ -154,15 +155,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         .eq('id', appointmentId);
       error = err;
     } else {
-      const { error: err } = await supabase
-        .from('appuntamenti')
-        .insert(payload);
-      error = err;
+      const result = await createAppointmentAction(payload);
+      error = result.error;
     }
 
     setLoading(false);
     if (!error) onSuccess();
-    else alert(error.message);
+    else alert(typeof error === 'string' ? error : error.message);
   };
 
   const handleDelete = async () => {
