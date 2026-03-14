@@ -14,7 +14,7 @@ import {
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { startOfWeek, addDays, format, isSameDay, parseISO, startOfDay, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
 import { DroppableCell } from '@/components/DroppableCell';
 import { DraggableAppointment } from '@/components/DraggableAppointment';
@@ -25,6 +25,7 @@ import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { User, Car, Clock, FileText, Phone, Calendar as CalendarIconSmall } from 'lucide-react';
 
 export default function CalendarPage() {
+  const supabase = createClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
