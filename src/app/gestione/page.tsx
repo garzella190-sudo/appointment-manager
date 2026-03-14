@@ -7,6 +7,7 @@ import { Modal } from '@/components/Modal';
 import { VeicoloForm } from '@/components/forms/VeicoloForm';
 import { IstruttoreForm } from '@/components/forms/IstruttoreForm';
 import { UserForm } from '@/components/forms/UserForm';
+import { PatenteForm } from '@/components/forms/PatenteForm';
 import { listUsersAction } from '@/actions/auth';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
@@ -96,7 +97,7 @@ const VeicoloCard = ({
 };
 
 // ── Tab: Veicoli ──────────────────────────────────────────────
-const TabVeicoli = () => {
+const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [veicoli, setVeicoli] = useState<Veicolo[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -109,9 +110,8 @@ const TabVeicoli = () => {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchVeicoli(); }, [fetchVeicoli]);
+  useEffect(() => { fetchVeicoli(); }, [fetchVeicoli, refreshKey]);
 
-  const openAdd = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (v: Veicolo) => { setEditing(v); setModalOpen(true); };
   const onSuccess = () => { setModalOpen(false); fetchVeicoli(); };
 
@@ -157,7 +157,7 @@ const TabVeicoli = () => {
 };
 
 // ── Tab: Istruttori ───────────────────────────────────────────
-const TabIstruttori = () => {
+const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [istruttori, setIstruttori] = useState<Istruttore[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -170,9 +170,8 @@ const TabIstruttori = () => {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetch(); }, [fetch, refreshKey]);
 
-  const openAdd = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (i: Istruttore) => { setEditing(i); setModalOpen(true); };
   const onSuccess = () => { setModalOpen(false); fetch(); };
 
@@ -503,7 +502,7 @@ const PatenteCard = ({
 };
 
 // ── Tab: Patenti ──────────────────────────────────────────────
-const TabPatenti = () => {
+const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [patenti, setPatenti] = useState<Patente[]>([]);
   const [veicoli, setVeicoli] = useState<Veicolo[]>([]);
@@ -523,7 +522,7 @@ const TabPatenti = () => {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 
   const handleSave = async (tipo: TipoPatente, data: any) => {
     const { error } = await supabase
@@ -626,10 +625,9 @@ const TabPatenti = () => {
 };
 
 // ── Tab: Utenti ───────────────────────────────────────────────
-const TabUtenti = () => {
+const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AuthUser[]>([]);
-  const [modalOpen, setModalOpen] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -642,29 +640,14 @@ const TabUtenti = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchUsers, refreshKey]);
 
   const onSuccess = () => {
-    setModalOpen(false);
     fetchUsers();
   };
 
   return (
     <div className="relative">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Gestione Account</h3>
-          <p className="text-sm text-zinc-500">Crea e gestisci gli accessi al sistema</p>
-        </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-        >
-          <UserPlus size={18} />
-          Nuovo Utente
-        </button>
-      </div>
-
       {loading ? (
         <div className="py-20 flex items-center justify-center">
           <Loader2 className="animate-spin text-blue-500" size={36} />
@@ -722,16 +705,6 @@ const TabUtenti = () => {
         </div>
       )}
 
-      <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Crea Nuovo Utente"
-      >
-        <UserForm
-          onSuccess={onSuccess}
-          onCancel={() => setModalOpen(false)}
-        />
-      </Modal>
     </div>
   );
 };
@@ -748,49 +721,99 @@ const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: st
 
 export default function GestionePage() {
   const [active, setActive] = useState<GestioneTab>('veicoli');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   const Tab = TABS.find(t => t.id === active)!;
   const Icon = Tab.icon;
 
+  const handleAddSuccess = () => {
+    setIsAddModalOpen(false);
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const getAddTitle = () => {
+    switch (active) {
+      case 'veicoli': return 'Nuovo Veicolo';
+      case 'istruttori': return 'Nuovo Istruttore';
+      case 'patenti': return 'Nuovo Impegno / Patente';
+      case 'utenti': return 'Nuovo Utente';
+      default: return 'Nuovo';
+    }
+  };
+
   return (
-    <div className="p-6 md:p-10 max-w-4xl mx-auto animate-fade-in">
+    <div className="p-6 md:p-10 max-w-4xl mx-auto animate-fade-in pb-32">
       {/* Header */}
       <header className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Gestione</h1>
         <p className="text-zinc-500 dark:text-zinc-400 mt-1">Configura le risorse della scuola guida</p>
       </header>
 
-      {/* Tab selector */}
-      <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl mb-8 w-fit overflow-x-auto max-w-full">
-        {TABS.map(tab => {
-          const TIcon = tab.icon;
-          const isActive = active === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActive(tab.id)}
-              className={cn(
-                'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap',
-                isActive
-                  ? 'bg-white dark:bg-zinc-800 shadow-sm' +
-                  (tab.color === 'emerald' ? ' text-emerald-600 dark:text-emerald-400' :
-                    tab.color === 'blue' ? ' text-blue-600 dark:text-blue-400' :
-                      tab.color === 'purple' ? ' text-purple-600 dark:text-purple-400' :
-                        ' text-indigo-600 dark:text-indigo-400')
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              )}
-            >
-              <TIcon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
+      {/* Tab selector & Add Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl w-fit overflow-x-auto max-w-full">
+          {TABS.map(tab => {
+            const TIcon = tab.icon;
+            const isActive = active === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActive(tab.id)}
+                className={cn(
+                  'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap',
+                  isActive
+                    ? 'bg-white dark:bg-zinc-800 shadow-sm' +
+                    (tab.color === 'emerald' ? ' text-emerald-600 dark:text-emerald-400' :
+                      tab.color === 'blue' ? ' text-blue-600 dark:text-blue-400' :
+                        tab.color === 'purple' ? ' text-purple-600 dark:text-purple-400' :
+                          ' text-indigo-600 dark:text-indigo-400')
+                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                )}
+              >
+                <TIcon size={16} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+        >
+          <Plus size={18} />
+          {getAddTitle()}
+        </button>
       </div>
 
       {/* Content */}
-      {active === 'veicoli' && <TabVeicoli />}
-      {active === 'istruttori' && <TabIstruttori />}
-      {active === 'patenti' && <TabPatenti />}
-      {active === 'utenti' && <TabUtenti />}
+      <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+        {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} />}
+        {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} />}
+        {active === 'patenti' && <TabPatenti refreshKey={refreshKey} />}
+        {active === 'utenti' && <TabUtenti refreshKey={refreshKey} />}
+      </div>
+
+      {/* Global Add Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title={getAddTitle()}
+      >
+        {active === 'veicoli' && (
+          <VeicoloForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+        )}
+        {active === 'istruttori' && (
+          <IstruttoreForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+        )}
+        {active === 'patenti' && (
+          <PatenteForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+        )}
+        {active === 'utenti' && (
+          <UserForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+        )}
+      </Modal>
     </div>
   );
 }
