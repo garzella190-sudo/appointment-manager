@@ -29,6 +29,7 @@ export interface Veicolo {
   data_revisione: string;              // ISO date
   tipo_patente: TipoPatente;
   cambio_manuale: boolean;
+  colore: string;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +57,7 @@ export interface Istruttore {
   telefono: string | null;
   email: string | null;
   patenti_abilitate: TipoPatente[];    // array di tipi patente
+  colore: string;
   created_at: string;
   updated_at: string;
 }
@@ -66,7 +68,9 @@ export interface Appuntamento {
   cliente_id: string;                  // FK → clienti.id
   istruttore_id: string;               // FK → istruttori.id
   veicolo_id: string | null;           // FK → veicoli.id (opzionale)
-  data: string;                        // ISO datetime (start)
+  data: string;                        // ISO date
+  inizio: string;                      // ISO datetime (start)
+  fine: string;                        // ISO datetime (end)
   durata: number;                      // minuti
   stato: StatoAppuntamento;
   importo: number | null;              // in centesimi o decimale
@@ -107,8 +111,8 @@ export const STATO_CONFIG: Record<StatoAppuntamento, { label: string; color: str
 
 export interface AppuntamentoDettagliato extends Appuntamento {
   cliente: Pick<Cliente, 'id' | 'nome' | 'cognome' | 'telefono'>;
-  istruttore: Pick<Istruttore, 'id' | 'nome' | 'cognome'>;
-  veicolo: Pick<Veicolo, 'id' | 'nome' | 'targa'> | null;
+  istruttore: Pick<Istruttore, 'id' | 'nome' | 'cognome' | 'colore'>;
+  veicolo: Pick<Veicolo, 'id' | 'nome' | 'targa' | 'colore'> | null;
 }
 
 export interface ClienteDettagliato extends Cliente {

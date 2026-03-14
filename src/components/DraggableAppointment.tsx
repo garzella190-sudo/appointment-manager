@@ -43,7 +43,8 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick }: Dr
       style={{ 
         ...style,
         borderLeftColor: isOverlapping ? '#ef4444' : (appointment.trainers?.color || '#3b82f6'),
-        backgroundColor: (appointment.trainers?.color && !isDragging && !isOverlapping ? appointment.trainers.color + '15' : undefined)
+        backgroundColor: (appointment.trainers?.color && !isDragging && !isOverlapping ? appointment.trainers.color + '15' : undefined),
+        borderRight: appointment.vehicle_color ? `3px solid ${appointment.vehicle_color}` : undefined
       }}
     >
       <div>

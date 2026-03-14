@@ -284,7 +284,7 @@ export default function SchedaClientePage() {
               const { error } = await supabase.from('clienti').update({
                 nome: payloadNome,
                 cognome: payloadCognome,
-                telefono: formState.telefono || null,
+                telefono: formState.telefono?.trim() || null,
                 email: payloadEmail,
                 patente_richiesta_id: formState.patente_richiesta_id || null,
                 preferenza_cambio: formState.preferenza_cambio || null,
@@ -309,12 +309,12 @@ export default function SchedaClientePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Telefono</label>
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Telefono (Opzionale)</label>
                 <input value={formState.telefono} onChange={(e) => setFormState(p => ({ ...p, telefono: e.target.value }))} type="tel" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Email</label>
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Email (Opzionale)</label>
                 <input value={formState.email} onChange={(e) => setFormState(p => ({ ...p, email: e.target.value }))} type="email" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
               </div>
 

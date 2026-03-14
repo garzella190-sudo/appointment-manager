@@ -86,10 +86,10 @@ export default function CalendarPage() {
         supabase
           .from('appuntamenti')
           .select(`
-            id, data, durata, stato, note, importo,
+            id, data, durata, stato, note, importo, istruttore_id, veicolo_id,
             clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
-            istruttori ( nome, cognome ),
-            veicoli ( targa, nome )
+            istruttori ( nome, cognome, colore ),
+            veicoli ( id, targa, nome, colore )
           `)
           .gte('data', displayStart.toISOString())
           .lt('data', fetchEndDate.toISOString()),
@@ -113,6 +113,7 @@ export default function CalendarPage() {
           phone: row.clienti?.telefono || '',
           trainer_id: row.istruttore_id,
           vehicle_id: row.veicoli ? `${row.veicoli.nome} (${row.veicoli.targa})` : 'Nessuno',
+          vehicle_id_uuid: row.veicolo_id,
           duration: row.durata,
           notes: row.note,
           status: row.stato,
@@ -122,8 +123,9 @@ export default function CalendarPage() {
           gearbox_type: row.clienti?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
           trainers: {
             name: row.istruttori ? `${row.istruttori.cognome} ${row.istruttori.nome}` : 'Non ass.',
-            color: '#3b82f6'
-          }
+            color: row.istruttori?.colore || '#3b82f6'
+          },
+          vehicle_color: row.veicoli?.colore
         };
       });
 
@@ -354,24 +356,36 @@ export default function CalendarPage() {
                     return (
                       <DroppableCell key={cellId} id={cellId}>
                         <div className="h-full w-full flex gap-0.5 p-0.5">
-                          {cellAppointments.map((apt, idx) => (
-                            <div
-                              key={apt.id}
-                              className={cn(
-                                "relative flex-1 min-w-[30px]",
-                                (apt as any).stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
-                              )}
-                              style={{
-                                zIndex: cellAppointments.length - idx
-                              }}
-                            >
-                              <DraggableAppointment
-                                appointment={apt}
-                                isOverlapping={cellAppointments.length > 1}
-                                onClick={setSelectedAppointment}
-                              />
-                            </div>
-                          ))}
+                          {cellAppointments.map((apt, idx) => {
+                            const hasConflict = cellAppointments.some(other => 
+                              other.id !== apt.id && 
+                              (apt as any).stato !== 'annullato' &&
+                              (other as any).stato !== 'annullato' &&
+                              (
+                                other.trainer_id === apt.trainer_id || 
+                                (other.vehicle_id_uuid && apt.vehicle_id_uuid && other.vehicle_id_uuid === apt.vehicle_id_uuid)
+                              )
+                            );
+
+                            return (
+                              <div
+                                key={apt.id}
+                                className={cn(
+                                  "relative flex-1 min-w-[30px]",
+                                  (apt as any).stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
+                                )}
+                                style={{
+                                  zIndex: cellAppointments.length - idx
+                                }}
+                              >
+                                <DraggableAppointment
+                                  appointment={apt}
+                                  isOverlapping={hasConflict}
+                                  onClick={setSelectedAppointment}
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       </DroppableCell>
                     );

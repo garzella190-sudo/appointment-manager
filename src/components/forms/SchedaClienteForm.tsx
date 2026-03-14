@@ -2,8 +2,13 @@
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Phone, Mail, BadgeCheck } from 'lucide-react';
-import { Patente, TipoPatente } from '@/lib/database.types';
+import { Loader2, Phone, Mail, BadgeCheck, AlertCircle, Trash2 } from 'lucide-react';
+import { Cliente, Patente, TipoPatente, TipoCambio } from '@/lib/database.types';
+import { 
+  createClienteAction, 
+  updateClienteAction, 
+  deleteClienteAction 
+} from '@/actions/clienti';
 
 interface SchedaClienteFormProps {
   clienteId?: string;    // undefined → nuovo cliente
@@ -45,6 +50,7 @@ export const SchedaClienteForm = ({
     riceve_email:         defaultValues?.riceve_email ?? true,
     riceve_whatsapp:      defaultValues?.riceve_whatsapp ?? true,
   });
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -60,31 +66,50 @@ export const SchedaClienteForm = ({
     const payload = {
       nome:                 payloadNome,
       cognome:              payloadCognome,
-      telefono:             form.telefono || null,
+      telefono:             form.telefono?.trim() || null,
       email:                payloadEmail,
       patente_richiesta_id: form.patente_richiesta_id || null,
-      preferenza_cambio:    form.preferenza_cambio || null,
+      preferenza_cambio:    (form.preferenza_cambio as TipoCambio) || null,
       riceve_email:         form.riceve_email,
       riceve_whatsapp:      form.riceve_whatsapp,
     };
 
-    const { data, error } = await supabase
-      .from('clienti')
-      .insert(payload)
-      .select('id')
-      .single();
+    const result = clienteId
+      ? await updateClienteAction(clienteId, payload)
+      : await createClienteAction(payload);
 
     setLoading(false);
 
-    if (!error) {
-      onSuccess(data?.id as string);
+    if (result.success) {
+      onSuccess(result.id as string);
     } else {
-      alert(error.message);
+      setServerError(result.error || 'Si è verificato un errore nel salvataggio.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!clienteId) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo cliente? L'azione è irreversibile e cancellerà anche tutti i suoi appuntamenti.")) return;
+
+    setLoading(true);
+    const result = await deleteClienteAction(clienteId);
+    setLoading(false);
+
+    if (result.success) {
+      onSuccess(clienteId);
+    } else {
+      setServerError(result.error || "Errore durante l'eliminazione.");
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {serverError && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
+          <AlertCircle size={18} className="shrink-0" />
+          <p className="font-medium">{serverError}</p>
+        </div>
+      )}
       {/* Cognome & Nome */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
@@ -99,13 +124,13 @@ export const SchedaClienteForm = ({
 
       {/* Telefono — con link tel: visualizzato accanto */}
       <div className="space-y-1.5">
-        <label className={LABEL_CLS}>Telefono</label>
+        <label className={LABEL_CLS}>Telefono (Opzionale)</label>
         <div className="flex items-center gap-2">
           <input
             value={form.telefono}
             onChange={set('telefono')}
             className={INPUT_CLS}
-            placeholder="333 1234567"
+            placeholder="Esempio: 333 1234567"
             type="tel"
           />
           {form.telefono && (
@@ -123,7 +148,7 @@ export const SchedaClienteForm = ({
 
       {/* Email — con link mailto: visualizzato accanto */}
       <div className="space-y-1.5">
-        <label className={LABEL_CLS}>Email</label>
+        <label className={LABEL_CLS}>Email (Opzionale)</label>
         <div className="flex items-center gap-2">
           <input
             value={form.email}
@@ -224,6 +249,17 @@ export const SchedaClienteForm = ({
           {loading ? <Loader2 className="animate-spin" size={18} /> : clienteId ? 'Salva modifiche' : 'Crea Cliente'}
         </button>
       </div>
+      {clienteId && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={loading}
+          className="w-full mt-3 py-3 rounded-xl font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center gap-2"
+        >
+          <Trash2 size={16} />
+          Elimina Cliente
+        </button>
+      )}
     </form>
   );
 };

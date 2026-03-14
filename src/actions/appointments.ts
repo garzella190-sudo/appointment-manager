@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { revalidatePath } from 'next/cache';
 import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -19,19 +20,43 @@ export async function createAppointmentAction(payload: {
   send_email?: boolean;
   send_whatsapp?: boolean;
   email_fallback?: string | null;
+  preferenza_cambio?: string | null;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const resendApiKey = process.env.RESEND_API_KEY;
 
+  // 0. Overlap Check (Rigid)
+  const startTime = new Date(payload.data);
+  const endTime = new Date(startTime.getTime() + payload.durata * 60000);
+  const startISO = startTime.toISOString();
+  const endISO = endTime.toISOString();
+  const dateOnly = payload.data.split('T')[0];
+
+  const { data: conflitti, error: overlapError } = await supabase
+    .from('appuntamenti')
+    .select('id, istruttore_id, veicolo_id, cliente_id')
+    .neq('stato', 'annullato')
+    .eq('data_solo', dateOnly)
+    .lt('inizio', endISO)
+    .gt('fine', startISO)
+    .or(`istruttore_id.eq.${payload.istruttore_id},cliente_id.eq.${payload.cliente_id}${payload.veicolo_id ? `,veicolo_id.eq.${payload.veicolo_id}` : ''}`);
+
+  if (overlapError) return { success: false, error: overlapError.message };
+
+  if (conflitti && conflitti.length > 0) {
+    return { 
+      success: false, 
+      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
+    };
+  }
+
   // 1. Fetch customer details
-  const { data: cliente, error: clienteError } = await (await supabase)
+  const { data: cliente, error: clienteError } = await supabase
     .from('clienti')
     .select('email, nome, cognome, riceve_email, riceve_whatsapp')
     .eq('id', payload.cliente_id)
     .single();
 
-  // If columns are missing or client not found, we still want to try creating the appointment
-  // but we might skip notifications or use defaults.
   const clientData = cliente || { 
     email: null, 
     nome: '', 
@@ -40,90 +65,146 @@ export async function createAppointmentAction(payload: {
     riceve_whatsapp: true 
   };
 
-  // 1.5 Update client email if fallback provided
+  // 1.5 Update client email if fallback provided or transmission preference
   let finalEmail = clientData.email;
-  if (payload.email_fallback && !clientData.email) {
-    const { error: updateError } = await (await supabase)
+  
+  const updates: any = {};
+  if (payload.email_fallback && !clientData.email) updates.email = payload.email_fallback;
+  if (payload.preferenza_cambio) updates.preferenza_cambio = payload.preferenza_cambio;
+
+  if (Object.keys(updates).length > 0) {
+    const { error: updateError } = await supabase
       .from('clienti')
-      .update({ email: payload.email_fallback })
+      .update(updates)
       .eq('id', payload.cliente_id);
     
     if (!updateError) {
-      finalEmail = payload.email_fallback;
-    } else {
-      console.error('Error updating client email:', updateError);
+      if (updates.email) finalEmail = payload.email_fallback;
     }
   }
 
-  // 2. Insert appointment (now including notification flags as requested)
-  // We remove email_fallback from the DB insert payload
-  const { email_fallback, ...dbPayload } = payload;
+  // 2. Insert appointment (with inizio and fine)
+  const { email_fallback, preferenza_cambio, ...dbPayload } = payload;
   
-  const { data: appointment, error: appointmentError } = await (await supabase)
+  const { data: appointment, error: appointmentError } = await supabase
     .from('appuntamenti')
-    .insert(dbPayload)
+    .insert({
+      ...dbPayload,
+      inizio: startISO,
+      fine: endISO,
+      data_solo: dateOnly // Helper column for performance
+    })
     .select()
     .single();
 
   if (appointmentError) {
-    console.error('Error creating appointment:', appointmentError);
-    return { error: appointmentError.message };
+    return { 
+      success: false, 
+      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
+    };
   }
 
-  // 3. Send confirmation email if client has email AND preference is enabled
-  // prioritize form override, fallback to client preference
-  const shouldSendEmail = payload.send_email !== undefined ? payload.send_email : clientData.riceve_email;
-
-  if (finalEmail && shouldSendEmail && resendApiKey) {
+  // 3. Email notification (unchanged logic)
+  if (finalEmail && (payload.send_email ?? clientData.riceve_email) && resendApiKey) {
     try {
       const resend = new Resend(resendApiKey);
       const startDate = parseISO(payload.data);
       const endDate = addMinutes(startDate, payload.durata);
-
-      // Format for email body
       const dateStr = format(startDate, 'dd/MM/yyyy', { locale: it });
       const timeStr = format(startDate, 'HH:mm', { locale: it });
 
-      // Format for Google Calendar (YYYYMMDDTHHMMSSZ)
       const formatGCal = (date: Date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
       const gcalStart = formatGCal(startDate);
       const gcalEnd = formatGCal(endDate);
 
-      const calendarUrl = new URL('https://www.google.com/calendar/render');
-      calendarUrl.searchParams.append('action', 'TEMPLATE');
-      calendarUrl.searchParams.append('text', 'Lezione di Guida - Autoscuola Toscana Fauglia');
-      calendarUrl.searchParams.append('dates', `${gcalStart}/${gcalEnd}`);
-      calendarUrl.searchParams.append('location', 'ci troviamo in autoscuola salvo diversi accordi');
+      const calendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=Lezione+di+Guida+-+Autoscuola+Toscana+Fauglia&dates=${gcalStart}/${gcalEnd}&location=ci+troviamo+in+autoscuola+salvo+diversi+accordi`;
       
       const emailHtml = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333 text-align: left;">
           <h2 style="color: #10b981;">Prenotazione Confermata</h2>
           <p>Ciao <strong>${clientData.nome}</strong>,</p>
           <p>Ti confermo la prenotazione per il giorno <strong>${dateStr}</strong> alle ore <strong>${timeStr}</strong>.</p>
-          
-          <div style="margin: 30px 0; text-align: center;">
-            <a href="${calendarUrl.toString()}" 
-               style="background-color: #3b82f6; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5);">
-              Aggiungi al Calendario
-            </a>
+          <div style="margin: 30px 0;">
+            <a href="${calendarUrl}" style="background-color: #3b82f6; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; display: inline-block;">Aggiungi al Calendario</a>
           </div>
-          
-          <p style="font-size: 14px; color: #666; border-top: 1px solid #eee; pt: 20px; margin-top: 30px;">
-            Ci troviamo in autoscuola salvo diversi accordi.<br>
-            <em>A presto!</em>
-          </p>
+          <p style="font-size: 14px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">Ci troviamo in autoscuola salvo diversi accordi.</p>
         </div>
+      `;
+
       await resend.emails.send({
         from: 'Autoscuola <onboarding@resend.dev>',
         to: finalEmail,
         subject: 'Conferma Prenotazione Guida',
         html: emailHtml,
       });
-
-    } catch (emailErr) {
-      console.error('Error sending email:', emailErr);
-    }
+    } catch (e) {}
   }
 
+  revalidatePath('/calendar');
+  revalidatePath('/gestione');
+
   return { success: true, appointment };
+}
+
+export async function updateAppointmentAction(id: string, payload: any) {
+  const supabase = await createClient();
+  
+  // 0. Overlap Check (Rigid)
+  const startTime = new Date(payload.data);
+  const endTime = new Date(startTime.getTime() + payload.durata * 60000);
+  const startISO = startTime.toISOString();
+  const endISO = endTime.toISOString();
+  const dateOnly = payload.data.split('T')[0];
+
+  const { data: conflitti, error: overlapError } = await supabase
+    .from('appuntamenti')
+    .select('id, istruttore_id, veicolo_id, cliente_id')
+    .neq('id', id) // Escludi se stesso
+    .neq('stato', 'annullato')
+    .eq('data_solo', dateOnly)
+    .lt('inizio', endISO)
+    .gt('fine', startISO)
+    .or(`istruttore_id.eq.${payload.istruttore_id},cliente_id.eq.${payload.cliente_id}${payload.veicolo_id ? `,veicolo_id.eq.${payload.veicolo_id}` : ''}`);
+
+  if (overlapError) return { success: false, error: overlapError.message };
+
+  if (conflitti && conflitti.length > 0) {
+    return { 
+      success: false, 
+      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
+    };
+  }
+
+  const { email_fallback, preferenza_cambio, ...dbPayload } = payload;
+  const { data, error } = await supabase
+    .from('appuntamenti')
+    .update({
+      ...dbPayload,
+      inizio: startISO,
+      fine: endISO,
+      data_solo: dateOnly
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    return { 
+      success: false, 
+      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
+    };
+  }
+
+  // Update client preference if provided
+  if (payload.preferenza_cambio) {
+    await supabase
+      .from('clienti')
+      .update({ preferenza_cambio: payload.preferenza_cambio })
+      .eq('id', payload.cliente_id);
+  }
+
+  revalidatePath('/calendar');
+  revalidatePath('/gestione');
+
+  return { success: true, appointment: data };
 }

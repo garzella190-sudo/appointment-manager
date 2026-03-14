@@ -2,8 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Phone, Mail } from 'lucide-react';
+import { Loader2, Phone, Mail, Trash2, AlertCircle } from 'lucide-react';
 import { TipoPatente } from '@/lib/database.types';
+import { 
+  createIstruttoreAction, 
+  updateIstruttoreAction, 
+  deleteIstruttoreAction 
+} from '@/actions/istruttori';
 
 const ALL_PATENTI: TipoPatente[] = ['AM', 'A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'];
 
@@ -15,6 +20,7 @@ interface IstruttoreFormProps {
     telefono: string;
     email: string;
     patenti_abilitate: TipoPatente[];
+    colore?: string;
   };
   onSuccess: () => void;
   onCancel: () => void;
@@ -41,7 +47,9 @@ export const IstruttoreForm = ({
     telefono: defaultValues?.telefono ?? '',
     email: defaultValues?.email ?? '',
     patenti_abilitate: defaultValues?.patenti_abilitate ?? [] as TipoPatente[],
+    colore: defaultValues?.colore ?? '#3B82F6',
   });
+  const [serverError, setServerError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm({
@@ -50,6 +58,7 @@ export const IstruttoreForm = ({
       telefono: defaultValues?.telefono ?? '',
       email: defaultValues?.email ?? '',
       patenti_abilitate: defaultValues?.patenti_abilitate ?? [] as TipoPatente[],
+      colore: defaultValues?.colore ?? '#3B82F6',
     });
   }, [JSON.stringify(defaultValues)]);
 
@@ -69,6 +78,7 @@ export const IstruttoreForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setServerError(null);
 
     const payload = {
       nome: form.nome,
@@ -76,15 +86,35 @@ export const IstruttoreForm = ({
       telefono: form.telefono || null,
       email: form.email || null,
       patenti_abilitate: form.patenti_abilitate,
+      colore: form.colore,
     };
 
-    const { error } = istruttoreId
-      ? await supabase.from('istruttori').update(payload).eq('id', istruttoreId)
-      : await supabase.from('istruttori').insert(payload);
+    const result = istruttoreId
+      ? await updateIstruttoreAction(istruttoreId, payload)
+      : await createIstruttoreAction(payload);
 
     setLoading(false);
-    if (error) alert(error.message);
-    else onSuccess();
+    
+    if (result.success) {
+      onSuccess();
+    } else {
+      setServerError(result.error || 'Si è verificato un errore nel salvataggio.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!istruttoreId) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? L'azione è irreversibile.")) return;
+
+    setLoading(true);
+    const result = await deleteIstruttoreAction(istruttoreId);
+    setLoading(false);
+
+    if (result.success) {
+      onSuccess();
+    } else {
+      setServerError(result.error || "Errore durante l'eliminazione.");
+    }
   };
 
   // Calcola se i dati sono stati modificati rispetto agli originali
@@ -93,10 +123,17 @@ export const IstruttoreForm = ({
     form.cognome !== (defaultValues?.cognome ?? '') ||
     form.telefono !== (defaultValues?.telefono ?? '') ||
     form.email !== (defaultValues?.email ?? '') ||
+    form.colore !== (defaultValues?.colore ?? '#3B82F6') ||
     JSON.stringify(form.patenti_abilitate) !== JSON.stringify(defaultValues?.patenti_abilitate ?? []);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {serverError && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
+          <AlertCircle size={18} className="shrink-0" />
+          <p className="font-medium">{serverError}</p>
+        </div>
+      )}
       {/* Cognome & Nome */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
@@ -118,6 +155,22 @@ export const IstruttoreForm = ({
             className={INPUT_CLS} 
             placeholder="Mario" 
           />
+        </div>
+      </div>
+
+      {/* Telefono */}
+      <div className="space-y-1.5">
+        <label className={LABEL_CLS}>Telefono</label>
+        <div className="flex items-center gap-2">
+          <input value={form.telefono} onChange={set('telefono')} className={INPUT_CLS} placeholder="333 1234567" type="tel" />
+          {form.telefono && (
+            <a
+              href={`tel:${form.telefono.replace(/\s/g, '')}`}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-sm font-semibold hover:bg-green-100 transition-colors"
+            >
+              <Phone size={14} />
+            </a>
+          )}
         </div>
       </div>
 
@@ -180,6 +233,20 @@ export const IstruttoreForm = ({
         )}
       </div>
 
+      {/* Colore */}
+      <div className="space-y-1.5">
+        <label className={LABEL_CLS}>Colore Identificativo</label>
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={form.colore}
+            onChange={set('colore' as any)}
+            className="w-12 h-10 p-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl cursor-pointer"
+          />
+          <span className="text-sm font-mono text-zinc-500 uppercase">{form.colore}</span>
+        </div>
+      </div>
+
       {/* Actions */}
       {!istruttoreId ? (
         <div className="flex gap-3 pt-2">
@@ -203,12 +270,13 @@ export const IstruttoreForm = ({
           <button
             type="button"
             onClick={() => {
-              setForm(defaultValues || {
-                nome: '',
-                cognome: '',
-                telefono: '',
-                email: '',
-                patenti_abilitate: []
+              setForm({
+                nome: capitalizeWords(defaultValues?.nome ?? ''),
+                cognome: capitalizeWords(defaultValues?.cognome ?? ''),
+                telefono: defaultValues?.telefono ?? '',
+                email: defaultValues?.email ?? '',
+                patenti_abilitate: defaultValues?.patenti_abilitate ?? [],
+                colore: defaultValues?.colore ?? '#3B82F6'
               });
             }}
             className="flex-1 py-3 rounded-xl font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all text-sm"
@@ -224,6 +292,18 @@ export const IstruttoreForm = ({
           </button>
         </div>
       ) : null}
+
+      {istruttoreId && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={loading}
+          className="w-full mt-3 py-3 rounded-xl font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center gap-2"
+        >
+          <Trash2 size={16} />
+          Elimina Istruttore
+        </button>
+      )}
     </form>
   );
 };

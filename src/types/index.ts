@@ -17,6 +17,7 @@ export interface Vehicle {
   license_types: string[];
   registration_date?: string;
   revision_expiry_date?: string;
+  color?: string;
   created_at?: string;
 }
 
@@ -38,7 +39,8 @@ export interface Appointment {
   client_name: string;
   phone?: string;
   trainer_id: string;
-  vehicle_id: string;
+  vehicle_id: string; // Per visualizzazione "Nome (Targa)"
+  vehicle_id_uuid?: string | null; // UUID crudo per check conflitti
   appointment_date: string;
   appointment_time: string;
   duration: number; // in minutes
@@ -53,4 +55,5 @@ export interface Appointment {
     name: string;
     color: string;
   };
+  vehicle_color?: string;
 }

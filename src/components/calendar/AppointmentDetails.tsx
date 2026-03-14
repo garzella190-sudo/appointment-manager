@@ -68,7 +68,7 @@ export const AppointmentDetails = ({
     <div className="space-y-6">
       <div className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700">
         <div
-          className="w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0"
+          className="w-12 h-12 rounded-full flex items-center justify-center text-white shrink-0 shadow-lg"
           style={{ backgroundColor: appointment.trainers?.color || '#3b82f6' }}
         >
           <User size={24} />
@@ -113,12 +113,18 @@ export const AppointmentDetails = ({
           <p className="text-[10px] uppercase font-bold text-zinc-400 mb-1 flex items-center gap-1">
             <Car size={12} /> Veicolo e Patente
           </p>
-          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            {appointment.license_type} - {appointment.gearbox_type}
+          <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            {appointment.license_type} 
+            <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            <span className="text-xs uppercase opacity-70">{appointment.gearbox_type}</span>
           </p>
-          <p className="text-[10px] text-zinc-500 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
-            {vehicleDisplay}
-          </p>
+          <div 
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold text-white mt-2 shadow-sm"
+            style={{ backgroundColor: appointment.vehicle_color || '#4b5563' }}
+          >
+            <Car size={12} />
+            <span className="truncate">{vehicleDisplay}</span>
+          </div>
         </div>
       </div>
 

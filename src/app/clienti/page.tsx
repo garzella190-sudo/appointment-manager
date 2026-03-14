@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Cliente, Patente } from '@/lib/database.types';
 import { Modal } from '@/components/Modal';
 import { SchedaClienteForm } from '@/components/forms/SchedaClienteForm';
-import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2 } from 'lucide-react';
+import { deleteClienteAction } from '@/actions/clienti';
+import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
 
@@ -28,6 +29,17 @@ export default function ClientiPage() {
     setPatenti(pRes.data ?? []);
     setLoading(false);
   }, []);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Sei sicuro di voler eliminare questo cliente? L'azione è irreversibile e cancellerà anche tutti i suoi appuntamenti.")) return;
+    const result = await deleteClienteAction(id);
+    if (result.success) {
+      fetchData();
+    } else {
+      alert(result.error || "Errore durante l'eliminazione.");
+    }
+  };
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -101,49 +113,62 @@ export default function ClientiPage() {
               const initials = `${cliente.nome[0] ?? ''}${cliente.cognome[0] ?? ''}`.toUpperCase();
 
               return (
-                <button
+                <div 
                   key={cliente.id}
-                  onClick={() => router.push(`/clienti/${cliente.id}`)}
-                  className="w-full p-5 flex items-center justify-between hover:bg-purple-50/40 dark:hover:bg-purple-900/10 transition-colors group text-left"
+                  className="w-full relative group hover:bg-purple-50/40 dark:hover:bg-purple-900/10 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Avatar */}
-                    <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-bold text-lg flex items-center justify-center shrink-0">
-                      {initials}
-                    </div>
+                  <button
+                    onClick={() => router.push(`/clienti/${cliente.id}`)}
+                    className="w-full p-5 flex items-center justify-between group text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Avatar */}
+                      <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-bold text-lg flex items-center justify-center shrink-0">
+                        {initials}
+                      </div>
 
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-zinc-900 dark:text-zinc-50 truncate">
-                        {cliente.cognome} {cliente.nome}
-                      </h4>
-                      <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                        {cliente.telefono && (
-                          <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            <Phone size={11} />
-                            {cliente.telefono}
-                          </span>
-                        )}
-                        {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
-                        {cliente.email && (
-                          <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                            <Mail size={11} />
-                            {cliente.email}
-                          </span>
-                        )}
-                        {patenteDisplay && (
-                          <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                            Pat. {patenteDisplay}
-                          </span>
-                        )}
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-zinc-900 dark:text-zinc-50 truncate">
+                          {cliente.cognome} {cliente.nome}
+                        </h4>
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                          {cliente.telefono && (
+                            <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                              <Phone size={11} />
+                              {cliente.telefono}
+                            </span>
+                          )}
+                          {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
+                          {cliente.email && (
+                            <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                              <Mail size={11} />
+                              {cliente.email}
+                            </span>
+                          )}
+                          {patenteDisplay && (
+                            <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                              Pat. {patenteDisplay}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <ChevronRight
-                    size={20}
-                    className="text-zinc-300 group-hover:text-purple-500 transition-colors shrink-0"
-                  />
-                </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => handleDelete(e, cliente.id)}
+                        className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                        title="Elimina cliente"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                      <ChevronRight
+                        size={20}
+                        className="text-zinc-300 group-hover:text-purple-500 transition-colors shrink-0"
+                      />
+                    </div>
+                  </button>
+                </div>
               );
             })}
           </div>

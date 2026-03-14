@@ -6,7 +6,7 @@ import { Loader2, Clock, Car, User, Search, Wrench, ShieldCheck, ChevronDown } f
 import { format, addMinutes } from 'date-fns';
 import { Cliente, Istruttore, Veicolo, Patente, TipoPatente, CambioAmmesso, StatoAppuntamento } from '@/lib/database.types';
 import { cn } from '@/lib/utils';
-import { createAppointmentAction } from '@/actions/appointments';
+import { createAppointmentAction, updateAppointmentAction } from '@/actions/appointments';
 
 interface FormProps {
   onSuccess: () => void;
@@ -45,6 +45,11 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     send_whatsapp: true,
     email_fallback: '',
   });
+  
+  const [instructorOverlap, setInstructorOverlap] = useState(false);
+  const [vehicleOverlap, setVehicleOverlap] = useState(false);
+  const [clientOverlap, setClientOverlap] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const [selectedPatente, setSelectedPatente] = useState<Patente | null>(null);
 
@@ -60,10 +65,21 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         supabase.from('patenti').select('*').order('tipo'),
       ]);
 
+      console.log('Fetching data from Supabase...', { 
+        clienti: cRes.data?.length, 
+        istruttori: iRes.data?.length, 
+        veicoli: vRes.data?.length, 
+        patenti: pRes.data?.length 
+      });
+
+      if (vRes.error) console.error('Error fetching vehicles:', vRes.error);
+
       setClienti(cRes.data ?? []);
       setIstruttori(iRes.data ?? []);
       setVeicoli(vRes.data ?? []);
       setPatenti(pRes.data ?? []);
+
+      console.log('State updated - Veicoli:', vRes.data);
 
       // If editing, fetch appointment details
       if (appointmentId) {
@@ -82,8 +98,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             data: dateObj.toISOString().split('T')[0],
             ora: format(dateObj, 'HH:mm'),
             durata: apt.durata || 60,
-            patente_id: '', // Non salviamo più il patente_id direttamente, va ricavato se serve
-            cambio: 'manuale', // Da recuperare dal cliente se necessario in futuro
+            patente_id: '', 
+            cambio: 'manuale', 
             note: apt.note || '',
             send_email: true,
             send_whatsapp: true,
@@ -96,6 +112,66 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
     loadData();
   }, [appointmentId]);
+
+  // Validazione Overlap in tempo reale (Strict Database Query)
+  useEffect(() => {
+    async function checkOverlap() {
+      if (!form.data || !form.ora || !form.durata || (!form.istruttore_id && !form.cliente_id)) {
+        setInstructorOverlap(false);
+        setVehicleOverlap(false);
+        setClientOverlap(false);
+        return;
+      }
+
+      const start = new Date(`${form.data}T${form.ora}`);
+      const end = new Date(start.getTime() + form.durata * 60000);
+      const startISO = start.toISOString();
+      const endISO = end.toISOString();
+
+      let query = supabase
+        .from('appuntamenti')
+        .select('id, istruttore_id, veicolo_id, cliente_id')
+        .neq('stato', 'annullato')
+        .eq('data_solo', form.data) // Query filtrata per data per velocità
+        .lt('inizio', endISO)
+        .gt('fine', startISO);
+
+      if (appointmentId) {
+        query = query.neq('id', appointmentId);
+      }
+
+      // Costruiamo la condizione OR per Istruttore, Cliente o Veicolo
+      let clauses = [];
+      if (form.istruttore_id) clauses.push(`istruttore_id.eq.${form.istruttore_id}`);
+      if (form.cliente_id) clauses.push(`cliente_id.eq.${form.cliente_id}`);
+      if (form.veicolo_id) clauses.push(`veicolo_id.eq.${form.veicolo_id}`);
+      
+      query = query.or(clauses.join(','));
+
+      const { data: conflitti, error } = await query;
+
+      if (error) {
+        console.error('Overlap check error:', error);
+        return;
+      }
+
+      const iConflict = conflitti?.some(c => form.istruttore_id && c.istruttore_id === form.istruttore_id) || false;
+      const vConflict = conflitti?.some(c => form.veicolo_id && c.veicolo_id === form.veicolo_id) || false;
+      const cConflict = conflitti?.some(c => form.cliente_id && c.cliente_id === form.cliente_id) || false;
+
+      setInstructorOverlap(iConflict);
+      setVehicleOverlap(vConflict);
+      setClientOverlap(cConflict);
+    }
+
+    const timer = setTimeout(checkOverlap, 300); // Debounce per evitare troppe query
+    return () => clearTimeout(timer);
+  }, [form.data, form.ora, form.durata, form.istruttore_id, form.veicolo_id, form.cliente_id, appointmentId]);
+
+  // Reset server error when form changes
+  useEffect(() => {
+    setServerError(null);
+  }, [form.data, form.ora, form.durata, form.istruttore_id, form.veicolo_id]);
 
   // Quando cambia il cliente, se ha una patente richiesta, pre-selezionala
   const handleClienteChange = (clientId: string) => {
@@ -111,6 +187,15 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
     if (cliente?.patente_richiesta_id && !appointmentId) {
       handlePatenteChange(cliente.patente_richiesta_id);
+    } else if (!cliente?.patente_richiesta_id && !appointmentId) {
+      // Fallback: se il cliente non ha una patente, resetta il campo così l'operatore può sceglierla
+      setForm(prev => ({ 
+        ...prev, 
+        patente_id: '',
+        // Se resettiamo la patente, manteniamo comunque la preferenza cambio del cliente per i veicoli
+        cambio: (cliente?.preferenza_cambio as 'manuale' | 'automatico') || prev.cambio
+      }));
+      setSelectedPatente(null);
     }
   };
 
@@ -120,17 +205,58 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     setSelectedPatente(pat || null);
 
     if (pat) {
-      setForm(prev => ({
-        ...prev,
-        patente_id: patId,
-        durata: pat.durata_default,
-        // Se il cambio ammesso è solo automatico, imposta automatico
-        cambio: pat.cambio_ammesso === 'automatico' ? 'automatico' : 'manuale',
-        // Resetta veicolo se non è tra i preferiti della patente (opzionale)
-        veicolo_id: '',
-      }));
+      setForm(prev => {
+        // Se il cliente è già selezionato, cerchiamo di rispettare la sua preferenza
+        // se la patente scelta la permette.
+        let targetCambio = prev.cambio;
+        
+        if (pat.cambio_ammesso === 'automatico') {
+          targetCambio = 'automatico';
+        } else if (pat.cambio_ammesso === 'manuale') {
+          targetCambio = 'manuale';
+        } 
+        // Se pat.cambio_ammesso === 'entrambi', manteniamo targetCambio invariato 
+        // (che deriva dal cliente o dalla scelta precedente)
+
+        return {
+          ...prev,
+          patente_id: patId,
+          durata: pat.durata_default,
+          cambio: targetCambio,
+          // veicolo_id: '',
+        };
+      });
     } else {
       setForm(prev => ({ ...prev, patente_id: patId }));
+    }
+  };
+
+  // Quando cambia il veicolo, forza la selezione della patente corrispondente
+  const handleVeicoloChange = (veicoloId: string) => {
+    const v = veicoli.find(veh => veh.id === veicoloId);
+    setForm(prev => ({ ...prev, veicolo_id: veicoloId }));
+
+    if (v && v.tipo_patente) {
+      // Trova la patente corrispondente al tipo del veicolo
+      const pat = patenti.find(p => p.tipo === v.tipo_patente);
+      if (pat) {
+        // Usiamo un wrapper per evitare reset ricorsivi se servisse, 
+        // ma handlePatenteChange ora non resetta più il veicolo.
+        const patObj = pat;
+        setSelectedPatente(patObj);
+        setForm(prev => {
+          let targetCambio = prev.cambio;
+          if (patObj.cambio_ammesso === 'automatico') targetCambio = 'automatico';
+          else if (patObj.cambio_ammesso === 'manuale') targetCambio = 'manuale';
+
+          return {
+            ...prev,
+            patente_id: patObj.id,
+            durata: patObj.durata_default,
+            cambio: targetCambio,
+          };
+        });
+      }
     }
   };
 
@@ -141,7 +267,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       return;
     }
 
+    if (instructorOverlap || vehicleOverlap || clientOverlap) {
+      alert('Impossibile salvare: risorsa già occupata (Istruttore, Veicolo o Cliente) in questa fascia oraria.');
+      return;
+    }
+
     setLoading(true);
+    setServerError(null);
 
     const startDateTime = new Date(`${form.data}T${form.ora}`).toISOString();
     const payload = {
@@ -156,23 +288,24 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       send_email: form.send_email,
       send_whatsapp: form.send_whatsapp,
       email_fallback: form.email_fallback || null,
+      preferenza_cambio: form.cambio, // Persistiamo la scelta per "memoria"
     };
 
-    let error;
+    let result: any;
     if (appointmentId) {
-      const { error: err } = await supabase
-        .from('appuntamenti')
-        .update(payload)
-        .eq('id', appointmentId);
-      error = err;
+      result = await updateAppointmentAction(appointmentId, payload);
     } else {
-      const result = await createAppointmentAction(payload);
-      error = result.error;
+      result = await createAppointmentAction(payload);
     }
 
     setLoading(false);
-    if (!error) onSuccess();
-    else alert(typeof error === 'string' ? error : error.message);
+    
+    if (result && result.error) {
+      setServerError(result.error);
+      return;
+    }
+
+    onSuccess?.();
   };
 
   const handleDelete = async () => {
@@ -205,17 +338,15 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
   const oraFine = calculateEndTime();
 
-  // Filtra veicoli in base alla patente selezionata E al tipo di cambio
-  const veicoliFiltrati = (selectedPatente && selectedPatente.veicoli_abilitati?.length > 0
-    ? veicoli.filter(v => selectedPatente.veicoli_abilitati.includes(v.id))
-    : selectedPatente
-      ? veicoli.filter(v => v.tipo_patente === selectedPatente.tipo) // Fallback al tipo patente
-      : veicoli
-  ).filter(v => {
-    if (form.cambio === 'manuale') return v.cambio_manuale === true;
-    if (form.cambio === 'automatico') return v.cambio_manuale === false;
-    return true;
-  });
+  // Mostra tutti i veicoli (il filtro rigido è stato rimosso per permettere all'utente di trovarli sempre)
+  const veicoliFiltrati = veicoli;
+
+  // Auto-selezione veicolo se c'è un match unico
+  useEffect(() => {
+    if (!appointmentId && veicoliFiltrati.length === 1 && form.veicolo_id !== veicoliFiltrati[0].id) {
+      setForm(prev => ({ ...prev, veicolo_id: veicoliFiltrati[0].id }));
+    }
+  }, [veicoliFiltrati, appointmentId, form.veicolo_id]);
 
   if (fetching) {
     return (
@@ -241,6 +372,11 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             <option key={c.id} value={c.id}>{c.cognome} {c.nome}</option>
           ))}
         </select>
+        {clientOverlap && (
+          <p className="text-red-500 text-sm font-medium mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+            Il cliente ha già un altro impegno in questo orario
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -280,14 +416,20 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         <div className="space-y-1.5">
           <label className={LABEL_CLS}><ShieldCheck size={13} /> Tipo Patente</label>
           <select
+            disabled={!!form.veicolo_id}
             value={form.patente_id}
             onChange={(e) => handlePatenteChange(e.target.value)}
-            className={INPUT_CLS}
+            className={cn(
+              INPUT_CLS,
+              form.veicolo_id && "bg-zinc-100 dark:bg-zinc-800/50 cursor-not-allowed opacity-70"
+            )}
           >
-            <option value="">Nessuna / Altro</option>
-            {patenti.map(p => (
-              <option key={p.id} value={p.id}>{p.nome_visualizzato || p.tipo}</option>
-            ))}
+            <option value="">{form.veicolo_id ? 'Vincolata dal veicolo' : 'Nessuna / Altro'}</option>
+            {patenti
+              .filter(p => !p.nascosta) // Mostra solo le patenti non nascoste
+              .map(p => (
+                <option key={p.id} value={p.id}>{p.nome_visualizzato || p.tipo}</option>
+              ))}
           </select>
         </div>
         {/* Durata */}
@@ -303,6 +445,44 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             className={INPUT_CLS}
           />
         </div>
+      </div>
+
+      {/* Tipo Cambio Selector */}
+      <div className="space-y-1.5">
+        <label className={LABEL_CLS}><Wrench size={13} /> Tipo Cambio</label>
+        <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl w-fit">
+          {[
+            { id: 'manuale', label: 'Manuale' },
+            { id: 'automatico', label: 'Automatico' }
+          ].map(opt => {
+            const isSelected = form.cambio === opt.id;
+            const isForced = selectedPatente && (
+              (selectedPatente.cambio_ammesso === 'manuale' && opt.id === 'automatico') ||
+              (selectedPatente.cambio_ammesso === 'automatico' && opt.id === 'manuale')
+            );
+            
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={!!isForced}
+                onClick={() => setForm(prev => ({ ...prev, cambio: opt.id as any, veicolo_id: '' }))}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  isSelected 
+                    ? "bg-white dark:bg-zinc-800 text-blue-600 shadow-sm" 
+                    : "text-zinc-500 hover:text-zinc-700",
+                  isForced && "opacity-30 cursor-not-allowed"
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {selectedPatente && selectedPatente.cambio_ammesso !== 'entrambi' && (
+          <p className="text-[10px] text-zinc-500 italic">Il tipo di cambio è vincolato dalla categoria {selectedPatente.tipo}.</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -326,20 +506,33 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               );
             })}
           </select>
+          {instructorOverlap && (
+            <p className="text-red-500 text-sm font-medium mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+              Istruttore non disponibile
+            </p>
+          )}
         </div>
         {/* Veicolo */}
         <div className="space-y-1.5">
           <label className={LABEL_CLS}><Car size={13} /> Veicolo</label>
           <select
             value={form.veicolo_id}
-            onChange={(e) => setForm(prev => ({ ...prev, veicolo_id: e.target.value }))}
+            onChange={(e) => handleVeicoloChange(e.target.value)}
             className={INPUT_CLS}
           >
             <option value="">Senza veicolo / Teoria</option>
-            {veicoliFiltrati.map(v => (
+            {veicoli.map(v => (
               <option key={v.id} value={v.id}>{v.nome} ({v.targa})</option>
             ))}
+            {veicoli.length === 0 && (
+              <option disabled>Nessun veicolo trovato nel database</option>
+            )}
           </select>
+          {vehicleOverlap && (
+            <p className="text-red-500 text-sm font-medium mt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+              Veicolo non disponibile
+            </p>
+          )}
         </div>
       </div>
 
@@ -396,6 +589,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         </div>
       )}
 
+      {/* Server Error Message */}
+      {serverError && (
+        <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-sm font-semibold animate-in fade-in slide-in-from-top-2 duration-300">
+          {serverError}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         <button
@@ -406,9 +606,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           Annulla
         </button>
         <button
-          disabled={loading}
+          disabled={loading || instructorOverlap || vehicleOverlap || clientOverlap}
           type="submit"
-          className="flex-1 py-3 rounded-xl font-semibold bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all flex items-center justify-center text-sm"
+          className={cn(
+            "flex-1 py-3 rounded-xl font-semibold text-white shadow-lg transition-all flex items-center justify-center text-sm",
+            (instructorOverlap || vehicleOverlap || clientOverlap) 
+              ? "bg-zinc-300 cursor-not-allowed shadow-none" 
+              : "bg-emerald-600 shadow-emerald-500/20 hover:bg-emerald-700"
+          )}
         >
           {loading ? <Loader2 className="animate-spin" size={18} /> : (appointmentId ? 'Aggiorna Appuntamento' : 'Crea Appuntamento')}
         </button>

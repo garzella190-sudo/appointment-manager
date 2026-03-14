@@ -9,11 +9,13 @@ import { IstruttoreForm } from '@/components/forms/IstruttoreForm';
 import { UserForm } from '@/components/forms/UserForm';
 import { PatenteForm } from '@/components/forms/PatenteForm';
 import { listUsersAction } from '@/actions/auth';
+import { deleteVeicoloAction } from '@/actions/veicoli';
+import { deleteIstruttoreAction } from '@/actions/istruttori';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
-  AlertTriangle, CheckCircle2, CalendarClock, Phone, Mail,
+  AlertTriangle, CheckCircle2, CalendarClock, Phone, Mail, Search,
   School, Clock, ChevronDown, ChevronUp, ClipboardList, EyeOff, Eye,
-  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, UserPlus, Key, User as UserIcon
+  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, UserPlus, Key, User as UserIcon, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { User as AuthUser } from '@supabase/supabase-js';
@@ -41,66 +43,11 @@ const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
   );
 };
 
-// ── Card singola veicolo (componente separato per rispettare le regole hooks) ──
-const VeicoloCard = ({
-  veicolo,
-  onEdit,
-}: {
-  veicolo: Veicolo;
-  onEdit: (v: Veicolo) => void;
-}) => {
-  const { calendarUrl } = useRevisionReminder(veicolo.data_revisione);
-  return (
-    <div className="glass-card p-5 flex items-center justify-between group">
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-          <Car size={26} strokeWidth={1.5} />
-        </div>
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-bold text-zinc-900 dark:text-zinc-50">{veicolo.nome}</h4>
-            <span className="font-mono text-xs font-bold px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md tracking-widest">
-              {veicolo.targa}
-            </span>
-          </div>
-          <div className="flex items-center flex-wrap gap-2 mt-1.5">
-            <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wide">
-              Pat. {veicolo.tipo_patente}
-            </span>
-            <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-bold">
-              {veicolo.cambio_manuale ? 'Manuale' : 'Automatico'}
-            </span>
-            <RevisionBadge dataRevisione={veicolo.data_revisione} />
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        {calendarUrl && (
-          <a
-            href={calendarUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Aggiungi reminder revisione al calendario"
-            className="p-2 rounded-xl text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
-          >
-            <CalendarClock size={18} />
-          </a>
-        )}
-        <button
-          onClick={() => onEdit(veicolo)}
-          className="p-2 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 transition-colors"
-        >
-          <Pencil size={16} />
-        </button>
-      </div>
-    </div>
-  );
-};
-
 // ── Tab: Veicoli ──────────────────────────────────────────────
 const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [veicoli, setVeicoli] = useState<Veicolo[]>([]);
+  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Veicolo | null>(null);
 
@@ -111,29 +58,123 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
     setLoading(false);
   }, []);
 
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Sei sicuro di voler eliminare questo veicolo? L'azione è irreversibile.")) return;
+    const result = await deleteVeicoloAction(id);
+    if (result.success) {
+      fetchVeicoli();
+    } else {
+      alert(result.error || "Errore durante l'eliminazione.");
+    }
+  };
+
   useEffect(() => { fetchVeicoli(); }, [fetchVeicoli, refreshKey]);
 
   const openEdit = (v: Veicolo) => { setEditing(v); setModalOpen(true); };
   const onSuccess = () => { setModalOpen(false); fetchVeicoli(); };
 
+  const filtered = veicoli.filter(v => 
+    v.nome.toLowerCase().includes(search.toLowerCase()) || 
+    v.targa.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div className="relative">
-      {loading ? (
-        <div className="py-20 flex items-center justify-center">
-          <Loader2 className="animate-spin text-emerald-500" size={36} />
-        </div>
-      ) : veicoli.length === 0 ? (
-        <div className="glass-card p-16 text-center">
-          <Car size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
-          <p className="text-zinc-400">Nessun veicolo registrato. Clicca <strong>+</strong> per aggiungerne uno.</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {veicoli.map(v => (
-            <VeicoloCard key={v.id} veicolo={v} onEdit={openEdit} />
-          ))}
-        </div>
-      )}
+    <div className="space-y-6">
+      {/* Search Bar - Veicoli */}
+      <div className="relative group">
+        <Search
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-emerald-500 transition-colors"
+          size={20}
+        />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Cerca per nome o targa…"
+          className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+        />
+      </div>
+
+      <div className="glass-card overflow-hidden">
+        {loading ? (
+          <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
+            <Loader2 className="animate-spin text-emerald-500" size={40} />
+            <p>Caricamento veicoli…</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-16 text-center">
+            <Car size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
+            <p className="text-zinc-400">
+              {search ? 'Nessun veicolo trovato per questa ricerca.' : 'Nessun veicolo ancora.'}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {filtered.map(v => {
+              const initials = v.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+              return (
+                <div 
+                  key={v.id}
+                  className="w-full relative group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors"
+                >
+                  <button
+                    onClick={() => openEdit(v)}
+                    className="w-full p-5 flex items-center justify-between group text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Avatar/Color Placeholder */}
+                      <div 
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-bold text-lg"
+                        style={{ 
+                          backgroundColor: `${v.colore}15`, 
+                          color: v.colore 
+                        }}
+                      >
+                        {initials || <Car size={24} />}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-zinc-900 dark:text-zinc-50 truncate">
+                            {v.nome}
+                          </h4>
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded tracking-widest leading-none">
+                            {v.targa}
+                          </span>
+                        </div>
+                        <div className="flex items-center flex-wrap gap-2 mt-1.5">
+                          <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                            Pat. {v.tipo_patente}
+                          </span>
+                          <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-bold">
+                            {v.cambio_manuale ? 'Manuale' : 'Automatico'}
+                          </span>
+                          <RevisionBadge dataRevisione={v.data_revisione} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => handleDelete(e, v.id)}
+                        className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                        title="Elimina veicolo"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                      <Pencil
+                        size={18}
+                        className="text-zinc-300 group-hover:text-emerald-500 transition-colors shrink-0"
+                      />
+                    </div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <Modal
         isOpen={modalOpen}
@@ -141,6 +182,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
         title={editing ? 'Modifica Veicolo' : 'Nuovo Veicolo'}
       >
         <VeicoloForm
+          key={editing?.id || 'new'}
           veicoloId={editing?.id}
           defaultValues={editing ? {
             nome: editing.nome,
@@ -148,6 +190,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
             data_revisione: editing.data_revisione,
             tipo_patente: editing.tipo_patente,
             cambio_manuale: editing.cambio_manuale,
+            colore: editing.colore,
           } : undefined}
           onSuccess={onSuccess}
           onCancel={() => setModalOpen(false)}
@@ -170,6 +213,16 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
     setIstruttori(data ?? []);
     setLoading(false);
   }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? L'azione è irreversibile.")) return;
+    const result = await deleteIstruttoreAction(id);
+    if (result.success) {
+      fetch();
+    } else {
+      alert(result.error || "Errore durante l'eliminazione.");
+    }
+  };
 
   useEffect(() => { fetch(); }, [fetch, refreshKey]);
 
@@ -222,12 +275,20 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => openEdit(i)}
-                  className="p-2 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Pencil size={16} />
-                </button>
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    onClick={() => openEdit(i)}
+                    className="p-2 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(i.id)}
+                    className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -240,6 +301,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
         title={editing ? 'Modifica Istruttore' : 'Nuovo Istruttore'}
       >
         <IstruttoreForm
+          key={editing?.id || 'new'}
           istruttoreId={editing?.id}
           defaultValues={editing ? {
             nome: editing.nome,
@@ -272,233 +334,55 @@ const CATEGORIA_COLOR: Record<string, string> = {
 // ── Componente Card Singola Patente ───────────────────────────
 const PatenteCard = ({
   pat,
-  veicoli,
-  isOpen,
-  onToggle,
-  onSave,
-  onAddVehicle,
+  onEdit,
 }: {
   pat: Patente;
-  veicoli: Veicolo[];
-  isOpen: boolean;
-  onToggle: () => void;
-  onSave: (tipo: TipoPatente, data: { nome: string; durata: number; cambio: CambioAmmesso; veicoli: string[]; nascosta?: boolean }) => Promise<void>;
-  onAddVehicle: (tipo: TipoPatente) => void;
+  onEdit: (p: Patente) => void;
 }) => {
-  const [saving, setSaving] = useState(false);
-  const isMoto = ['AM', 'A1', 'A2', 'A'].includes(pat.tipo);
-
-  const [edit, setEdit] = useState<{
-    nome: string;
-    durata: number | '';
-    cambio: CambioAmmesso;
-    veicoli: string[];
-    nascosta: boolean;
-  }>({
-    nome: pat.nome_visualizzato || `Patente ${pat.tipo}`,
-    durata: pat.durata_default,
-    cambio: pat.cambio_ammesso || (isMoto ? 'entrambi' : 'manuale'),
-    veicoli: pat.veicoli_abilitati || [],
-    nascosta: pat.nascosta || false,
-  });
-
-  // Sync internal state when pat changes from database
-  useEffect(() => {
-    setEdit({
-      nome: pat.nome_visualizzato || `Patente ${pat.tipo}`,
-      durata: pat.durata_default,
-      cambio: pat.cambio_ammesso || (isMoto ? 'entrambi' : 'manuale'),
-      veicoli: pat.veicoli_abilitati || [],
-      nascosta: pat.nascosta || false,
-    });
-  }, [pat, isMoto]);
-
-  const veicoliCompatibili = veicoli.filter(v => v.tipo_patente === pat.tipo);
   const c = CATEGORIA_COLOR[pat.tipo] ?? 'zinc';
-
-  const handleSaveInternal = async () => {
-    setSaving(true);
-    const { durata, ...rest } = edit;
-    await onSave(pat.tipo, {
-      ...rest,
-      durata: Number(durata) || 0
-    });
-    setSaving(false);
-  };
-
-  const toggleNascosta = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // prevent card open
-    setSaving(true);
-    const nextNascosta = !edit.nascosta;
-    setEdit(prev => ({ ...prev, nascosta: nextNascosta }));
-
-    const { durata, ...rest } = edit;
-    await onSave(pat.tipo, {
-      ...rest,
-      durata: Number(durata) || 0,
-      nascosta: nextNascosta
-    });
-    setSaving(false);
-  };
-
-  const toggleVeicolo = (vId: string) => {
-    setEdit(prev => ({
-      ...prev,
-      veicoli: prev.veicoli.includes(vId) ? prev.veicoli.filter(id => id !== vId) : [...prev.veicoli, vId],
-    }));
-  };
+  const veicoliAbilitatiCount = pat.veicoli_abilitati?.length || 0;
 
   return (
-    <div className="glass-card overflow-hidden">
-      <div
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-5 text-left transition-colors hover:bg-zinc-50/50 dark:hover:bg-zinc-900/50 cursor-pointer"
-        role="button"
-        tabIndex={0}
-      >
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg bg-${c}-100 dark:bg-${c}-900/20 text-${c}-600 dark:text-${c}-400 opacity-${edit.nascosta ? '50' : '100'}`}>
-            {pat.tipo}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className={`font-bold transition-colors ${edit.nascosta ? 'text-zinc-400 dark:text-zinc-500 line-through' : 'text-zinc-900 dark:text-zinc-50'}`}>
-                {edit.nome}
-              </h3>
-              {edit.nascosta && (
-                <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-bold uppercase tracking-wide rounded-md">
-                  Nascosta
-                </span>
-              )}
-            </div>
-            <div className={`flex items-center gap-3 mt-0.5 text-xs transition-colors ${edit.nascosta ? 'text-zinc-400/50 dark:text-zinc-600' : 'text-zinc-500'}`}>
-              <span className="flex items-center gap-1"><Clock size={11} /> {edit.durata} min</span>
-              <span className="flex items-center gap-1 font-medium capitalize">
-                Cambio: {edit.cambio}
-              </span>
-              <span className="flex items-center gap-1"><Car size={11} /> {edit.veicoli.length} veicoli</span>
-            </div>
-          </div>
+    <div className={cn(
+      "glass-card p-5 flex items-center justify-between group transition-all",
+      pat.nascosta && "opacity-60 grayscale-[0.5]"
+    )}>
+      <div className="flex items-center gap-4">
+        <div className={cn(
+          "w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-xl shrink-0 transition-colors",
+          `bg-${c}-100 dark:bg-${c}-900/20 text-${c}-600 dark:text-${c}-400`
+        )}>
+          {pat.tipo}
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={toggleNascosta}
-            className={`p-2 rounded-xl transition-all font-bold ${edit.nascosta ? 'bg-red-50 text-red-500 border border-red-100 dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/30' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
-            title={edit.nascosta ? "Mostra categoria" : "Nascondi categoria"}
-          >
-            {edit.nascosta ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
-          {isOpen ? <ChevronUp size={18} className="text-zinc-400" /> : <ChevronDown size={18} className="text-zinc-400" />}
+        <div>
+          <div className="flex items-center gap-2">
+            <h4 className="font-bold text-zinc-900 dark:text-zinc-50">
+              {pat.nome_visualizzato || `Patente ${pat.tipo}`}
+            </h4>
+            {pat.nascosta && (
+              <span className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-bold uppercase tracking-wide rounded-md">
+                Disattivata
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-zinc-500">
+            <span className="flex items-center gap-1"><Clock size={12} /> {pat.durata_default} min</span>
+            <span className="flex items-center gap-1 capitalize"><Car size={12} /> {veicoliAbilitatiCount} veicoli</span>
+            <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-[10px] font-bold uppercase tracking-tighter">
+              {pat.cambio_ammesso}
+            </span>
+          </div>
         </div>
       </div>
-
-      {isOpen && (
-        <div className="px-5 pb-5 border-t border-zinc-100 dark:border-zinc-800 pt-5 space-y-6 animate-fade-in">
-          <div className="grid md:grid-cols-2 gap-5">
-            {/* Nome Visualizzato */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Nome Visualizzato</label>
-              <input
-                type="text"
-                value={edit.nome}
-                onChange={e => setEdit(prev => ({ ...prev, nome: e.target.value }))}
-                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
-              />
-            </div>
-
-            {/* Cambio Ammesso */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Tipo Cambio Ammesso</label>
-              <select
-                value={edit.cambio}
-                onChange={e => setEdit(prev => ({ ...prev, cambio: e.target.value as CambioAmmesso }))}
-                className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
-              >
-                <option value="manuale">Manuale</option>
-                <option value="automatico">Automatico</option>
-                <option value="entrambi">Entrambi (M / A)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-5">
-            {/* Durata default */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide flex items-center gap-1.5">
-                <Clock size={12} /> Durata Appuntamento (min)
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={15}
-                  max={240}
-                  step={5}
-                  value={edit.durata}
-                  onChange={e => setEdit(prev => ({ ...prev, durata: e.target.value === '' ? '' : Number(e.target.value) }))}
-                  className="w-24 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm font-mono font-bold"
-                />
-                <span className="text-xs text-zinc-400">minuti</span>
-              </div>
-            </div>
-
-            {/* Veicoli abilitati */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wide flex items-center gap-1.5">
-                  <Car size={12} /> Veicoli Abilitati
-                </label>
-                <button
-                  onClick={() => onAddVehicle(pat.tipo)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] font-bold hover:bg-emerald-100 dark:hover:bg-emerald-800/40 transition-colors"
-                >
-                  <Plus size={12} /> Nuovo Veicolo
-                </button>
-              </div>
-
-              {veicoliCompatibili.length === 0 ? (
-                <div className="p-4 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center">
-                  <p className="text-[11px] text-zinc-400 italic">
-                    Nessun veicolo {pat.tipo}. Aggiungine uno per abilitarlo.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {veicoliCompatibili.map(v => {
-                    const sel = edit.veicoli.includes(v.id);
-                    return (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => toggleVeicolo(v.id)}
-                        className={cn(
-                          'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all',
-                          sel
-                            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                            : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-purple-400'
-                        )}
-                      >
-                        {v.nome}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={handleSaveInternal}
-              disabled={saving}
-              className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white rounded-xl font-bold text-xs hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
-              Salva {pat.tipo}
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => onEdit(pat)}
+          className="p-2.5 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+          title="Modifica Categoria"
+        >
+          <Pencil size={18} />
+        </button>
+      </div>
     </div>
   );
 };
@@ -507,44 +391,27 @@ const PatenteCard = ({
 const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [patenti, setPatenti] = useState<Patente[]>([]);
-  const [veicoli, setVeicoli] = useState<Veicolo[]>([]);
-  const [expanded, setExpanded] = useState<TipoPatente | null>('B');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Patente | null>(null);
   const [mostraNascoste, setMostraNascoste] = useState(false);
-  const [modalVeicoloOpen, setModalVeicoloOpen] = useState(false);
-  const [preselectedTipo, setPreselectedTipo] = useState<TipoPatente | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [pRes, vRes] = await Promise.all([
-      supabase.from('patenti').select('*').order('tipo'),
-      supabase.from('veicoli').select('*').order('nome'),
-    ]);
-    setPatenti(pRes.data ?? []);
-    setVeicoli(vRes.data ?? []);
+    const { data } = await supabase.from('patenti').select('*').order('tipo');
+    setPatenti(data ?? []);
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 
-  const handleSave = async (tipo: TipoPatente, data: any) => {
-    const { error } = await supabase
-      .from('patenti')
-      .upsert({
-        tipo: tipo,
-        nome_visualizzato: data.nome,
-        durata_default: data.durata,
-        cambio_ammesso: data.cambio,
-        veicoli_abilitati: data.veicoli,
-        nascosta: data.nascosta,
-      }, { onConflict: 'tipo' });
-
-    if (error) alert(error.message);
-    else await fetchData();
+  const openEdit = (p: Patente) => {
+    setEditing(p);
+    setModalOpen(true);
   };
 
-  const handleAddVehicle = (tipo: TipoPatente) => {
-    setPreselectedTipo(tipo);
-    setModalVeicoloOpen(true);
+  const onSuccess = () => {
+    setModalOpen(false);
+    fetchData();
   };
 
   if (loading) {
@@ -555,11 +422,10 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
     );
   }
 
-  // Assicurati che tutte le categorie richieste esistano nel database (o almeno nella visualizzazione)
-  // Nota: Lo schema SQL inserisce già i record.
   const patentiFiltrate = CATEGORIE.map(tipo => {
     const isMoto = ['AM', 'A1', 'A2', 'A'].includes(tipo);
-    return patenti.find(p => p.tipo === tipo) || {
+    const existing = patenti.find(p => p.tipo === tipo);
+    return existing || {
       tipo,
       nome_visualizzato: `Patente ${tipo}`,
       durata_default: 60,
@@ -573,7 +439,7 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
   const patentiNascosteCount = patentiFiltrate.length - patentiVisibili.length;
 
   return (
-    <div className="space-y-6 pb-14">
+    <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -583,7 +449,7 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
         {patentiNascosteCount > 0 && (
           <button
             onClick={() => setMostraNascoste(prev => !prev)}
-            className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50"
+            className="flex items-center gap-2 text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
           >
             {mostraNascoste ? <EyeOff size={16} /> : <Eye size={16} />}
             {mostraNascoste ? 'Nascondi disattivate' : `Mostra ${patentiNascosteCount} disattivate`}
@@ -596,30 +462,29 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
           <PatenteCard
             key={pat.tipo}
             pat={pat}
-            veicoli={veicoli}
-            isOpen={expanded === pat.tipo}
-            onToggle={() => setExpanded(expanded === pat.tipo ? null : pat.tipo)}
-            onSave={handleSave}
-            onAddVehicle={handleAddVehicle}
+            onEdit={openEdit}
           />
         ))}
       </div>
 
       <Modal
-        isOpen={modalVeicoloOpen}
-        onClose={() => setModalVeicoloOpen(false)}
-        title="Aggiungi Veicolo"
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={`Modifica Categoria ${editing?.tipo || ''}`}
       >
-        <VeicoloForm
-          defaultValues={preselectedTipo ? {
-            nome: '',
-            targa: '',
-            data_revisione: '',
-            tipo_patente: preselectedTipo,
-            cambio_manuale: true
+        <PatenteForm
+          key={editing?.tipo || 'edit'}
+          tipoId={editing?.tipo}
+          defaultValues={editing ? {
+            tipo: editing.tipo,
+            nome: editing.nome_visualizzato,
+            durata: editing.durata_default,
+            cambio: editing.cambio_ammesso,
+            veicoli: editing.veicoli_abilitati,
+            nascosta: editing.nascosta,
           } : undefined}
-          onSuccess={() => { setModalVeicoloOpen(false); fetchData(); }}
-          onCancel={() => setModalVeicoloOpen(false)}
+          onSuccess={onSuccess}
+          onCancel={() => setModalOpen(false)}
         />
       </Modal>
     </div>
@@ -804,16 +669,32 @@ export default function GestionePage() {
         title={getAddTitle()}
       >
         {active === 'veicoli' && (
-          <VeicoloForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+          <VeicoloForm 
+            key="global-add-veicoli"
+            onSuccess={handleAddSuccess} 
+            onCancel={() => setIsAddModalOpen(false)} 
+          />
         )}
         {active === 'istruttori' && (
-          <IstruttoreForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+          <IstruttoreForm 
+            key="global-add-istruttori"
+            onSuccess={handleAddSuccess} 
+            onCancel={() => setIsAddModalOpen(false)} 
+          />
         )}
         {active === 'patenti' && (
-          <PatenteForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+          <PatenteForm 
+            key="global-add-patenti"
+            onSuccess={handleAddSuccess} 
+            onCancel={() => setIsAddModalOpen(false)} 
+          />
         )}
         {active === 'utenti' && (
-          <UserForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />
+          <UserForm 
+            key="global-add-utenti"
+            onSuccess={handleAddSuccess} 
+            onCancel={() => setIsAddModalOpen(false)} 
+          />
         )}
       </Modal>
     </div>
