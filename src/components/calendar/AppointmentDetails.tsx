@@ -8,7 +8,7 @@ import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
 import { supabase } from '@/lib/supabase';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface AppointmentDetailsProps {
   appointment: Appointment;
@@ -27,6 +27,7 @@ export const AppointmentDetails = ({
   onDelete,
   onClose
 }: AppointmentDetailsProps) => {
+  const router = useRouter();
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notes, setNotes] = useState(appointment.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
@@ -47,6 +48,16 @@ export const AppointmentDetails = ({
     }
   };
 
+  const handleGoToClient = () => {
+    if (appointment.cliente_id) {
+      onClose();
+      router.push(`/clienti/${appointment.cliente_id}`);
+    } else {
+      console.warn('Missing cliente_id for appointment:', appointment);
+      alert('ID Cliente non trovato. Ricarica la pagina.');
+    }
+  };
+
   const startTime = parseISO(`${appointment.appointment_date}T${appointment.appointment_time}`);
   const endTime = addMinutes(startTime, appointment.duration);
   
@@ -63,19 +74,19 @@ export const AppointmentDetails = ({
           <User size={24} />
         </div>
         <div className="min-w-0 flex-1">
-          <Link 
-            href={`/clienti/${appointment.cliente_id}`}
-            onClick={onClose}
+          <button 
+            type="button"
+            onClick={handleGoToClient}
             className={cn(
-              "group inline-flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
-              (appointment as any).stato === 'annullato' && "line-through opacity-70"
+              "group inline-flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left",
+              ((appointment as any).stato === 'annullato' || (appointment as any).status === 'cancelled' || (appointment as any).status === 'annullato') && "line-through opacity-70"
             )}
           >
             <span className="truncate group-hover:underline decoration-2 underline-offset-4">
               {appointment.client_name}
             </span>
             <ExternalLink size={16} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </Link>
+          </button>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-zinc-500 flex items-center gap-1">
               <Phone size={14} /> {appointment.phone || 'Nessun numero'}
