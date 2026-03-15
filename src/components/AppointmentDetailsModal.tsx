@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Appointment } from '@/types';
+import Link from 'next/link';
 
 interface AppointmentDetailsModalProps {
   appointment: Appointment;
@@ -21,7 +22,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   if (!appointment) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity overflow-y-auto">
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-black/60 backdrop-blur-sm transition-opacity overflow-y-auto scrollbar-hide">
       <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-auto sm:max-h-[90vh] flex flex-col">
         
         {/* HEADER MODALE */}
@@ -50,9 +51,12 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
               </div>
               
               <div className="flex flex-col flex-1">
-                <h3 className="text-xl font-bold text-gray-900 leading-tight">
+                <Link 
+                  href={`/clienti/${appointment.cliente_id}`}
+                  className="text-xl font-extrabold text-gray-900 leading-tight hover:text-blue-600 transition-colors inline-block"
+                >
                   {appointment.client_name}
-                </h3>
+                </Link>
                 
                 {/* AZIONI RAPIDE CONTATTO */}
                 <div className="flex flex-wrap gap-3 mt-1.5 mb-3">

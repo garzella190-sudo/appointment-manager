@@ -31,7 +31,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
 
   const modalContent = (
     <div className={cn(
-      "fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 transition-all duration-300 overflow-y-auto",
+      "fixed inset-0 z-[9999] grid place-items-center p-4 sm:p-6 transition-all duration-300 overflow-y-auto",
       isOpen ? "opacity-100 visible" : "opacity-0 invisible"
     )}>
       {/* Backdrop overlay glassmorphism */}
