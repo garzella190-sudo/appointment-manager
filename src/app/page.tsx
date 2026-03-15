@@ -44,15 +44,15 @@ export default function Home() {
           .order('data'),
         supabase.from('patenti').select('id, tipo')
       ]);
-      
+
       if (dbError) throw dbError;
-      
+
       const patentiMap = new Map((patentiData || []).map((p: any) => [p.id, p.tipo]));
 
       const mappedAppointments = (dbData || []).map((row: any) => {
         const rowDate = new Date(row.data);
         const patenteId = row.clienti?.patente_richiesta_id;
-        
+
         return {
           id: row.id,
           appointment_date: format(rowDate, 'yyyy-MM-dd'),
@@ -118,11 +118,11 @@ export default function Home() {
 
     const { error } = await supabase
       .from('appuntamenti')
-      .update({ 
-        stato: 'annullato', 
-        note: cancelReason 
-          ? `${selectedAppointment.notes || ''}\n\nMotivo annullamento: ${cancelReason}`.trim() 
-          : selectedAppointment.notes 
+      .update({
+        stato: 'annullato',
+        note: cancelReason
+          ? `${selectedAppointment.notes || ''}\n\nMotivo annullamento: ${cancelReason}`.trim()
+          : selectedAppointment.notes
       })
       .eq('id', selectedAppointment.id);
 
@@ -148,20 +148,20 @@ export default function Home() {
               {format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}
             </p>
             <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner">
-              <button 
-                onClick={() => navigateDay(-1)} 
+              <button
+                onClick={() => navigateDay(-1)}
                 className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
               >
                 <ChevronLeft size={18} />
               </button>
-              <button 
-                onClick={() => setCurrentDate(new Date())} 
+              <button
+                onClick={() => setCurrentDate(new Date())}
                 className="px-3 py-1 text-xs font-bold text-zinc-900 dark:text-zinc-100"
               >
                 Oggi
               </button>
-              <button 
-                onClick={() => navigateDay(1)} 
+              <button
+                onClick={() => navigateDay(1)}
                 className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
               >
                 <ChevronRight size={18} />
@@ -169,7 +169,7 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all focus:ring-4 focus:ring-blue-500/20"
         >
@@ -179,7 +179,7 @@ export default function Home() {
 
       <section className="space-y-6">
         <h2 className="text-xl font-semibold px-1 capitalize">{titleText}</h2>
-        
+
         {loading ? (
           <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
             <Loader2 className="animate-spin" size={40} />
@@ -188,8 +188,8 @@ export default function Home() {
         ) : appointments.length > 0 ? (
           <div className="grid gap-4">
             {appointments.map((apt) => (
-              <div 
-                key={apt.id} 
+              <div
+                key={apt.id}
                 onClick={() => setSelectedAppointment(apt)}
                 className={cn(
                   "glass-card p-5 group cursor-pointer hover:border-blue-500/50 transition-all",
@@ -238,9 +238,9 @@ export default function Home() {
       </section>
 
       {/* Modal Nuovo Appuntamento */}
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         title="Nuovo Appuntamento"
       >
         <AppointmentForm onSuccess={handleSuccess} onCancel={() => setIsModalOpen(false)} />
