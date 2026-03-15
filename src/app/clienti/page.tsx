@@ -117,9 +117,9 @@ export default function ClientiPage() {
                   key={cliente.id}
                   className="w-full relative group hover:bg-purple-50/40 dark:hover:bg-purple-900/10 transition-colors"
                 >
-                  <button
+                  <div
                     onClick={() => router.push(`/clienti/${cliente.id}`)}
-                    className="w-full p-5 flex items-center justify-between group text-left"
+                    className="w-full p-5 flex items-center justify-between group text-left cursor-pointer"
                   >
                     <div className="flex items-center gap-4">
                       {/* Avatar */}
@@ -156,7 +156,7 @@ export default function ClientiPage() {
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={(e) => handleDelete(e, cliente.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(e, cliente.id); }}
                         className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
                         title="Elimina cliente"
                       >
@@ -167,7 +167,7 @@ export default function ClientiPage() {
                         className="text-zinc-300 group-hover:text-purple-500 transition-colors shrink-0"
                       />
                     </div>
-                  </button>
+                  </div>
                 </div>
               );
             })}

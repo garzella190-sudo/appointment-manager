@@ -118,9 +118,9 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                   key={v.id}
                   className="w-full relative group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors"
                 >
-                  <button
+                  <div
                     onClick={() => openEdit(v)}
-                    className="w-full p-5 flex items-center justify-between group text-left"
+                    className="w-full p-5 flex items-center justify-between group text-left cursor-pointer"
                   >
                     <div className="flex items-center gap-4">
                       {/* Avatar/Color Placeholder */}
@@ -157,7 +157,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={(e) => handleDelete(e, v.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(e, v.id); }}
                         className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
                         title="Elimina veicolo"
                       >
@@ -168,7 +168,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                         className="text-zinc-300 group-hover:text-emerald-500 transition-colors shrink-0"
                       />
                     </div>
-                  </button>
+                  </div>
                 </div>
               );
             })}
