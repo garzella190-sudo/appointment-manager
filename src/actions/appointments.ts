@@ -25,29 +25,68 @@ export async function createAppointmentAction(payload: {
   const supabase = await createClient();
   const resendApiKey = process.env.RESEND_API_KEY;
 
-  // 0. Overlap Check (Rigid)
+  // 0. Universal Overlap Check
   const startTime = new Date(payload.data);
+  startTime.setSeconds(0, 0); // Zeroing for precision
   const endTime = new Date(startTime.getTime() + payload.durata * 60000);
+  endTime.setSeconds(0, 0);
+  
   const startISO = startTime.toISOString();
   const endISO = endTime.toISOString();
   const dateOnly = payload.data.split('T')[0];
 
-  const { data: conflitti, error: overlapError } = await supabase
+  console.log('DEBUG: Creating appointment', {
+    localData: payload.data,
+    startISO,
+    endISO,
+    durata: payload.durata,
+    istruttore: payload.istruttore_id,
+    cliente: payload.cliente_id
+  });
+
+  // Logic: An instructor, client, or vehicle cannot have two overlapping appointments.
+  // We use strict inequality to allow back-to-back appointments (e.g., 16:00-17:00 and 17:00-18:00)
+  // but block even 1 minute overlap.
+  
+  // 1. Instructor Check
+  const { data: instructorBusy } = await supabase
     .from('appuntamenti')
-    .select('id, istruttore_id, veicolo_id, cliente_id')
+    .select('id')
     .neq('stato', 'annullato')
-    .eq('data_solo', dateOnly)
+    .eq('istruttore_id', payload.istruttore_id)
     .lt('inizio', endISO)
-    .gt('fine', startISO)
-    .or(`istruttore_id.eq.${payload.istruttore_id},cliente_id.eq.${payload.cliente_id}${payload.veicolo_id ? `,veicolo_id.eq.${payload.veicolo_id}` : ''}`);
+    .gt('fine', startISO);
 
-  if (overlapError) return { success: false, error: overlapError.message };
+  if (instructorBusy && instructorBusy.length > 0) {
+    return { success: false, error: "Istruttore già impegnato in questa fascia oraria." };
+  }
 
-  if (conflitti && conflitti.length > 0) {
-    return { 
-      success: false, 
-      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
-    };
+  // 2. Client Check
+  const { data: clientBusy } = await supabase
+    .from('appuntamenti')
+    .select('id')
+    .neq('stato', 'annullato')
+    .eq('cliente_id', payload.cliente_id)
+    .lt('inizio', endISO)
+    .gt('fine', startISO);
+
+  if (clientBusy && clientBusy.length > 0) {
+    return { success: false, error: "Il cliente ha già un'altra guida in questo orario." };
+  }
+
+  // 3. Vehicle Check (if applicable)
+  if (payload.veicolo_id) {
+    const { data: vehicleBusy } = await supabase
+      .from('appuntamenti')
+      .select('id')
+      .neq('stato', 'annullato')
+      .eq('veicolo_id', payload.veicolo_id)
+      .lt('inizio', endISO)
+      .gt('fine', startISO);
+
+    if (vehicleBusy && vehicleBusy.length > 0) {
+      return { success: false, error: "Veicolo già in uso in questa fascia oraria." };
+    }
   }
 
   // 1. Fetch customer details
@@ -149,30 +188,67 @@ export async function createAppointmentAction(payload: {
 export async function updateAppointmentAction(id: string, payload: any) {
   const supabase = await createClient();
   
-  // 0. Overlap Check (Rigid)
+  // 0. Universal Overlap Check
   const startTime = new Date(payload.data);
+  startTime.setSeconds(0, 0); // Zeroing for precision
   const endTime = new Date(startTime.getTime() + payload.durata * 60000);
+  endTime.setSeconds(0, 0);
+  
   const startISO = startTime.toISOString();
   const endISO = endTime.toISOString();
   const dateOnly = payload.data.split('T')[0];
 
-  const { data: conflitti, error: overlapError } = await supabase
+  console.log('DEBUG: Creating appointment', {
+    localData: payload.data,
+    startISO,
+    endISO,
+    durata: payload.durata,
+    istruttore: payload.istruttore_id,
+    cliente: payload.cliente_id
+  });
+
+  // 1. Instructor Check
+  const { data: instructorBusy } = await supabase
     .from('appuntamenti')
-    .select('id, istruttore_id, veicolo_id, cliente_id')
-    .neq('id', id) // Escludi se stesso
+    .select('id')
+    .neq('id', id)
     .neq('stato', 'annullato')
-    .eq('data_solo', dateOnly)
+    .eq('istruttore_id', payload.istruttore_id)
     .lt('inizio', endISO)
-    .gt('fine', startISO)
-    .or(`istruttore_id.eq.${payload.istruttore_id},cliente_id.eq.${payload.cliente_id}${payload.veicolo_id ? `,veicolo_id.eq.${payload.veicolo_id}` : ''}`);
+    .gt('fine', startISO);
 
-  if (overlapError) return { success: false, error: overlapError.message };
+  if (instructorBusy && instructorBusy.length > 0) {
+    return { success: false, error: "Istruttore già impegnato in questa fascia oraria." };
+  }
 
-  if (conflitti && conflitti.length > 0) {
-    return { 
-      success: false, 
-      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
-    };
+  // 2. Client Check
+  const { data: clientBusy } = await supabase
+    .from('appuntamenti')
+    .select('id')
+    .neq('id', id)
+    .neq('stato', 'annullato')
+    .eq('cliente_id', payload.cliente_id)
+    .lt('inizio', endISO)
+    .gt('fine', startISO);
+
+  if (clientBusy && clientBusy.length > 0) {
+    return { success: false, error: "Il cliente ha già un'altra guida in questo orario." };
+  }
+
+  // 3. Vehicle Check
+  if (payload.veicolo_id) {
+    const { data: vehicleBusy } = await supabase
+      .from('appuntamenti')
+      .select('id')
+      .neq('id', id)
+      .neq('stato', 'annullato')
+      .eq('veicolo_id', payload.veicolo_id)
+      .lt('inizio', endISO)
+      .gt('fine', startISO);
+
+    if (vehicleBusy && vehicleBusy.length > 0) {
+      return { success: false, error: "Veicolo già in uso in questa fascia oraria." };
+    }
   }
 
   const { email_fallback, preferenza_cambio, ...dbPayload } = payload;

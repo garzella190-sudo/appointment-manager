@@ -10,7 +10,7 @@ import { UserForm } from '@/components/forms/UserForm';
 import { PatenteForm } from '@/components/forms/PatenteForm';
 import { listUsersAction } from '@/actions/auth';
 import { deleteVeicoloAction } from '@/actions/veicoli';
-import { deleteIstruttoreAction } from '@/actions/istruttori';
+import { deleteIstruttoreAction, updateIstruttoreAction } from '@/actions/istruttori';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
   AlertTriangle, CheckCircle2, CalendarClock, Phone, Mail, Search,
@@ -81,7 +81,6 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
 
   return (
     <div className="space-y-6">
-      {/* Search Bar - Veicoli */}
       <div className="relative group">
         <Search
           className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-emerald-500 transition-colors"
@@ -120,7 +119,6 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                   className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all"
                 >
                   <div className="flex items-center gap-4">
-                    {/* Avatar/Color Placeholder */}
                     <div 
                       className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-bold text-lg"
                       style={{ 
@@ -199,16 +197,23 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
 // ── Tab: Istruttori ───────────────────────────────────────────
 const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
-  const [istruttori, setIstruttori] = useState<Istruttore[]>([]);
+  const [istruttori, setIstruttori] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<Veicolo[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Istruttore | null>(null);
+  const [editing, setEditing] = useState<any>(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('istruttori').select('*').order('cognome');
-    setIstruttori(data ?? []);
+    const [{ data: iData }, { data: vData }] = await Promise.all([
+      // Esplicitiamo i campi per evitare errori di schema cache su colonne mancanti o rinominate
+      supabase.from('trainers').select('id, name, phone, email, color, default_vehicle_id, patenti_abilitate').order('name'),
+      supabase.from('veicoli').select('*').order('nome')
+    ]);
+    setIstruttori(iData ?? []);
+    setVehicles(vData ?? []);
     setLoading(false);
   }, []);
+
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? L'azione è irreversibile.")) return;
@@ -222,7 +227,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
 
   useEffect(() => { fetch(); }, [fetch, refreshKey]);
 
-  const openEdit = (i: Istruttore) => { setEditing(i); setModalOpen(true); };
+  const openEdit = (i: any) => { setEditing(i); setModalOpen(true); };
   const onSuccess = () => { setModalOpen(false); fetch(); };
 
   return (
@@ -239,35 +244,35 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
       ) : (
         <div className="grid gap-4">
           {istruttori.map(i => {
-            const initials = `${i.nome[0] ?? ''}${i.cognome[0] ?? ''}`.toUpperCase();
+            const initials = (i.name || 'IS').split(' ').map((n: string) => n[0] || '').join('').toUpperCase().slice(0, 2);
             return (
               <div 
                 key={i.id} 
-                className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all"
+                className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all"
                 onClick={() => openEdit(i)}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1">
                   <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold text-xl flex items-center justify-center shrink-0">
                     {initials}
                   </div>
-                  <div>
-                    <h4 className="font-bold text-zinc-900 dark:text-white">{i.cognome} {i.nome}</h4>
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {i.telefono && (
-                        <a href={`tel:${i.telefono}`} className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 hover:text-green-600 transition-colors" onClick={e => e.stopPropagation()}>
-                          <Phone size={11} /> {i.telefono}
-                        </a>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-zinc-900 dark:text-white truncate">{i.name}</h4>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5 min-w-0">
+                      {i.phone ? (
+                        <PhoneActions phone={i.phone} secondary />
+                      ) : (
+                        <span className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 rounded-lg text-[10px] font-semibold italic">
+                          <Phone size={10} /> Da inserire
+                        </span>
                       )}
-                      {i.telefono && <PhoneActions phone={i.telefono} secondary />}
-                      {i.telefono && i.email && <span className="text-zinc-300 dark:text-zinc-700">·</span>}
                       {i.email && (
-                        <a href={`mailto:${i.email}`} className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 hover:text-blue-600 transition-colors" onClick={e => e.stopPropagation()}>
+                        <a href={`mailto:${i.email}`} className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 rounded-lg text-[10px] font-semibold transition-colors truncate" onClick={e => e.stopPropagation()}>
                           <Mail size={11} /> {i.email}
                         </a>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {(i.patenti_abilitate as TipoPatente[]).map(p => (
+                      {((i.patenti_abilitate as TipoPatente[]) || []).map(p => (
                         <span key={p} className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded text-[10px] font-bold">
                           {p}
                         </span>
@@ -275,14 +280,26 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(i.id); }}
-                    className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  <Pencil size={18} className="text-zinc-300 group-hover:text-blue-500 transition-colors" />
+
+                <div className="flex items-center gap-4">
+                  {i.default_vehicle_id && (
+                    <div className="hidden lg:flex flex-col gap-0.5 text-right mr-2">
+                      <label className="text-[9px] font-bold text-zinc-500 uppercase">Veicolo Predefinito</label>
+                      <span className="text-[10px] font-bold text-blue-500">
+                        {vehicles.find(v => v.id === i.default_vehicle_id)?.nome || 'Assegnato'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-all ml-auto sm:ml-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(i.id); }}
+                      className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <Pencil size={18} className="text-zinc-300 group-hover:text-blue-500 transition-colors" />
+                  </div>
                 </div>
               </div>
             );
@@ -299,11 +316,13 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
           key={editing?.id || 'new'}
           istruttoreId={editing?.id}
           defaultValues={editing ? {
-            nome: editing.nome,
-            cognome: editing.cognome,
-            telefono: editing.telefono ?? '',
+            nome: editing.name?.split(' ')[0] || '',
+            cognome: editing.name?.split(' ').slice(1).join(' ') || '',
+            telefono: editing.phone ?? '',
             email: editing.email ?? '',
-            patenti_abilitate: editing.patenti_abilitate as TipoPatente[],
+            patenti_abilitate: (editing.patenti_abilitate || []) as TipoPatente[],
+            colore: editing.color || editing.colore || '#3B82F6',
+            default_vehicle_id: editing.default_vehicle_id,
           } : undefined}
           onSuccess={onSuccess}
           onCancel={() => setModalOpen(false)}
@@ -498,10 +517,6 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
     fetchUsers();
   }, [fetchUsers, refreshKey]);
 
-  const onSuccess = () => {
-    fetchUsers();
-  };
-
   return (
     <div className="relative">
       {loading ? (
@@ -560,7 +575,6 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
           })}
         </div>
       )}
-
     </div>
   );
 };
@@ -592,7 +606,7 @@ export default function GestionePage() {
     switch (active) {
       case 'veicoli': return 'Nuovo Veicolo';
       case 'istruttori': return 'Nuovo Istruttore';
-      case 'patenti': return 'Nuovo Impegno / Patente';
+      case 'patenti': return 'Nuova Patente';
       case 'utenti': return 'Nuovo Utente';
       default: return 'Nuovo';
     }
@@ -600,13 +614,11 @@ export default function GestionePage() {
 
   return (
     <div className="p-6 md:p-10 max-w-4xl mx-auto animate-fade-in pb-32">
-      {/* Header */}
       <header className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Gestione</h1>
         <p className="text-zinc-500 dark:text-zinc-400 mt-1">Configura le risorse della scuola guida</p>
       </header>
 
-      {/* Tab selector & Add Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl w-fit overflow-x-auto max-w-full">
           {TABS.map(tab => {
@@ -643,7 +655,6 @@ export default function GestionePage() {
         </button>
       </div>
 
-      {/* Content */}
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
         {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} />}
         {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} />}
@@ -651,7 +662,6 @@ export default function GestionePage() {
         {active === 'utenti' && <TabUtenti refreshKey={refreshKey} />}
       </div>
 
-      {/* Global Add Modal */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

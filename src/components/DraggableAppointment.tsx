@@ -35,16 +35,17 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick }: Dr
         if (onClick) onClick(appointment);
       }}
       className={cn(
-        "absolute inset-0.5 p-1 rounded-md cursor-grab active:cursor-grabbing transition-all z-10 overflow-hidden shadow-sm flex flex-col justify-between",
-        isDragging ? "invisible" : "hover:scale-[1.01] hover:shadow-md",
-        appointment.is_unavailability ? "bg-zinc-200 dark:bg-zinc-700" : "bg-blue-500/10 border-l-2",
+        "absolute inset-x-0.5 top-0 p-1.5 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] shadow-sm flex flex-col justify-between border-l-4",
+        isDragging ? "invisible" : "hover:scale-[1.02] hover:shadow-lg hover:z-[30]",
+        appointment.is_unavailability ? "bg-zinc-200 dark:bg-zinc-700/50" : "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md",
         isOverlapping && "ring-2 ring-red-500 animate-pulse bg-red-500/10 dark:bg-red-500/20"
       )}
       style={{ 
         ...style,
+        height: `${(appointment.duration / 15) * 40 - 2}px`,
         borderLeftColor: isOverlapping ? '#ef4444' : (appointment.trainers?.color || '#3b82f6'),
-        backgroundColor: (appointment.trainers?.color && !isDragging && !isOverlapping ? appointment.trainers.color + '15' : undefined),
-        borderRight: appointment.vehicle_color ? `3px solid ${appointment.vehicle_color}` : undefined
+        boxShadow: isOverlapping ? '0 0 20px rgba(239, 68, 68, 0.2)' : `0 4px 12px -2px ${appointment.trainers?.color}20`,
+        borderRight: appointment.vehicle_color ? `4px solid ${appointment.vehicle_color}` : undefined,
       }}
     >
       <div>

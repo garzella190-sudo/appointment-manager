@@ -23,7 +23,7 @@ import { Toast } from '@/components/Toast';
 import { Modal } from '@/components/Modal';
 import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { User, Car, Clock, FileText, Phone, Calendar as CalendarIconSmall } from 'lucide-react';
-import { AppointmentDetails } from '@/components/calendar/AppointmentDetails';
+import { AppointmentDetailsModal } from '@/components/AppointmentDetailsModal';
 
 export default function CalendarPage() {
   const supabase = createClient();
@@ -34,8 +34,6 @@ export default function CalendarPage() {
   const [overId, setOverId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [showCancelReason, setShowCancelReason] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
   const [viewDays, setViewDays] = useState<1 | 3 | 5 | 7>(7);
 
@@ -86,7 +84,7 @@ export default function CalendarPage() {
         supabase
           .from('appuntamenti')
           .select(`
-            id, data, durata, stato, note, importo, istruttore_id, veicolo_id,
+            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine,
             clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
@@ -164,7 +162,7 @@ export default function CalendarPage() {
         type: 'success'
       });
 
-      // Update local state immediately for snappy feel
+      // Update Local State Snappy
       setAppointments(prev => prev.map(apt => {
         if (apt.id === active.id) {
           return { ...apt, appointment_date: dateStr, appointment_time: timeStr };
@@ -173,10 +171,34 @@ export default function CalendarPage() {
       }));
 
       // Update Supabase
-      const startDateTime = new Date(`${dateStr}T${timeStr}`).toISOString();
+      const targetApt = appointments.find(a => a.id === active.id);
+      if (!targetApt) return;
+
+      const duration = (targetApt as any).duration || 30;
+      const startDateTime = new Date(`${dateStr}T${timeStr}`);
+      startDateTime.setSeconds(0, 0); // Zeroing for precision
+      const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+      endDateTime.setSeconds(0, 0);
+      
+      const startISO = startDateTime.toISOString();
+      const endISO = endDateTime.toISOString();
+
+      console.log('DEBUG: Moving appointment', {
+        id: active.id,
+        localStart: `${dateStr} ${timeStr}`,
+        startISO,
+        endISO,
+        duration
+      });
+
       const { error } = await supabase
         .from('appuntamenti')
-        .update({ data: startDateTime })
+        .update({ 
+          data: startISO,
+          inizio: startISO,
+          fine: endISO,
+          data_solo: dateStr
+        })
         .eq('id', active.id);
 
       if (error) {
@@ -212,29 +234,6 @@ export default function CalendarPage() {
     }
   };
 
-  const handleConfirmCancel = async () => {
-    if (!selectedAppointment) return;
-
-    const { error } = await supabase
-      .from('appuntamenti')
-      .update({ 
-        stato: 'annullato', 
-        note: cancelReason 
-          ? `${selectedAppointment.notes || ''}\n\nMotivo annullamento: ${cancelReason}`.trim() 
-          : selectedAppointment.notes 
-      })
-      .eq('id', selectedAppointment.id);
-
-    if (!error) {
-      setSelectedAppointment(null);
-      setShowCancelReason(false);
-      setCancelReason('');
-      if (mounted) fetchWeekAppointments();
-      setToast({ message: 'Appuntamento annullato', type: 'success' });
-    } else {
-      setToast({ message: 'Errore durante l\'annullamento', type: 'error' });
-    }
-  };
 
   return (
     <DndContext
@@ -338,7 +337,11 @@ export default function CalendarPage() {
                     "grid border-b last:border-0 h-10 transition-colors",
                     isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
                   )}
-                  style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` }}
+                  style={{ 
+                    gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))`,
+                    zIndex: timeSlots.length - timeSlots.indexOf(slot),
+                    position: 'relative'
+                  }}
                 >
                   <div className={cn(
                     "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
@@ -355,7 +358,7 @@ export default function CalendarPage() {
 
                     return (
                       <DroppableCell key={cellId} id={cellId}>
-                        <div className="h-full w-full flex gap-0.5 p-0.5">
+                        <div className="h-full w-full flex gap-0.5 p-0.5 relative">
                           {cellAppointments.map((apt, idx) => {
                             const hasConflict = cellAppointments.some(other => 
                               other.id !== apt.id && 
@@ -430,46 +433,38 @@ export default function CalendarPage() {
           ) : null}
         </DragOverlay>
 
-        {selectedAppointment && (
+        {selectedAppointment && isEditingAppointment && (
           <Modal
-            isOpen={!!selectedAppointment}
+            isOpen={true}
             onClose={() => {
-              setSelectedAppointment(null);
-              setShowCancelReason(false);
-              setCancelReason('');
               setIsEditingAppointment(false);
+              setSelectedAppointment(null);
             }}
-            title={isEditingAppointment ? "Modifica Appuntamento" : "Dettagli Appuntamento"}
+            title="Modifica Appuntamento"
           >
-            {isEditingAppointment ? (
-              <div className="p-2 sm:p-4 bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 shadow-sm mt-2">
-                <AppointmentForm
-                  appointmentId={selectedAppointment.id}
-                  onSuccess={() => {
-                    setIsEditingAppointment(false);
-                    setSelectedAppointment(null);
-                    fetchWeekAppointments();
-                    setToast({ message: 'Appuntamento aggiornato', type: 'success' });
-                  }}
-                  onCancel={() => setIsEditingAppointment(false)}
-                />
-              </div>
-            ) : (
-              <AppointmentDetails
-                appointment={selectedAppointment}
-                onRefresh={fetchWeekAppointments}
-                onEdit={() => setIsEditingAppointment(true)}
-                onCancel={() => setShowCancelReason(true)}
-                onDelete={handleDeleteAppointment}
-                onClose={() => {
-                  setSelectedAppointment(null);
-                  setShowCancelReason(false);
-                  setCancelReason('');
+            <div className="p-2 sm:p-4 bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 shadow-sm mt-2">
+              <AppointmentForm
+                appointmentId={selectedAppointment.id}
+                onSuccess={() => {
                   setIsEditingAppointment(false);
+                  setSelectedAppointment(null);
+                  fetchWeekAppointments();
+                  setToast({ message: 'Appuntamento aggiornato', type: 'success' });
                 }}
+                onCancel={() => setIsEditingAppointment(false)}
               />
-            )}
+            </div>
           </Modal>
+        )}
+
+        {selectedAppointment && !isEditingAppointment && (
+          <AppointmentDetailsModal
+            appointment={selectedAppointment}
+            onClose={() => setSelectedAppointment(null)}
+            onUpdate={fetchWeekAppointments}
+            onEdit={() => setIsEditingAppointment(true)}
+            onDelete={handleDeleteAppointment}
+          />
         )}
 
         {toast && (

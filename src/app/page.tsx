@@ -133,18 +133,6 @@ export default function Home() {
     }
   };
 
-  const handleCancelGuide = async (id: string) => {
-    if (confirm('Vuoi annullare questa guida?')) {
-      const { error } = await supabase
-        .from('appuntamenti')
-        .update({ stato: 'annullato' })
-        .eq('id', id);
-
-      if (!error) {
-        fetchAppointments();
-      }
-    }
-  };
 
   const titleText = isSameDay(currentDate, new Date()) ? "Oggi" : format(currentDate, 'EEEE d MMMM', { locale: it });
 
@@ -300,7 +288,7 @@ export default function Home() {
           onClose={() => setSelectedAppointment(null)}
           onEdit={() => setIsEditingAppointment(true)}
           onDelete={handleDeleteAppointment}
-          onCancelGuide={handleCancelGuide}
+          onUpdate={fetchAppointments}
         />
       )}
     </div>

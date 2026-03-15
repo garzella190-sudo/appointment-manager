@@ -16,6 +16,12 @@
 - Calendario: Giorno selezionato 'z-index: 10' e 'text-white'.
 - Interazioni: 'readOnly' su input datepicker.
 
+## Logica di Business Universale
+- Sovrapposizioni: Non consentire sovrapposizioni anche di 1 minuto tra risorse (Istruttore, Cliente, Veicolo).
+- Stato "Svolto": Visualizzare come "Svolto" gli appuntamenti passati (currentTime > endTime) non annullati.
+- Note Real-time: Salvare le note in tempo reale con debouncing di 1 secondo.
+- Relazione Istruttore-Veicolo: Consenti l'assegnazione di un `veicolo_default_id`. Se la patente è 'B', il sistema deve selezionare automaticamente quel veicolo nell'AppointmentForm.
+
 ## Protocollo Risposta
 - File COMPLETO.
 - Planning Step obbligatorio.

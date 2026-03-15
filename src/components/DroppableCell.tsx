@@ -18,7 +18,7 @@ export const DroppableCell = ({ id, children }: DroppableCellProps) => {
     <div 
       ref={setNodeRef}
       className={cn(
-        "border-r border-zinc-100 dark:border-zinc-800 last:border-0 relative h-20 transition-colors",
+        "border-r border-zinc-100 dark:border-zinc-800 last:border-0 relative h-10 transition-colors",
         isOver ? "bg-blue-500/5 ring-2 ring-blue-500/20 ring-inset" : ""
       )}
     >

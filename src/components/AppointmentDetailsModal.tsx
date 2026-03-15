@@ -1,28 +1,34 @@
-import React, { useEffect, useState } from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Appointment } from '@/types';
-import Link from 'next/link';
-import { User, Phone, Calendar as CalendarIcon, Car, FileText, X, ExternalLink } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { X, Phone, User, Calendar as CalendarIcon, Car, FileText, ExternalLink, Loader2, Trash2, Edit3, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format, parseISO, addMinutes } from 'date-fns';
+import { it } from 'date-fns/locale';
+import Link from 'next/link';
 
 interface AppointmentDetailsModalProps {
   appointment: Appointment;
   onClose: () => void;
+  onUpdate: () => void;
   onEdit?: (app: Appointment) => void;
   onDelete?: (id: string) => void;
-  onCancelGuide?: (id: string) => void;
 }
 
 export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = ({
   appointment,
   onClose,
+  onUpdate,
   onEdit,
-  onDelete,
-  onCancelGuide,
+  onDelete
 }) => {
   const [mounted, setMounted] = useState(false);
+  const [note, setNote] = useState(appointment.notes || '');
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Lock dello scroll e gestione montaggio per Portals
   useEffect(() => {
     setMounted(true);
     document.body.style.overflow = 'hidden';
@@ -31,149 +37,204 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
     };
   }, []);
 
-  if (!appointment || !mounted) return null;
+  // --- LOGICA NOTE REAL-TIME ---
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const delayDebounceFn = setTimeout(async () => {
+      if (note !== appointment.notes) {
+        setIsSaving(true);
+        try {
+          const { error } = await supabase
+            .from('appuntamenti')
+            .update({ note: note })
+            .eq('id', appointment.id);
+          
+          if (!error) {
+            onUpdate();
+          }
+        } catch (err) {
+          console.error("Error saving note:", err);
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    }, 1000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [note, appointment.id, appointment.notes, onUpdate, mounted]);
+
+  if (!mounted) return null;
+
+  // --- LOGICA ANNULLA GUIDA ---
+  const handleCancel = async () => {
+    const confirm = window.confirm("Vuoi annullare questa guida?");
+    if (confirm) {
+      const { error } = await supabase
+        .from('appuntamenti')
+        .update({ stato: 'annullato' })
+        .eq('id', appointment.id);
+      
+      if (!error) {
+        onUpdate();
+        onClose();
+      }
+    }
+  };
+
+  // --- LOGICA STATO AUTOMATICO (SVOLTO) ---
+  const checkIsCompleted = () => {
+    if (appointment.status === 'cancelled' || (appointment as any).stato === 'annullato') return false;
+    const now = new Date();
+    const startTime = parseISO(`${appointment.appointment_date}T${appointment.appointment_time}`);
+    const endTime = addMinutes(startTime, appointment.duration || 60);
+    return now > endTime;
+  };
+
+  const isCompleted = checkIsCompleted();
+  const vehicleDisplay = appointment.vehicle_id.split(' (')[0];
 
   const modalContent = (
-    /* OVERLAY: z-[9999] per stare sopra la BottomNav (z-50) */
-    <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center w-full h-[100dvh] bg-black/60 backdrop-blur-md transition-all p-4"
-      onClick={onClose}
-    >
-      {/* CONTENITORE MODALE */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md h-[100dvh]" onClick={onClose}>
       <div 
-        className="relative bg-white dark:bg-zinc-900 w-full max-w-sm sm:max-w-md rounded-[38px] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/20 dark:border-zinc-800 flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-300"
+        className="bg-[#1c1c1e] text-white rounded-[32px] w-full max-w-sm border border-gray-800 shadow-2xl overflow-hidden animate-in zoom-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* HEADER */}
-        <div className="flex justify-between items-center px-8 pt-8 pb-4 shrink-0">
-          <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight">Dettagli Appuntamento</h2>
-          <button 
-            onClick={onClose} 
-            className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors h-10 w-10 flex items-center justify-center appearance-none"
-          >
-            <X size={20} />
+        <div className="flex justify-between items-center p-6 pb-2">
+          <h2 className="text-xl font-bold tracking-tight">Dettagli Guida</h2>
+          <button onClick={onClose} className="p-2 bg-gray-800 rounded-full h-10 w-10 flex items-center justify-center hover:bg-gray-700 transition-all">
+            <X size={20} className="text-gray-400" />
           </button>
         </div>
 
-        <div className="px-8 pb-8 pt-2 space-y-5 overflow-y-auto scrollbar-hide">
+        <div className="p-6 pt-2 space-y-4">
           
-          {/* SCHEDA PROFILO - Font Ingrandito per il nome */}
-          <div className="flex items-center gap-4 p-5 rounded-[32px] bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700">
-            <div
-              className="w-16 h-16 rounded-[24px] flex items-center justify-center text-white shrink-0 shadow-lg"
-              style={{ backgroundColor: appointment.trainers?.color || '#3b82f6' }}
-            >
-              <User size={32} />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                {appointment.cliente_id ? (
-                  <Link 
+          {/* SCHEDA CLIENTE & ISTRUTTORE */}
+          <div className="bg-[#2c2c2e] rounded-3xl p-5 border border-gray-700/50">
+            <div className="flex items-center gap-4">
+              <div 
+                className="h-14 w-14 rounded-full flex items-center justify-center shrink-0 shadow-lg text-white"
+                style={{ backgroundColor: appointment.trainers?.color || '#3b82f6' }}
+              >
+                <User size={30} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                   <Link 
                     href={`/clienti/${appointment.cliente_id}`}
                     onClick={onClose}
-                    className="text-2xl font-black text-zinc-900 dark:text-zinc-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate"
+                    className="text-lg font-bold truncate hover:text-blue-400 transition-colors"
                   >
                     {appointment.client_name}
                   </Link>
-                ) : (
-                  <h3 className="text-2xl font-black text-zinc-900 dark:text-zinc-50 truncate">
-                    {appointment.client_name}
-                  </h3>
-                )}
-                <ExternalLink size={16} className="text-zinc-400 shrink-0" />
-              </div>
-
-              <div className="flex items-center gap-3 mt-1.5 overflow-x-auto scrollbar-hide">
-                <a 
-                  href={`tel:${appointment.phone}`}
-                  className="flex items-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 text-[12px] font-bold uppercase tracking-wider transition-colors shrink-0"
-                >
-                  <Phone size={16} className="mr-1.5" /> CHIAMA
-                </a>
-                <a 
-                  href={`https://wa.me/${appointment.phone?.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center text-emerald-600 dark:text-emerald-500 text-[12px] font-bold uppercase tracking-wider transition-colors shrink-0"
-                >
-                  <span className="mr-1.5 text-base">💬</span> WHATSAPP
-                </a>
-              </div>
-
-              {/* BADGE ISTRUTTORE */}
-              <div className="mt-2.5 inline-flex items-center gap-1.5 py-1.5 px-3.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
-                <span className="text-[14px]">🎓</span>
-                <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tight">
-                  ISTRUTTORE: <span className="text-zinc-900 dark:text-zinc-100 ml-1.5">{appointment.trainers?.name || 'NON ASSEGNATO'}</span>
-                </span>
+                  <ExternalLink size={14} className="text-gray-500 shrink-0" />
+                </div>
+                
+                <div className="flex gap-4 my-1">
+                  <a href={`tel:${appointment.phone}`} className="text-[10px] font-black text-blue-400 uppercase flex items-center gap-1">
+                    <Phone size={10} /> Chiama
+                  </a>
+                  <a 
+                    href={`https://wa.me/${appointment.phone?.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-black text-emerald-400 uppercase flex items-center gap-1"
+                  >
+                    <MessageCircle size={10} /> WhatsApp
+                  </a>
+                </div>
+                
+                {/* BADGE ISTRUTTORE */}
+                <div className="flex items-center gap-2 py-1 px-3 mt-2 border border-gray-600/50 rounded-xl bg-black/20 w-fit">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                    ISTRUTTORE: <span className="text-white ml-1 font-black">{appointment.trainers?.name || 'NON ASSEGNATO'}</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* GRID INFO - Font Ingrandito */}
+          {/* GRID INFO (Data/Veicolo) */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 p-4 rounded-3xl shadow-sm">
-              <span className="text-[11px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1 mb-2">
-                <CalendarIcon size={14} /> DATA E ORA
-              </span>
-              <div className="text-base font-bold text-zinc-900 dark:text-zinc-50">{new Date(appointment.appointment_date).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-              <div className="text-blue-600 dark:text-blue-400 font-black text-base mt-0.5">{appointment.appointment_time.slice(0, 5)} - {appointment.duration || 60}m</div>
+            <div className="bg-[#2c2c2e] p-4 rounded-3xl border border-gray-700/30">
+              <span className="text-[9px] font-bold text-gray-500 uppercase block mb-1">📅 Data e Ora</span>
+              <div className="text-xs font-bold leading-tight">
+                {format(parseISO(appointment.appointment_date), 'dd MMM yyyy', { locale: it })}
+              </div>
+              <div className="text-blue-400 font-black text-xs mt-1">
+                {appointment.appointment_time.slice(0, 5)} - {appointment.duration}m
+              </div>
             </div>
-
-            <div className="bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 p-4 rounded-3xl shadow-sm">
-              <span className="text-[11px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1 mb-2">
-                <Car size={14} /> VEICOLO
-              </span>
-              <div className="text-base font-bold text-zinc-900 dark:text-zinc-50 uppercase truncate">{appointment.license_type} • {appointment.gearbox_type}</div>
+            
+            <div className="bg-[#2c2c2e] p-4 rounded-3xl border border-gray-700/30">
+              <span className="text-[9px] font-bold text-gray-500 uppercase block mb-1">🚗 Veicolo</span>
+              <div className="text-xs font-bold uppercase truncate">{appointment.license_type} • {appointment.gearbox_type === 'Automatic' ? 'Automatico' : 'Manuale'}</div>
               <div 
-                className="mt-2 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase text-white"
-                style={{ backgroundColor: appointment.vehicle_color || '#4b5563' }}
+                className="mt-1.5 inline-flex px-2 py-0.5 rounded bg-pink-500/20 text-pink-400 text-[9px] font-black uppercase tracking-tighter"
+                style={appointment.vehicle_color ? { backgroundColor: `${appointment.vehicle_color}20`, color: appointment.vehicle_color } : {}}
               >
-                {appointment.vehicle_id.split(' (')[0]}
+                {vehicleDisplay}
               </div>
             </div>
           </div>
 
-          {/* NOTE */}
-          <div className="bg-zinc-50/50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-3xl p-5 min-h-[100px]">
-             <span className="text-[11px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-1 mb-2">
-               <FileText size={14} /> NOTE
-             </span>
-             <p className="text-base text-zinc-600 dark:text-zinc-400 leading-snug italic whitespace-pre-wrap">
-                {appointment.notes || 'Nessuna nota presente.'}
-             </p>
+          {/* NOTE REAL-TIME */}
+          <div className="bg-[#2c2c2e] rounded-3xl p-4 border border-gray-700/30 relative">
+             <div className="flex justify-between items-center mb-2">
+                <span className="text-[9px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                  <FileText size={10} /> Note
+                </span>
+                {isSaving && (
+                  <div className="flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin text-blue-400" />
+                    <span className="text-[8px] text-blue-400 font-bold uppercase">In salvataggio...</span>
+                  </div>
+                )}
+             </div>
+             <textarea 
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="w-full bg-transparent text-sm text-gray-100 italic focus:outline-none resize-none h-16 scrollbar-hide"
+                placeholder="Nessuna nota... clicca qui per aggiungere"
+             />
           </div>
 
-          {/* AZIONI - h-11 obbligatorio per iOS */}
+          {/* AZIONI (iOS h-11) */}
           <div className="grid grid-cols-2 gap-2 pt-2">
             <button 
-              onClick={() => onEdit?.(appointment)} 
-              className="h-11 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 font-black rounded-2xl text-[12px] uppercase tracking-wider transition-transform active:scale-95"
+              onClick={() => onEdit?.(appointment)}
+              className="h-11 bg-blue-600/20 text-blue-400 font-black rounded-2xl text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              MODIFICA
+              <Edit3 size={14} /> Modifica
             </button>
             <button 
-              onClick={() => onCancelGuide?.(appointment.id)} 
-              className="h-11 bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400 font-black rounded-2xl text-[12px] uppercase tracking-wider transition-transform active:scale-95"
+                onClick={handleCancel}
+                disabled={appointment.status === 'cancelled' || (appointment as any).stato === 'annullato'}
+                className="h-11 bg-amber-600/20 text-amber-400 font-black rounded-2xl text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              ANNULLA
+              Annulla
             </button>
             <button 
-              onClick={() => onDelete?.(appointment.id)} 
-              className="h-11 bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 font-black rounded-2xl text-[12px] uppercase tracking-wider transition-transform active:scale-95"
+              onClick={() => onDelete?.(appointment.id)}
+              className="h-11 bg-red-600/20 text-red-400 font-black rounded-2xl text-[10px] uppercase tracking-wider active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              ELIMINA
+              <Trash2 size={14} /> Elimina
             </button>
-            <button 
-              onClick={onClose} 
-              className="h-11 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900 font-black rounded-2xl text-[12px] uppercase tracking-wider transition-transform active:scale-95 shadow-lg"
-            >
-              CHIUDI
+            <button onClick={onClose} className="h-11 bg-gray-700 text-white font-black rounded-2xl text-[10px] uppercase tracking-wider active:scale-95 transition-all">
+              Chiudi
             </button>
           </div>
 
+          {/* INDICATORE STATO AUTOMATICO */}
+          {isCompleted && (
+            <div className="text-center pt-2">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest border border-emerald-500/20">
+                ✓ Guida Svolta
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

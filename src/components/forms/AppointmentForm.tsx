@@ -108,7 +108,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       }
 
       const start = new Date(`${form.data}T${form.ora}`);
+      start.setSeconds(0, 0);
       const end = new Date(start.getTime() + form.durata * 60000);
+      end.setSeconds(0, 0);
       const startISO = start.toISOString();
       const endISO = end.toISOString();
 
@@ -128,12 +130,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       if (form.veicolo_id) clauses.push(`veicolo_id.eq.${form.veicolo_id}`);
       
       query = query.or(clauses.join(','));
+
       const { data: conflitti, error } = await query;
 
       if (!error) {
-        setInstructorOverlap(conflitti?.some(c => form.istruttore_id && c.istruttore_id === form.istruttore_id) || false);
-        setVehicleOverlap(conflitti?.some(c => form.veicolo_id && c.veicolo_id === form.veicolo_id) || false);
-        setClientOverlap(conflitti?.some(c => form.cliente_id && c.cliente_id === form.cliente_id) || false);
+        setInstructorOverlap(conflitti?.some((c: any) => form.istruttore_id && c.istruttore_id === form.istruttore_id) || false);
+        setVehicleOverlap(conflitti?.some((c: any) => form.veicolo_id && c.veicolo_id === form.veicolo_id) || false);
+        setClientOverlap(conflitti?.some((c: any) => form.cliente_id && c.cliente_id === form.cliente_id) || false);
       }
     }
     const timer = setTimeout(checkOverlap, 300);
@@ -183,6 +186,16 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       }
     }
   };
+
+  useEffect(() => {
+    // Se la categoria è 'B', impostiamo automaticamente il veicolo di default dell'istruttore
+    const selectedPatente = patenti.find(p => p.id === form.patente_id);
+    const selectedIstruttore = istruttori.find(i => i.id === form.istruttore_id);
+
+    if (selectedPatente?.tipo === 'B' && selectedIstruttore?.default_vehicle_id) {
+      setForm(prev => ({ ...prev, veicolo_id: selectedIstruttore.default_vehicle_id! }));
+    }
+  }, [form.istruttore_id, form.patente_id, patenti, istruttori]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
