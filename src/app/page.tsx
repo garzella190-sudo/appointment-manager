@@ -92,14 +92,14 @@ export default function Home() {
     fetchAppointments();
   }, [currentDate]);
 
-  // Search logic (Client/Trainer filter)
+  // Search logic (Client/Trainer filter) - FIX: phone optional check
   const filteredAppointments = useMemo(() => {
     if (!searchQuery) return appointments;
     const q = searchQuery.toLowerCase();
     return appointments.filter(a => 
-      a.client_name.toLowerCase().includes(q) || 
-      a.trainers?.name.toLowerCase().includes(q) ||
-      a.phone.includes(q)
+      (a.client_name?.toLowerCase().includes(q)) || 
+      (a.trainers?.name?.toLowerCase().includes(q)) ||
+      (a.phone && a.phone.includes(q))
     );
   }, [appointments, searchQuery]);
 
