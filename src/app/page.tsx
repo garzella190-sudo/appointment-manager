@@ -75,7 +75,7 @@ export default function Home() {
         };
       });
 
-      setAppointments(mappedAppointments as Appointment[]);
+      setAppointments(mappedAppointments as unknown as Appointment[]);
     } catch (error) {
       console.error('Error fetching appointments:', error);
     } finally {
