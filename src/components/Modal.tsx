@@ -31,7 +31,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
 
   const modalContent = (
     <div className={cn(
-      "fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 transition-all duration-300",
+      "fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 transition-all duration-300 overflow-y-auto",
       isOpen ? "opacity-100 visible" : "opacity-0 invisible"
     )}>
       {/* Backdrop overlay glassmorphism */}
@@ -47,7 +47,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       {/* Modal Panel - Proportional Sizing & Centered */}
       <div 
         className={cn(
-          "relative bg-white dark:bg-zinc-900 w-full max-w-xl rounded-[32px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transition-all duration-500 transform border border-white/20 dark:border-zinc-800",
+          "relative bg-white dark:bg-zinc-900 w-full max-w-xl rounded-[32px] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transition-all duration-500 transform border border-white/20 dark:border-zinc-800 my-auto",
           isOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-8"
         )}
       >

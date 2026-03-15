@@ -21,11 +21,11 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   if (!appointment) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
-      <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity overflow-y-auto">
+      <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-auto sm:max-h-[90vh] flex flex-col">
         
         {/* HEADER MODALE */}
-        <div className="flex justify-between items-center p-6 pb-2">
+        <div className="flex justify-between items-center p-6 pb-2 shrink-0">
           <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Dettagli Appuntamento</h2>
           <button 
             onClick={onClose} 
@@ -37,7 +37,8 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
           </button>
         </div>
 
-        <div className="p-6 pt-2 space-y-4">
+        {/* CONTENT (Scrollable on small screens) */}
+        <div className="p-6 pt-2 space-y-4 overflow-y-auto custom-scrollbar">
           
           {/* SCHEDA CLIENTE E ISTRUTTORE */}
           <div className="bg-gray-50/80 rounded-3xl p-5 border border-gray-100 shadow-sm">
