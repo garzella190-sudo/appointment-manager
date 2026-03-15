@@ -250,7 +250,6 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           />
         </div>
         
-        {/* Allineamento Orizzontale Inizio/Fine per iPhone */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className={LABEL_CLS}>Inizio</label>

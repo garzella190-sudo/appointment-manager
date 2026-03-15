@@ -85,7 +85,7 @@ export default function Home() {
         if (updated) setSelectedAppointment(updated as unknown as Appointment);
       }
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+      // Silence background errors for stable UI, error already logged in server if needed
     } finally {
       setLoading(false);
     }
@@ -253,7 +253,6 @@ export default function Home() {
               onRefresh={fetchAppointments}
               onEdit={() => setIsEditingAppointment(true)}
               onCancel={() => {
-                // Semplificato per evitare bug cancellazione
                 if (confirm('Vuoi annullare questa guida?')) {
                    supabase
                     .from('appuntamenti')
