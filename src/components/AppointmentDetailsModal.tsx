@@ -3,6 +3,7 @@
 import React from 'react';
 import { Appointment } from '@/types';
 import Link from 'next/link';
+import { X } from 'lucide-react';
 
 interface AppointmentDetailsModalProps {
   appointment: Appointment;
@@ -22,8 +23,10 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
   if (!appointment) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-black/60 backdrop-blur-sm transition-opacity overflow-y-auto scrollbar-hide">
-      <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-auto sm:max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto scrollbar-hide">
+      
+      {/* Centering Wrapper using my-auto for robust behavior in overflow-y containers */}
+      <div className="relative my-auto w-full max-w-lg bg-white rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
         
         {/* HEADER MODALE */}
         <div className="flex justify-between items-center p-6 pb-2 shrink-0">
@@ -32,9 +35,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
             onClick={onClose} 
             className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors h-10 w-10 flex items-center justify-center appearance-none"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X size={20} />
           </button>
         </div>
 
@@ -51,18 +52,24 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
               </div>
               
               <div className="flex flex-col flex-1">
-                <Link 
-                  href={`/clienti/${appointment.cliente_id}`}
-                  className="text-xl font-extrabold text-gray-900 leading-tight hover:text-blue-600 transition-colors inline-block"
-                >
-                  {appointment.client_name}
-                </Link>
+                {appointment.cliente_id ? (
+                  <Link 
+                    href={`/clienti/${appointment.cliente_id}`}
+                    className="text-xl font-extrabold text-gray-900 leading-tight hover:text-blue-600 hover:underline transition-all inline-block decoration-2 underline-offset-4"
+                  >
+                    {appointment.client_name}
+                  </Link>
+                ) : (
+                  <h3 className="text-xl font-extrabold text-gray-900 leading-tight">
+                    {appointment.client_name}
+                  </h3>
+                )}
                 
                 {/* AZIONI RAPIDE CONTATTO */}
                 <div className="flex flex-wrap gap-3 mt-1.5 mb-3">
                   <a 
                     href={`tel:${appointment.phone}`}
-                    className="flex items-center text-green-600 text-[11px] font-black uppercase tracking-widest hover:opacity-70 transition-opacity"
+                    className="flex items-center text-green-600 text-[11px] font-black uppercase tracking-widest hover:brightness-90 transition-all"
                   >
                     <span className="mr-1 text-sm">📞</span> Chiama
                   </a>
@@ -70,7 +77,7 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
                     href={`https://wa.me/${appointment.phone?.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center text-emerald-500 text-[11px] font-black uppercase tracking-widest hover:opacity-70 transition-opacity"
+                    className="flex items-center text-emerald-500 text-[11px] font-black uppercase tracking-widest hover:brightness-90 transition-all"
                   >
                     <span className="mr-1 text-sm">💬</span> WhatsApp
                   </a>
