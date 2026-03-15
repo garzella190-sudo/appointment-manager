@@ -9,7 +9,7 @@ import { Modal } from '@/components/Modal';
 import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { format, addDays, parseISO, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { AppointmentDetails } from '@/components/calendar/AppointmentDetails';
+import { AppointmentDetailsModal } from '@/components/AppointmentDetailsModal';
 
 export default function Home() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -92,7 +92,7 @@ export default function Home() {
     fetchAppointments();
   }, [currentDate]);
 
-  // Search logic (Client/Trainer filter) - FIX: phone optional check
+  // Search logic
   const filteredAppointments = useMemo(() => {
     if (!searchQuery) return appointments;
     const q = searchQuery.toLowerCase();
@@ -117,19 +117,31 @@ export default function Home() {
     setCurrentDate(prev => addDays(prev, direction));
   };
 
-  const handleDeleteAppointment = async () => {
-    if (!selectedAppointment) return;
+  const handleDeleteAppointment = async (id: string) => {
     if (window.confirm('Sei sicuro di voler eliminare questo appuntamento?')) {
       const { error } = await supabase
         .from('appuntamenti')
         .delete()
-        .eq('id', selectedAppointment.id);
+        .eq('id', id);
 
       if (!error) {
         setSelectedAppointment(null);
         fetchAppointments();
       } else {
         alert('Errore durante l\'eliminazione');
+      }
+    }
+  };
+
+  const handleCancelGuide = async (id: string) => {
+    if (confirm('Vuoi annullare questa guida?')) {
+      const { error } = await supabase
+        .from('appuntamenti')
+        .update({ stato: 'annullato' })
+        .eq('id', id);
+
+      if (!error) {
+        fetchAppointments();
       }
     }
   };
@@ -176,7 +188,7 @@ export default function Home() {
         </button>
       </header>
 
-      {/* Search Bar - Estetica Gestione */}
+      {/* Search Bar */}
       <div className="relative mb-8 group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors" size={20} />
         <input
@@ -263,44 +275,33 @@ export default function Home() {
         <AppointmentForm onSuccess={handleSuccess} onCancel={() => setIsModalOpen(false)} />
       </Modal>
 
-      {selectedAppointment && (
+      {/* NEW MODAL INTEGRATION */}
+      {selectedAppointment && isEditingAppointment && (
         <Modal
-          isOpen={!!selectedAppointment}
+          isOpen={true}
           onClose={() => {
-            setSelectedAppointment(null);
             setIsEditingAppointment(false);
           }}
-          title={isEditingAppointment ? "Modifica Appuntamento" : "Dettagli Appuntamento"}
+          title="Modifica Appuntamento"
         >
-          {isEditingAppointment ? (
-            <div className="p-1 sm:p-2 bg-white dark:bg-zinc-950 rounded-2xl mt-2">
-              <AppointmentForm
-                appointmentId={selectedAppointment.id}
-                onSuccess={handleEditSuccess}
-                onCancel={() => setIsEditingAppointment(false)}
-              />
-            </div>
-          ) : (
-            <AppointmentDetails
-              appointment={selectedAppointment}
-              onRefresh={fetchAppointments}
-              onEdit={() => setIsEditingAppointment(true)}
-              onCancel={() => {
-                if (confirm('Vuoi annullare questa guida?')) {
-                   supabase
-                    .from('appuntamenti')
-                    .update({ stato: 'annullato' })
-                    .eq('id', selectedAppointment.id)
-                    .then(() => fetchAppointments());
-                }
-              }}
-              onDelete={handleDeleteAppointment}
-              onClose={() => {
-                setSelectedAppointment(null);
-              }}
+          <div className="p-1 sm:p-2 bg-white dark:bg-zinc-950 rounded-2xl mt-2">
+            <AppointmentForm
+              appointmentId={selectedAppointment.id}
+              onSuccess={handleEditSuccess}
+              onCancel={() => setIsEditingAppointment(false)}
             />
-          )}
+          </div>
         </Modal>
+      )}
+
+      {selectedAppointment && !isEditingAppointment && (
+        <AppointmentDetailsModal
+          appointment={selectedAppointment}
+          onClose={() => setSelectedAppointment(null)}
+          onEdit={() => setIsEditingAppointment(true)}
+          onDelete={handleDeleteAppointment}
+          onCancelGuide={handleCancelGuide}
+        />
       )}
     </div>
   );
