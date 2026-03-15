@@ -103,10 +103,10 @@ export const AppointmentDetailsModal: React.FC<AppointmentDetailsModalProps> = (
               </div>
 
               {/* BADGE ISTRUTTORE */}
-              <div className="mt-2.5 inline-flex items-center gap-1.5 py-1 px-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
-                <span className="text-[12px]">🎓</span>
-                <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-tighter">
-                  ISTRUTTORE: <span className="text-zinc-900 dark:text-zinc-100 ml-1">{appointment.trainers?.name || 'NON ASSEGNATO'}</span>
+              <div className="mt-2.5 inline-flex items-center gap-1.5 py-1.5 px-3.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
+                <span className="text-[14px]">🎓</span>
+                <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tight">
+                  ISTRUTTORE: <span className="text-zinc-900 dark:text-zinc-100 ml-1.5">{appointment.trainers?.name || 'NON ASSEGNATO'}</span>
                 </span>
               </div>
             </div>
