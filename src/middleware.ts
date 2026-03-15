@@ -2,6 +2,7 @@ import { type NextRequest } from 'next/server'
 import { proxy } from '@/utils/supabase/proxy'
 
 export async function middleware(request: NextRequest) {
+  // Chiama la logica di Supabase definita nel file delle utility
   return await proxy(request)
 }
 
