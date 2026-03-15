@@ -90,21 +90,21 @@ export default function ClientiPage() {
       </div>
 
       {/* List */}
-      <div className="glass-card overflow-hidden">
+      <div className="">
         {loading ? (
           <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
             <Loader2 className="animate-spin" size={40} />
             <p>Caricamento clienti…</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-16 text-center">
+          <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-16 text-center">
             <UserCircle2 size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
             <p className="text-zinc-400">
               {search ? 'Nessun cliente trovato per questa ricerca.' : 'Nessun cliente ancora. Clicca il + per aggiungerne uno.'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="grid gap-4">
             {filtered.map(cliente => {
               const patenteName = patenteLabel(cliente.patente_richiesta_id);
               const patenteDisplay = patenteName 
@@ -115,58 +115,54 @@ export default function ClientiPage() {
               return (
                 <div 
                   key={cliente.id}
-                  className="w-full relative group hover:bg-purple-50/40 dark:hover:bg-purple-900/10 transition-colors"
+                  onClick={() => router.push(`/clienti/${cliente.id}`)}
+                  className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group cursor-pointer hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-all"
                 >
-                  <div
-                    onClick={() => router.push(`/clienti/${cliente.id}`)}
-                    className="w-full p-5 flex items-center justify-between group text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Avatar */}
-                      <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-bold text-lg flex items-center justify-center shrink-0">
-                        {initials}
-                      </div>
-
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-zinc-900 dark:text-zinc-50 truncate">
-                          {cliente.cognome} {cliente.nome}
-                        </h4>
-                        <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                          {cliente.telefono && (
-                            <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-                              <Phone size={11} />
-                              {cliente.telefono}
-                            </span>
-                          )}
-                          {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
-                          {cliente.email && (
-                            <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                              <Mail size={11} />
-                              {cliente.email}
-                            </span>
-                          )}
-                          {patenteDisplay && (
-                            <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                              Pat. {patenteDisplay}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                  <div className="flex items-center gap-4">
+                    {/* Avatar */}
+                    <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-bold text-lg flex items-center justify-center shrink-0">
+                      {initials}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(e, cliente.id); }}
-                        className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
-                        title="Elimina cliente"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                      <ChevronRight
-                        size={20}
-                        className="text-zinc-300 group-hover:text-purple-500 transition-colors shrink-0"
-                      />
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-zinc-900 dark:text-white truncate">
+                        {cliente.cognome} {cliente.nome}
+                      </h4>
+                      <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        {cliente.telefono && (
+                          <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            <Phone size={11} />
+                            {cliente.telefono}
+                          </span>
+                        )}
+                        {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
+                        {cliente.email && (
+                          <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                            <Mail size={11} />
+                            {cliente.email}
+                          </span>
+                        )}
+                        {patenteDisplay && (
+                          <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                            Pat. {patenteDisplay}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(e, cliente.id); }}
+                      className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                      title="Elimina cliente"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <ChevronRight
+                      size={20}
+                      className="text-zinc-300 group-hover:text-purple-500 transition-colors shrink-0"
+                    />
                   </div>
                 </div>
               );

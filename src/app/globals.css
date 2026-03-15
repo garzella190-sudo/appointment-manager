@@ -89,3 +89,77 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
 }
+
+/* Premium DatePicker Overrides */
+.premium-calendar {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 1.25rem !important; /* rounded-2xl */
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  font-family: inherit !important;
+  padding: 0.5rem !important;
+}
+
+.premium-calendar .react-datepicker__header {
+  background-color: var(--card) !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-top-left-radius: 1rem !important;
+  border-top-right-radius: 1rem !important;
+  padding-top: 0.75rem !important;
+}
+
+.premium-calendar .react-datepicker__current-month {
+  color: var(--foreground) !important;
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.premium-calendar .react-datepicker__day-name {
+  color: #94a3b8 !important; /* slate-400 */
+  font-weight: 600 !important;
+  width: 2.25rem !important;
+  line-height: 2.25rem !important;
+}
+
+.premium-calendar .react-datepicker__day {
+  color: var(--foreground) !important;
+  width: 2.25rem !important;
+  line-height: 2.25rem !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.2s !important;
+  margin: 0.1rem !important;
+}
+
+.premium-calendar .react-datepicker__day:hover {
+  background-color: #3b82f620 !important;
+  color: #3b82f6 !important;
+}
+
+.premium-calendar .react-datepicker__day--selected {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  font-weight: 700 !important;
+}
+
+.premium-calendar .react-datepicker__day--keyboard-selected {
+  background-color: #3b82f620 !important;
+  color: #3b82f6 !important;
+}
+
+.premium-calendar .react-datepicker__day--today {
+  font-weight: 800 !important;
+  color: #3b82f6 !important;
+}
+
+.premium-calendar .react-datepicker__navigation {
+  top: 1rem !important;
+}
+
+.premium-calendar .react-datepicker__navigation-icon::before {
+  border-color: #64748b !important;
+}
+
+.premium-calendar .react-datepicker__triangle {
+  display: none !important;
+}

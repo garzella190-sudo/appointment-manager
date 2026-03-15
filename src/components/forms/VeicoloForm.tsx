@@ -6,6 +6,7 @@ import { Loader2, CalendarClock, AlertTriangle, CheckCircle2, AlertCircle } from
 import { TipoPatente, TipoCambio } from '@/lib/database.types';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import { createVeicoloAction, updateVeicoloAction, deleteVeicoloAction } from '@/actions/veicoli';
+import DatePicker from '@/components/DatePicker';
 import { Trash2 } from 'lucide-react';
 
 const TIPI_PATENTE: TipoPatente[] = ['AM', 'A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'];
@@ -152,12 +153,15 @@ export const VeicoloForm = ({
       <div className="space-y-1.5">
         <label className={LABEL_CLS}>Scadenza Revisione</label>
         <div className="flex items-center gap-2">
-          <input
+          <DatePicker
+            selected={form.data_revisione ? new Date(form.data_revisione) : new Date()}
+            onChange={(date) => {
+              if (date) {
+                const formatted = date.toISOString().split('T')[0];
+                setForm(prev => ({ ...prev, data_revisione: formatted }));
+              }
+            }}
             required
-            type="date"
-            value={form.data_revisione}
-            onChange={set('data_revisione')}
-            className={INPUT_CLS}
           />
           {form.data_revisione && calendarUrl && (
             <a

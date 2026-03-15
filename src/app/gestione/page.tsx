@@ -96,78 +96,74 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
         />
       </div>
 
-      <div className="glass-card overflow-hidden">
+      <div className="">
         {loading ? (
           <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
             <Loader2 className="animate-spin text-emerald-500" size={40} />
             <p>Caricamento veicoli…</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-16 text-center">
+          <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-16 text-center">
             <Car size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
             <p className="text-zinc-400">
               {search ? 'Nessun veicolo trovato per questa ricerca.' : 'Nessun veicolo ancora.'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="grid gap-4">
             {filtered.map(v => {
               const initials = v.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
               return (
                 <div 
                   key={v.id}
-                  className="w-full relative group hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors"
+                  onClick={() => openEdit(v)}
+                  className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all"
                 >
-                  <div
-                    onClick={() => openEdit(v)}
-                    className="w-full p-5 flex items-center justify-between group text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Avatar/Color Placeholder */}
-                      <div 
-                        className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-bold text-lg"
-                        style={{ 
-                          backgroundColor: `${v.colore}15`, 
-                          color: v.colore 
-                        }}
-                      >
-                        {initials || <Car size={24} />}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-zinc-900 dark:text-zinc-50 truncate">
-                            {v.nome}
-                          </h4>
-                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded tracking-widest leading-none">
-                            {v.targa}
-                          </span>
-                        </div>
-                        <div className="flex items-center flex-wrap gap-2 mt-1.5">
-                          <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
-                            Pat. {v.tipo_patente}
-                          </span>
-                          <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-bold">
-                            {v.cambio_manuale ? 'Manuale' : 'Automatico'}
-                          </span>
-                          <RevisionBadge dataRevisione={v.data_revisione} />
-                        </div>
-                      </div>
+                  <div className="flex items-center gap-4">
+                    {/* Avatar/Color Placeholder */}
+                    <div 
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-bold text-lg"
+                      style={{ 
+                        backgroundColor: `${v.colore}15`, 
+                        color: v.colore 
+                      }}
+                    >
+                      {initials || <Car size={24} />}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(e, v.id); }}
-                        className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
-                        title="Elimina veicolo"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                      <Pencil
-                        size={18}
-                        className="text-zinc-300 group-hover:text-emerald-500 transition-colors shrink-0"
-                      />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-zinc-900 dark:text-white truncate">
+                          {v.nome}
+                        </h4>
+                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded tracking-widest leading-none">
+                          {v.targa}
+                        </span>
+                      </div>
+                      <div className="flex items-center flex-wrap gap-2 mt-1.5">
+                        <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                          Pat. {v.tipo_patente}
+                        </span>
+                        <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-bold">
+                          {v.cambio_manuale ? 'Manuale' : 'Automatico'}
+                        </span>
+                        <RevisionBadge dataRevisione={v.data_revisione} />
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(e, v.id); }}
+                      className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                      title="Elimina veicolo"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <Pencil
+                      size={18}
+                      className="text-zinc-300 group-hover:text-emerald-500 transition-colors shrink-0"
+                    />
                   </div>
                 </div>
               );
@@ -236,7 +232,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
           <Loader2 className="animate-spin text-blue-500" size={36} />
         </div>
       ) : istruttori.length === 0 ? (
-        <div className="glass-card p-16 text-center">
+        <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-16 text-center">
           <Users size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
           <p className="text-zinc-400">Nessun istruttore. Clicca <strong>+</strong> per aggiungerne uno.</p>
         </div>
@@ -245,23 +241,27 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
           {istruttori.map(i => {
             const initials = `${i.nome[0] ?? ''}${i.cognome[0] ?? ''}`.toUpperCase();
             return (
-              <div key={i.id} className="glass-card p-5 flex items-center justify-between group">
+              <div 
+                key={i.id} 
+                className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all"
+                onClick={() => openEdit(i)}
+              >
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold text-xl flex items-center justify-center shrink-0">
                     {initials}
                   </div>
                   <div>
-                    <h4 className="font-bold text-zinc-900 dark:text-zinc-50">{i.cognome} {i.nome}</h4>
+                    <h4 className="font-bold text-zinc-900 dark:text-white">{i.cognome} {i.nome}</h4>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {i.telefono && (
-                        <a href={`tel:${i.telefono}`} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-green-600 transition-colors">
+                        <a href={`tel:${i.telefono}`} className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 hover:text-green-600 transition-colors" onClick={e => e.stopPropagation()}>
                           <Phone size={11} /> {i.telefono}
                         </a>
                       )}
                       {i.telefono && <PhoneActions phone={i.telefono} secondary />}
-                      {i.telefono && i.email && <span className="text-zinc-300">·</span>}
+                      {i.telefono && i.email && <span className="text-zinc-300 dark:text-zinc-700">·</span>}
                       {i.email && (
-                        <a href={`mailto:${i.email}`} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-blue-600 transition-colors">
+                        <a href={`mailto:${i.email}`} className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 hover:text-blue-600 transition-colors" onClick={e => e.stopPropagation()}>
                           <Mail size={11} /> {i.email}
                         </a>
                       )}
@@ -277,17 +277,12 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
                   <button
-                    onClick={() => openEdit(i)}
-                    className="p-2 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(i.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(i.id); }}
                     className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
                   >
                     <Trash2 size={16} />
                   </button>
+                  <Pencil size={18} className="text-zinc-300 group-hover:text-blue-500 transition-colors" />
                 </div>
               </div>
             );
@@ -344,9 +339,9 @@ const PatenteCard = ({
 
   return (
     <div className={cn(
-      "glass-card p-5 flex items-center justify-between group transition-all",
+      "bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group transition-all hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer",
       pat.nascosta && "opacity-60 grayscale-[0.5]"
-    )}>
+    )} onClick={() => onEdit(pat)}>
       <div className="flex items-center gap-4">
         <div className={cn(
           "w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-xl shrink-0 transition-colors",
@@ -356,7 +351,7 @@ const PatenteCard = ({
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h4 className="font-bold text-zinc-900 dark:text-zinc-50">
+            <h4 className="font-bold text-zinc-900 dark:text-white">
               {pat.nome_visualizzato || `Patente ${pat.tipo}`}
             </h4>
             {pat.nascosta && (
@@ -374,14 +369,8 @@ const PatenteCard = ({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => onEdit(pat)}
-          className="p-2.5 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-          title="Modifica Categoria"
-        >
-          <Pencil size={18} />
-        </button>
+      <div className="flex items-center gap-2">
+        <Pencil size={18} className="text-zinc-300 group-hover:text-purple-500 opacity-0 group-hover:opacity-100 transition-all" />
       </div>
     </div>
   );
@@ -520,7 +509,7 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
           <Loader2 className="animate-spin text-blue-500" size={36} />
         </div>
       ) : users.length === 0 ? (
-        <div className="glass-card p-16 text-center">
+        <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-16 text-center">
           <Users size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
           <p className="text-zinc-400">Nessun utente trovato.</p>
         </div>
@@ -538,7 +527,7 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
               .slice(0, 2);
 
             return (
-              <div key={user.id} className="glass-card p-5 flex items-center justify-between group">
+              <div key={user.id} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
                 <div className="flex items-center gap-4">
                   <div className={cn(
                     "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 font-bold text-xl",
@@ -550,7 +539,7 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-zinc-900 dark:text-zinc-50">{fullName}</h4>
+                      <h4 className="font-bold text-zinc-900 dark:text-white">{fullName}</h4>
                       <span className={cn(
                         "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide",
                         role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" :

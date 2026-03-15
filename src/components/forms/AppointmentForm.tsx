@@ -7,6 +7,7 @@ import { format, addMinutes } from 'date-fns';
 import { Cliente, Istruttore, Veicolo, Patente, TipoPatente, CambioAmmesso, StatoAppuntamento } from '@/lib/database.types';
 import { cn } from '@/lib/utils';
 import { createAppointmentAction, updateAppointmentAction } from '@/actions/appointments';
+import DatePicker from '@/components/DatePicker';
 
 interface FormProps {
   onSuccess: () => void;
@@ -383,12 +384,15 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         {/* Data */}
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Data</label>
-          <input
+          <DatePicker
+            selected={form.data ? new Date(form.data) : new Date()}
+            onChange={(date) => {
+              if (date) {
+                const formatted = date.toISOString().split('T')[0];
+                setForm(prev => ({ ...prev, data: formatted }));
+              }
+            }}
             required
-            type="date"
-            value={form.data}
-            onChange={(e) => setForm(prev => ({ ...prev, data: e.target.value }))}
-            className={INPUT_CLS}
           />
         </div>
         {/* Ora Inizio */}
