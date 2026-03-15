@@ -34,3 +34,4 @@ export async function proxy(request: NextRequest) {
 
   return response
 }
+// fix build
