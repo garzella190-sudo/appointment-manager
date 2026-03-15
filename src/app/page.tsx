@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Car, FileText, Phone, Calendar as CalendarIconSmall } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Car, FileText, Phone, Calendar as CalendarIconSmall, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
@@ -16,11 +16,10 @@ export default function Home() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Popup state
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [showCancelReason, setShowCancelReason] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
@@ -79,13 +78,11 @@ export default function Home() {
 
       setAppointments(mappedAppointments as unknown as Appointment[]);
       
-      // Real-time Update for selected appointment
       if (selectedAppointment) {
         const updated = mappedAppointments.find(a => a.id === selectedAppointment.id);
         if (updated) setSelectedAppointment(updated as unknown as Appointment);
       }
     } catch (error) {
-      // Silence background errors for stable UI, error already logged in server if needed
     } finally {
       setLoading(false);
     }
@@ -94,6 +91,17 @@ export default function Home() {
   useEffect(() => {
     fetchAppointments();
   }, [currentDate]);
+
+  // Search logic (Client/Trainer filter)
+  const filteredAppointments = useMemo(() => {
+    if (!searchQuery) return appointments;
+    const q = searchQuery.toLowerCase();
+    return appointments.filter(a => 
+      a.client_name.toLowerCase().includes(q) || 
+      a.trainers?.name.toLowerCase().includes(q) ||
+      a.phone.includes(q)
+    );
+  }, [appointments, searchQuery]);
 
   const handleSuccess = () => {
     setIsModalOpen(false);
@@ -129,30 +137,30 @@ export default function Home() {
   const titleText = isSameDay(currentDate, new Date()) ? "Oggi" : format(currentDate, 'EEEE d MMMM', { locale: it });
 
   return (
-    <div className="p-6 md:p-10 max-w-4xl mx-auto animate-fade-in">
-      <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+    <div className="p-6 md:p-10 max-w-4xl mx-auto animate-fade-in pb-32">
+      <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Agenda</h1>
+          <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">Agenda</h1>
           <div className="flex items-center gap-4 mt-2">
             <p className="text-zinc-500 dark:text-zinc-400 capitalize text-lg font-medium">
               {format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}
             </p>
-            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner">
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
               <button
                 onClick={() => navigateDay(-1)}
-                className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+                className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400 appearance-none"
               >
                 <ChevronLeft size={18} />
               </button>
               <button
                 onClick={() => setCurrentDate(new Date())}
-                className="px-3 py-1 text-xs font-bold text-zinc-900 dark:text-zinc-100"
+                className="px-3 py-1 text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider"
               >
                 Oggi
               </button>
               <button
                 onClick={() => navigateDay(1)}
-                className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+                className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400 appearance-none"
               >
                 <ChevronRight size={18} />
               </button>
@@ -161,63 +169,88 @@ export default function Home() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all focus:ring-4 focus:ring-blue-500/20"
+          className="bg-blue-600 px-6 h-11 rounded-2xl text-white font-bold shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 appearance-none"
         >
-          <Plus size={24} />
+          <Plus size={20} />
+          <span>Nuovo Appuntamento</span>
         </button>
       </header>
 
+      {/* Search Bar - Estetica Gestione */}
+      <div className="relative mb-8 group">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors" size={20} />
+        <input
+          type="text"
+          placeholder="Cerca per cliente, istruttore o telefono..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm appearance-none shadow-sm"
+        />
+      </div>
+
       <section className="space-y-6">
-        <h2 className="text-xl font-semibold px-1 capitalize">{titleText}</h2>
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{titleText}</h2>
+          <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{filteredAppointments.length} Appuntamenti</span>
+        </div>
 
         {loading && appointments.length === 0 ? (
-          <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
-            <Loader2 className="animate-spin" size={40} />
-            <p>Caricamento appuntamenti...</p>
+          <div className="py-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
+            <Loader2 className="animate-spin text-blue-500" size={40} />
+            <p className="text-sm font-medium">Caricamento in corso...</p>
           </div>
-        ) : appointments.length > 0 ? (
-          <div className="grid gap-4">
-            {appointments.map((apt) => (
+        ) : filteredAppointments.length > 0 ? (
+          <div className="grid gap-3">
+            {filteredAppointments.map((apt) => (
               <div
                 key={apt.id}
                 onClick={() => setSelectedAppointment(apt)}
                 className={cn(
-                  "glass-card p-5 group cursor-pointer hover:border-blue-500/50 transition-all",
-                  (apt as any).stato === 'annullato' ? "opacity-60 grayscale" : ""
+                  "group relative p-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all",
+                  (apt as any).stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950"
                 )}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={cn(
-                      "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-inner",
-                      apt.is_unavailability ? "bg-zinc-400" : "bg-blue-500"
-                    )} style={apt.trainers?.color ? { backgroundColor: apt.trainers?.color } : {}}>
-                      <Clock size={20} />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-inner"
+                      style={{ backgroundColor: apt.trainers?.color || '#3b82f6' }}
+                    >
+                      <Clock size={22} className="stroke-[2.5]" />
                     </div>
-                    <div>
-                      <h3 className={cn("font-bold text-lg", (apt as any).stato === 'annullato' && "line-through")}>
+                    <div className="min-w-0">
+                      <h3 className={cn(
+                        "font-bold text-zinc-900 dark:text-zinc-100 truncate",
+                        (apt as any).stato === 'annullato' && "line-through"
+                      )}>
                         {apt.client_name}
                       </h3>
-                      <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        <span className="font-bold text-zinc-900 dark:text-zinc-300">{apt.appointment_time.slice(0, 5)}</span>
-                        <span>•</span>
-                        <span>{apt.trainers?.name || 'Istruttore'}</span>
-                        <span>•</span>
-                        <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                        <span className="text-xs font-black text-blue-600 dark:text-blue-400">{apt.appointment_time.slice(0, 5)}</span>
+                        <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
+                          <User size={12} className="text-zinc-400" />
+                          <span className="truncate">{apt.trainers?.name}</span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-black uppercase tracking-wider">
                           {apt.license_type}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <ChevronRight size={20} className="text-zinc-300 group-hover:text-blue-500 transition-colors" />
+                  <ChevronRight size={20} className="text-zinc-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="glass-card p-10 text-center text-zinc-400 flex flex-col items-center justify-center gap-2">
-            <CalendarIconSmall size={32} className="opacity-50" />
-            <p>Nessun appuntamento in questa data.</p>
+          <div className="p-12 text-center bg-zinc-50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
+              <CalendarIconSmall size={24} />
+            </div>
+            <div>
+              <p className="text-zinc-900 dark:text-zinc-100 font-bold">Nessun risultato trovato</p>
+              <p className="text-zinc-500 text-sm">Prova a cambiare i filtri o la data.</p>
+            </div>
           </div>
         )}
       </section>
