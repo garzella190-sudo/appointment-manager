@@ -27,8 +27,9 @@ const DatePicker = ({ selected, onChange, className, placeholderText, required }
         dateFormat="dd/MM/yyyy"
         placeholderText={placeholderText}
         required={required}
+        readOnly // Regola .cursorrules: evita tastiera su mobile
         className={cn(
-          "w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm pr-10",
+          "w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm pr-10 appearance-none h-11",
           className
         )}
         calendarClassName="premium-calendar"

@@ -127,23 +127,26 @@ body {
   width: 2.25rem !important;
   line-height: 2.25rem !important;
   border-radius: 0.75rem !important;
-  transition: all 0.2s !important;
+  transition: none !important; /* Rimosso fade/transizione */
   margin: 0.1rem !important;
 }
 
 .premium-calendar .react-datepicker__day:hover {
-  background-color: #3b82f620 !important;
+  background-color: transparent !important; /* Rimosso background hover */
   color: #3b82f6 !important;
+  cursor: pointer;
 }
 
 .premium-calendar .react-datepicker__day--selected {
   background-color: #3b82f6 !important;
   color: white !important;
   font-weight: 700 !important;
+  position: relative !important;
+  z-index: 10 !important; /* Regola .cursorrules */
 }
 
 .premium-calendar .react-datepicker__day--keyboard-selected {
-  background-color: #3b82f620 !important;
+  background-color: transparent !important;
   color: #3b82f6 !important;
 }
 
