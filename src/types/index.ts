@@ -1,3 +1,9 @@
+import { Istruttore, Veicolo, Cliente } from '@/lib/database.types';
+
+export type Trainer = Istruttore;
+export type Vehicle = Veicolo;
+export type Customer = Cliente;
+
 export interface Appointment {
   id: string;
   cliente_id?: string; // <--- AGGIUNTO IL '?' PER RENDERLO OPZIONALE
