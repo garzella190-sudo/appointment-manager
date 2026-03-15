@@ -1,6 +1,6 @@
 export interface Appointment {
   id: string;
-  cliente_id?: string;
+  cliente_id?: string; // <--- AGGIUNTO IL '?' PER RENDERLO OPZIONALE
   client_name: string;
   phone?: string;
   trainer_id: string;
