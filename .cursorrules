@@ -1,0 +1,21 @@
+# Regole di Progetto - Appointment Manager
+
+## Stack Tecnologico
+- Next.js 16.1.6 con Turbopack.
+- Supabase SSR.
+- Tailwind CSS.
+- Mobile-first (iOS Safari).
+
+## Convenzioni File & Build
+- Middleware: Usa 'src/proxy.ts'.
+- TypeScript: Usa 'as unknown as Type' per la build.
+- Export: Mai doppi export o config annidati.
+
+## Standard UI Mobile
+- Input: 'appearance-none' e 'h-[44px]'.
+- Calendario: Giorno selezionato 'z-index: 10' e 'text-white'.
+- Interazioni: 'readOnly' su input datepicker.
+
+## Protocollo Risposta
+- File COMPLETO.
+- Planning Step obbligatorio.
