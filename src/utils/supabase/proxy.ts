@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+imimport { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
@@ -29,7 +29,6 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // IMPORTANTE: Questo rinfresca il token Auth se scaduto
   await supabase.auth.getUser()
 
   return response
