@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Car, FileText, Phone, Calendar as CalendarIconSmall } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Appointment } from '@/types';
@@ -23,7 +23,7 @@ export default function Home() {
   const [cancelReason, setCancelReason] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     setLoading(true);
     const dateStr = format(currentDate, 'yyyy-MM-dd');
     const startOfDayStr = new Date(`${dateStr}T00:00:00`).toISOString();
@@ -34,10 +34,10 @@ export default function Home() {
         supabase
           .from('appuntamenti')
           .select(`
-            id, data, durata, stato, note, importo,
+            id, cliente_id, istruttore_id, data, durata, stato, note, importo,
             clienti ( nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
             istruttori ( nome, cognome ),
-            veicoli ( targa, nome )
+            veicoli ( targa, nome, colore )
           `)
           .gte('data', startOfDayStr)
           .lte('data', endOfDayStr)
@@ -55,16 +55,18 @@ export default function Home() {
 
         return {
           id: row.id,
+          cliente_id: row.cliente_id,
           appointment_date: format(rowDate, 'yyyy-MM-dd'),
           appointment_time: format(rowDate, 'HH:mm'),
           client_name: row.clienti ? `${row.clienti.cognome} ${row.clienti.nome}` : 'Sconosciuto',
           phone: row.clienti?.telefono || '',
           trainer_id: row.istruttore_id,
           vehicle_id: row.veicoli ? `${row.veicoli.nome} (${row.veicoli.targa})` : 'Nessuno',
+          vehicle_color: row.veicoli?.colore,
           duration: row.durata,
           notes: row.note,
           status: row.stato,
-          stato: row.stato, // Mantengo entrambi per compatibilità
+          stato: row.stato,
           cost: row.importo || 0,
           license_type: patenteId ? (patentiMap.get(patenteId) || 'B') : 'B',
           gearbox_type: row.clienti?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
@@ -76,12 +78,18 @@ export default function Home() {
       });
 
       setAppointments(mappedAppointments as unknown as Appointment[]);
+      
+      // Real-time Update for selected appointment
+      if (selectedAppointment) {
+        const updated = mappedAppointments.find(a => a.id === selectedAppointment.id);
+        if (updated) setSelectedAppointment(updated as unknown as Appointment);
+      }
     } catch (error) {
       console.error('Error fetching appointments:', error);
     } finally {
       setLoading(false);
     }
-  }
+  }, [currentDate, selectedAppointment?.id]);
 
   useEffect(() => {
     fetchAppointments();
@@ -89,6 +97,11 @@ export default function Home() {
 
   const handleSuccess = () => {
     setIsModalOpen(false);
+    fetchAppointments();
+  };
+
+  const handleEditSuccess = () => {
+    setIsEditingAppointment(false);
     fetchAppointments();
   };
 
@@ -110,29 +123,6 @@ export default function Home() {
       } else {
         alert('Errore durante l\'eliminazione');
       }
-    }
-  };
-
-  const handleConfirmCancel = async () => {
-    if (!selectedAppointment) return;
-
-    const { error } = await supabase
-      .from('appuntamenti')
-      .update({
-        stato: 'annullato',
-        note: cancelReason
-          ? `${selectedAppointment.notes || ''}\n\nMotivo annullamento: ${cancelReason}`.trim()
-          : selectedAppointment.notes
-      })
-      .eq('id', selectedAppointment.id);
-
-    if (!error) {
-      setSelectedAppointment(null);
-      setShowCancelReason(false);
-      setCancelReason('');
-      fetchAppointments();
-    } else {
-      alert('Errore durante l\'annullamento');
     }
   };
 
@@ -180,7 +170,7 @@ export default function Home() {
       <section className="space-y-6">
         <h2 className="text-xl font-semibold px-1 capitalize">{titleText}</h2>
 
-        {loading ? (
+        {loading && appointments.length === 0 ? (
           <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
             <Loader2 className="animate-spin" size={40} />
             <p>Caricamento appuntamenti...</p>
@@ -216,11 +206,6 @@ export default function Home() {
                         <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-[10px] font-bold uppercase tracking-wider">
                           {apt.license_type}
                         </span>
-                        {(apt as any).stato === 'annullato' && (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                            Annullato
-                          </span>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -237,7 +222,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* Modal Nuovo Appuntamento */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -246,28 +230,20 @@ export default function Home() {
         <AppointmentForm onSuccess={handleSuccess} onCancel={() => setIsModalOpen(false)} />
       </Modal>
 
-      {/* Modal Dettaglio Appuntamento (Copiato dal Calendar) */}
       {selectedAppointment && (
         <Modal
           isOpen={!!selectedAppointment}
           onClose={() => {
             setSelectedAppointment(null);
-            setShowCancelReason(false);
-            setCancelReason('');
             setIsEditingAppointment(false);
           }}
           title={isEditingAppointment ? "Modifica Appuntamento" : "Dettagli Appuntamento"}
         >
           {isEditingAppointment ? (
-            <div className="p-2 sm:p-4 bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 shadow-sm mt-2">
+            <div className="p-1 sm:p-2 bg-white dark:bg-zinc-950 rounded-2xl mt-2">
               <AppointmentForm
                 appointmentId={selectedAppointment.id}
-                onSuccess={() => {
-                  setIsEditingAppointment(false);
-                  setSelectedAppointment(null);
-                  fetchAppointments();
-                  // alert or toast usually missing here since toast isn't in page.tsx yet
-                }}
+                onSuccess={handleEditSuccess}
                 onCancel={() => setIsEditingAppointment(false)}
               />
             </div>
@@ -276,13 +252,19 @@ export default function Home() {
               appointment={selectedAppointment}
               onRefresh={fetchAppointments}
               onEdit={() => setIsEditingAppointment(true)}
-              onCancel={() => setShowCancelReason(true)}
+              onCancel={() => {
+                // Semplificato per evitare bug cancellazione
+                if (confirm('Vuoi annullare questa guida?')) {
+                   supabase
+                    .from('appuntamenti')
+                    .update({ stato: 'annullato' })
+                    .eq('id', selectedAppointment.id)
+                    .then(() => fetchAppointments());
+                }
+              }}
               onDelete={handleDeleteAppointment}
               onClose={() => {
                 setSelectedAppointment(null);
-                setShowCancelReason(false);
-                setCancelReason('');
-                setIsEditingAppointment(false);
               }}
             />
           )}
