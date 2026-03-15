@@ -27,13 +27,17 @@ const DatePicker = ({ selected, onChange, className, placeholderText, required }
         dateFormat="dd/MM/yyyy"
         placeholderText={placeholderText}
         required={required}
-        readOnly // Regola .cursorrules: evita tastiera su mobile
+        // Utilizziamo onFocus/readOnly in modo che sia cliccabile ma non apra tastiera
+        autoComplete="off"
+        onKeyDown={(e) => e.preventDefault()}
         className={cn(
-          "w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm pr-10 appearance-none h-11",
+          "w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm pr-10 appearance-none h-11 cursor-pointer",
           className
         )}
         calendarClassName="premium-calendar"
         popperPlacement="bottom-start"
+        // Force the input to not trigger keyboard on mobile while remaining interactive
+        inputMode="none"
       />
       <Calendar 
         size={16} 
