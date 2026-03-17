@@ -3,13 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, CalendarClock, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
-import { TipoPatente, TipoCambio } from '@/lib/database.types';
+import { TipoPatente, TipoCambio, Patente } from '@/lib/database.types';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import { createVeicoloAction, updateVeicoloAction, deleteVeicoloAction } from '@/actions/veicoli';
 import DatePicker from '@/components/DatePicker';
 import { Trash2 } from 'lucide-react';
 
-const TIPI_PATENTE: TipoPatente[] = ['AM', 'A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C1E', 'C', 'CE', 'D1', 'D1E', 'D', 'DE'];
 
 interface VeicoloFormProps {
   veicoloId?: string;
@@ -43,6 +42,7 @@ export const VeicoloForm = ({
     cambio_manuale: defaultValues?.cambio_manuale  ?? true,
     colore:         defaultValues?.colore          ?? '#10B981',
   });
+  const [patenti, setPatenti] = useState<Patente[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
 
   // Sincronizza lo stato quando cambiano i defaultValues (importante se il modal non viene smontato)
@@ -68,6 +68,14 @@ export const VeicoloForm = ({
       });
     }
   }, [defaultValues]);
+  
+  useEffect(() => {
+    async function fetchPatenti() {
+      const { data } = await supabase.from('patenti').select('*').eq('nascosta', false).order('tipo');
+      if (data) setPatenti(data);
+    }
+    fetchPatenti();
+  }, []);
 
   const set = (key: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -200,13 +208,15 @@ export const VeicoloForm = ({
         <div className="space-y-3">
           <label className={LABEL_CLS}>Categoria Patente</label>
           <div className="flex flex-wrap gap-2 p-1 bg-zinc-100/50 dark:bg-zinc-900/50 rounded-2xl">
-            {TIPI_PATENTE.map(tipo => {
+            {patenti.map(p => {
+              const tipo = p.tipo;
               const active = form.tipo_patente === tipo;
               return (
                 <button
-                  key={tipo}
+                  key={p.id}
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, tipo_patente: tipo }))}
+                  title={p.nome_visualizzato || tipo}
                   className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${
                     active
                       ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm'
@@ -251,11 +261,13 @@ export const VeicoloForm = ({
       </div>
 
       <div className="space-y-3">
-        <label className={LABEL_CLS}>Colore Identificativo</label>
+        <label htmlFor="colore" className={LABEL_CLS}>Colore Identificativo</label>
         <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800">
           <input
+            id="colore"
             type="color"
             value={form.colore}
+            title="Colore Identificativo"
             onChange={set('colore')}
             className="w-14 h-14 p-1 bg-white dark:bg-zinc-800 border-none rounded-2xl cursor-pointer shadow-sm"
           />

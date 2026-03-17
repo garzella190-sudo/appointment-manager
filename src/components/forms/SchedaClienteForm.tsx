@@ -178,10 +178,10 @@ export const SchedaClienteForm = ({
             <BadgeCheck size={18} className="text-blue-500 shrink-0" />
             <select
               value={form.patente_richiesta_id}
+              title="Seleziona Patente"
               onChange={set('patente_richiesta_id')}
               className={INPUT_CLS}
             >
-              <option value="">— Nessuna —</option>
               {patenti.map(p => (
                 <option key={p.id} value={p.id}>
                   {p.nome_visualizzato || p.tipo}
@@ -195,10 +195,10 @@ export const SchedaClienteForm = ({
           <label className={LABEL_CLS}>Tipo Cambio</label>
           <select
             value={form.preferenza_cambio}
+            title="Seleziona Preferenza Cambio"
             onChange={set('preferenza_cambio')}
             className={INPUT_CLS}
           >
-            <option value="">— Indifferente —</option>
             <option value="manuale">Manuale</option>
             <option value="automatico">Automatico</option>
           </select>

@@ -87,7 +87,7 @@ export default function SchedaClientePage() {
     // 1. Cliente + patenti in parallelo
     const [cRes, pRes] = await Promise.all([
       supabase.from('clienti').select('*').eq('id', id).single(),
-      supabase.from('patenti').select('*').order('tipo'),
+      supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
     ]);
 
     if (cRes.error || !cRes.data) {
@@ -299,37 +299,35 @@ export default function SchedaClientePage() {
             }} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Cognome</label>
-                  <input required value={formState.cognome} onChange={(e) => setFormState(p => ({ ...p, cognome: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
+                  <label htmlFor="cognome" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Cognome</label>
+                  <input id="cognome" required value={formState.cognome} title="Cognome" onChange={(e) => setFormState(p => ({ ...p, cognome: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Nome</label>
-                  <input required value={formState.nome} onChange={(e) => setFormState(p => ({ ...p, nome: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
+                  <label htmlFor="nome" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Nome</label>
+                  <input id="nome" required value={formState.nome} title="Nome" onChange={(e) => setFormState(p => ({ ...p, nome: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Telefono (Opzionale)</label>
-                <input value={formState.telefono} onChange={(e) => setFormState(p => ({ ...p, telefono: e.target.value }))} type="tel" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
+                <label htmlFor="telefono" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Telefono (Opzionale)</label>
+                <input id="telefono" value={formState.telefono} title="Telefono" onChange={(e) => setFormState(p => ({ ...p, telefono: e.target.value }))} type="tel" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Email (Opzionale)</label>
-                <input value={formState.email} onChange={(e) => setFormState(p => ({ ...p, email: e.target.value }))} type="email" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
+                <label htmlFor="email" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Email (Opzionale)</label>
+                <input id="email" value={formState.email} title="Email" onChange={(e) => setFormState(p => ({ ...p, email: e.target.value }))} type="email" className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Patente Richiesta</label>
-                  <select value={formState.patente_richiesta_id} onChange={(e) => setFormState(p => ({ ...p, patente_richiesta_id: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
-                    <option value="">— Nessuna —</option>
+                  <label htmlFor="patente" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Patente Richiesta</label>
+                  <select id="patente" value={formState.patente_richiesta_id} title="Seleziona Patente" onChange={(e) => setFormState(p => ({ ...p, patente_richiesta_id: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
                     {patenti.map(p => <option key={p.id} value={p.id}>{p.nome_visualizzato || p.tipo}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Tipo Cambio</label>
-                  <select value={formState.preferenza_cambio} onChange={(e) => setFormState(p => ({ ...p, preferenza_cambio: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
-                    <option value="">— Indifferente —</option>
+                  <label htmlFor="cambio" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Tipo Cambio</label>
+                  <select id="cambio" value={formState.preferenza_cambio} title="Seleziona Tipo Cambio" onChange={(e) => setFormState(p => ({ ...p, preferenza_cambio: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
                     <option value="manuale">Manuale</option>
                     <option value="automatico">Automatico</option>
                   </select>

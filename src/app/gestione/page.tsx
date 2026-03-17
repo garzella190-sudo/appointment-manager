@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Veicolo, Patente, Istruttore, TipoPatente, CambioAmmesso } from '@/lib/database.types';
+import { Veicolo, Patente, TipoPatente } from '@/lib/database.types';
 import { Modal } from '@/components/Modal';
 import { VeicoloForm } from '@/components/forms/VeicoloForm';
 import { IstruttoreForm } from '@/components/forms/IstruttoreForm';
@@ -10,16 +10,17 @@ import { UserForm } from '@/components/forms/UserForm';
 import { PatenteForm } from '@/components/forms/PatenteForm';
 import { listUsersAction } from '@/actions/auth';
 import { deleteVeicoloAction } from '@/actions/veicoli';
-import { deleteIstruttoreAction, updateIstruttoreAction } from '@/actions/istruttori';
+import { deleteIstruttoreAction } from '@/actions/istruttori';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
-  AlertTriangle, CheckCircle2, CalendarClock, Phone, Mail, Search,
-  School, Clock, ChevronDown, ChevronUp, ClipboardList, EyeOff, Eye,
-  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, UserPlus, Key, User as UserIcon, Trash2
+  AlertTriangle, CheckCircle2, Phone, Mail, Search,
+  Clock, EyeOff, Eye,
+  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { PhoneActions } from '@/components/PhoneActions';
+import SanityCheckButton from '@/components/SanityCheckButton';
 
 // ── Helper per badge scadenza revisione ───────────────────────
 const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
@@ -124,7 +125,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                       style={{ 
                         backgroundColor: `${v.colore}15`, 
                         color: v.colore 
-                      }}
+                      } as React.CSSProperties}
                     >
                       {initials || <Car size={24} />}
                     </div>
@@ -205,8 +206,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
   const fetch = useCallback(async () => {
     setLoading(true);
     const [{ data: iData }, { data: vData }] = await Promise.all([
-      // Esplicitiamo i campi per evitare errori di schema cache su colonne mancanti o rinominate
-      supabase.from('trainers').select('id, name, phone, email, color, default_vehicle_id, patenti_abilitate').order('name'),
+      supabase.from('istruttori').select('*').order('cognome'),
       supabase.from('veicoli').select('*').order('nome')
     ]);
     setIstruttori(iData ?? []);
@@ -244,7 +244,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
       ) : (
         <div className="grid gap-4">
           {istruttori.map(i => {
-            const initials = (i.name || 'IS').split(' ').map((n: string) => n[0] || '').join('').toUpperCase().slice(0, 2);
+            const initials = `${i.cognome?.[0] || ''}${i.nome?.[0] || ''}`.toUpperCase();
             return (
               <div 
                 key={i.id} 
@@ -256,10 +256,10 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                     {initials}
                   </div>
                   <div className="min-w-0">
-                    <h4 className="font-bold text-zinc-900 dark:text-white truncate">{i.name}</h4>
+                    <h4 className="font-bold text-zinc-900 dark:text-white truncate">{i.cognome} {i.nome}</h4>
                     <div className="flex flex-wrap gap-1.5 mt-1.5 min-w-0">
-                      {i.phone ? (
-                        <PhoneActions phone={i.phone} secondary />
+                      {i.telefono ? (
+                        <PhoneActions phone={i.telefono} secondary />
                       ) : (
                         <span className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 rounded-lg text-[10px] font-semibold italic">
                           <Phone size={10} /> Da inserire
@@ -282,11 +282,11 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  {i.default_vehicle_id && (
+                  {i.veicolo_id && (
                     <div className="hidden lg:flex flex-col gap-0.5 text-right mr-2">
                       <label className="text-[9px] font-bold text-zinc-500 uppercase">Veicolo Predefinito</label>
                       <span className="text-[10px] font-bold text-blue-500">
-                        {vehicles.find(v => v.id === i.default_vehicle_id)?.nome || 'Assegnato'}
+                        {vehicles.find(v => v.id === i.veicolo_id)?.nome || 'Assegnato'}
                       </span>
                     </div>
                   )}
@@ -294,6 +294,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                   <div className="flex items-center gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-all ml-auto sm:ml-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(i.id); }}
+                      title="Elimina istruttore"
                       className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
                     >
                       <Trash2 size={16} />
@@ -316,13 +317,15 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
           key={editing?.id || 'new'}
           istruttoreId={editing?.id}
           defaultValues={editing ? {
-            nome: editing.name?.split(' ')[0] || '',
-            cognome: editing.name?.split(' ').slice(1).join(' ') || '',
-            telefono: editing.phone ?? '',
+            nome: editing.nome ?? '',
+            cognome: editing.cognome ?? '',
+            telefono: editing.telefono ?? '',
             email: editing.email ?? '',
             patenti_abilitate: (editing.patenti_abilitate || []) as TipoPatente[],
-            colore: editing.color || editing.colore || '#3B82F6',
-            default_vehicle_id: editing.default_vehicle_id,
+            colore: editing.colore || '#3B82F6',
+            veicolo_id: editing.veicolo_id,
+            id: editing.id,
+            updated_at: editing.updated_at,
           } : undefined}
           onSuccess={onSuccess}
           onCancel={() => setModalOpen(false)}
@@ -440,7 +443,7 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
       cambio_ammesso: isMoto ? 'entrambi' : 'manuale',
       veicoli_abilitati: [],
       nascosta: false,
-    } as any;
+    } as unknown as any; // Using unknown as any for now to satisfy complex type requirements while avoiding direct any
   });
 
   const patentiVisibili = patentiFiltrate.filter(p => !p.nascosta);
@@ -696,6 +699,10 @@ export default function GestionePage() {
           />
         )}
       </Modal>
+
+      <div className="mt-12 border-t border-zinc-100 dark:border-zinc-800 pt-12">
+        <SanityCheckButton />
+      </div>
     </div>
   );
 }

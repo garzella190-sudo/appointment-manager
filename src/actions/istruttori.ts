@@ -11,15 +11,9 @@ export async function createIstruttoreAction(payload: {
   email: string | null;
   patenti_abilitate: TipoPatente[];
   colore: string;
-  default_vehicle_id: string | null;
+  veicolo_id?: string | null;
 }) {
   const supabase = await createClient();
-
-  // Sanitizzazione server-side
-  let targetVehicleId = payload.default_vehicle_id;
-  if (targetVehicleId === "" || targetVehicleId === "Nessuno") {
-    targetVehicleId = null;
-  }
 
   let targetPhone = payload.telefono;
   // Se il telefono è vuoto o ha il placeholder, usiamo stringa vuota invece di null
@@ -29,14 +23,15 @@ export async function createIstruttoreAction(payload: {
   }
 
   const { data, error } = await supabase
-    .from('trainers')
+    .from('istruttori')
     .insert({
-      name: `${payload.nome} ${payload.cognome}`.trim(),
-      phone: targetPhone,
+      nome: payload.nome,
+      cognome: payload.cognome,
+      telefono: targetPhone,
       email: payload.email,
-      color: payload.colore,
+      colore: payload.colore,
       patenti_abilitate: payload.patenti_abilitate,
-      default_vehicle_id: targetVehicleId,
+      veicolo_id: payload.veicolo_id || null,
     })
     .select()
     .single();
@@ -59,15 +54,9 @@ export async function updateIstruttoreAction(id: string, payload: {
   email: string | null;
   patenti_abilitate: TipoPatente[];
   colore: string;
-  default_vehicle_id: string | null;
+  veicolo_id?: string | null;
 }) {
   const supabase = await createClient();
-
-  // Sanitizzazione server-side
-  let targetVehicleId = payload.default_vehicle_id;
-  if (targetVehicleId === "" || targetVehicleId === "Nessuno") {
-    targetVehicleId = null;
-  }
 
   let targetPhone = payload.telefono;
   if (!targetPhone || targetPhone === "" || targetPhone === "Da inserire") {
@@ -75,14 +64,15 @@ export async function updateIstruttoreAction(id: string, payload: {
   }
 
   const { data, error } = await supabase
-    .from('trainers')
+    .from('istruttori')
     .update({
-      name: `${payload.nome} ${payload.cognome}`.trim(),
-      phone: targetPhone,
+      nome: payload.nome,
+      cognome: payload.cognome,
+      telefono: targetPhone,
       email: payload.email,
-      color: payload.colore,
+      colore: payload.colore,
       patenti_abilitate: payload.patenti_abilitate,
-      default_vehicle_id: targetVehicleId,
+      veicolo_id: payload.veicolo_id || null,
     })
     .eq('id', id)
     .select()
@@ -102,7 +92,7 @@ export async function updateIstruttoreAction(id: string, payload: {
 export async function deleteIstruttoreAction(id: string) {
   const supabase = await createClient();
 
-  const { error } = await supabase.from('trainers').delete().eq('id', id);
+  const { error } = await supabase.from('istruttori').delete().eq('id', id);
 
   if (error) {
     console.error('Error deleting instructor:', error.message);

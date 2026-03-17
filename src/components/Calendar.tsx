@@ -26,6 +26,7 @@ export const Calendar: React.FC<CalendarProps> = ({ selectedDate, onDateSelect }
       <div className="flex justify-between items-center mb-4 px-2">
         <button 
           type="button"
+          title="Mese precedente"
           className="p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg transition-colors appearance-none"
         >
           <ChevronLeft size={20} />
@@ -35,6 +36,7 @@ export const Calendar: React.FC<CalendarProps> = ({ selectedDate, onDateSelect }
         </h3>
         <button 
           type="button"
+          title="Mese successivo"
           className="p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg transition-colors appearance-none"
         >
           <ChevronRight size={20} />

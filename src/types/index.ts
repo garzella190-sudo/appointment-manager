@@ -16,13 +16,14 @@ export interface Appointment {
   appointment_time: string;
   duration: number;
   notes?: string;
-  status: 'scheduled' | 'done' | 'cancelled';
+  status: string;
+  stato: string;
   cost: number;
   license_type: string;
-  gearbox_type: 'Manual' | 'Automatic';
+  gearbox_type: string;
   is_unavailability?: boolean;
   created_at?: string;
-  trainers?: {
+  istruttore?: {
     name: string;
     color: string;
   };

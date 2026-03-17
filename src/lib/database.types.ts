@@ -54,15 +54,13 @@ export interface Istruttore {
   id: string;                          // uuid
   nome: string;                        // Backwards compatibility
   cognome: string;                     // Backwards compatibility
-  name?: string;                       // From trainers table
-  phone?: string | null;               // From trainers table
+  phone?: string | null;               // DEPRECATED
   telefono: string | null;
   email: string | null;
   patenti_abilitate: TipoPatente[];    // array di tipi patente
   colore: string;
-  color?: string;                      // From trainers table
-  veicolo_default_id: string | null;   // DEPRECATED: use default_vehicle_id
-  default_vehicle_id: string | null;   // FK → veicoli.id (veicolo preferito)
+  veicolo_default_id: string | null;   // DEPRECATED: use veicolo_id
+  veicolo_id: string | null;           // FK → veicoli.id (veicolo preferito)
   created_at: string;
   updated_at: string;
 }

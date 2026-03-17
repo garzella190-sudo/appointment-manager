@@ -23,7 +23,7 @@ export default function ClientiPage() {
     setLoading(true);
     const [cRes, pRes] = await Promise.all([
       supabase.from('clienti').select('*').order('cognome').order('nome'),
-      supabase.from('patenti').select('*').order('tipo'),
+      supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
     ]);
     setClienti(cRes.data ?? []);
     setPatenti(pRes.data ?? []);
@@ -68,6 +68,7 @@ export default function ClientiPage() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
+          title="Nuovo Cliente"
           className="bg-purple-600 p-3 rounded-2xl text-white shadow-lg shadow-purple-500/20 hover:scale-105 active:scale-95 transition-all"
         >
           <Plus size={24} />

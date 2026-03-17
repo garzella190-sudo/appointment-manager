@@ -43,10 +43,10 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick }: Dr
       style={{ 
         ...style,
         height: `${(appointment.duration / 15) * 40 - 2}px`,
-        borderLeftColor: isOverlapping ? '#ef4444' : (appointment.trainers?.color || '#3b82f6'),
-        boxShadow: isOverlapping ? '0 0 20px rgba(239, 68, 68, 0.2)' : `0 4px 12px -2px ${appointment.trainers?.color}20`,
+        borderLeftColor: isOverlapping ? '#ef4444' : (appointment.istruttore?.color || '#3b82f6'),
+        boxShadow: isOverlapping ? '0 0 20px rgba(239, 68, 68, 0.2)' : `0 4px 12px -2px ${appointment.istruttore?.color}20`,
         borderRight: appointment.vehicle_color ? `4px solid ${appointment.vehicle_color}` : undefined,
-      }}
+      } as React.CSSProperties}
     >
       <div>
         <div className="flex items-start justify-between gap-1">

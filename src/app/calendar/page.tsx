@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import {
   DndContext,
   DragEndEvent,
+  DragStartEvent,
+  DragOverEvent,
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay,
-  defaultDropAnimationSideEffects
+  DragOverlay
 } from '@dnd-kit/core';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
-import { startOfWeek, addDays, format, isSameDay, parseISO, startOfDay, addMinutes } from 'date-fns';
+import { startOfWeek, addDays, format, isSameDay, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
@@ -20,10 +21,42 @@ import { DroppableCell } from '@/components/DroppableCell';
 import { DraggableAppointment } from '@/components/DraggableAppointment';
 import { cn } from '@/lib/utils';
 import { Toast } from '@/components/Toast';
-import { Modal } from '@/components/Modal';
-import { AppointmentForm } from '@/components/forms/AppointmentForm';
-import { User, Car, Clock, FileText, Phone, Calendar as CalendarIconSmall } from 'lucide-react';
-import { AppointmentDetailsModal } from '@/components/AppointmentDetailsModal';
+import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
+import DetailsModal from '@/components/modals/DetailsModal';
+import { Clock } from 'lucide-react';
+
+export interface AppointmentRow {
+  id: string;
+  data: string;
+  durata: number;
+  stato: string;
+  note: string | null;
+  importo: number | null;
+  istruttore_id: string;
+  veicolo_id: string | null;
+  inizio: string | null;
+  fine: string | null;
+  data_solo: string | null;
+  clienti: {
+    id: string;
+    nome: string;
+    cognome: string;
+    telefono: string | null;
+    preferenza_cambio: string | null;
+    patente_richiesta_id: string | null;
+  } | null;
+  istruttori: {
+    nome: string;
+    cognome: string;
+    colore: string | null;
+  } | null;
+  veicoli: {
+    id: string;
+    targa: string;
+    nome: string;
+    colore: string | null;
+  } | null;
+}
 
 export default function CalendarPage() {
   const supabase = createClient();
@@ -34,7 +67,6 @@ export default function CalendarPage() {
   const [overId, setOverId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
   const [viewDays, setViewDays] = useState<1 | 3 | 5 | 7>(7);
 
   // Usa l'hook per gestire responsive in modo solido dopo l'idratazione
@@ -61,11 +93,11 @@ export default function CalendarPage() {
     })
   );
 
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate.getTime()]);
   // Per evitare scatti in fase di caricamento dal server
   const effectiveViewDays = mounted ? viewDays : 7; 
-  const displayStart = effectiveViewDays === 7 ? weekStart : currentDate;
-  const displayDays = Array.from({ length: effectiveViewDays }, (_, i) => addDays(displayStart, i));
+  const displayStart = useMemo(() => effectiveViewDays === 7 ? weekStart : currentDate, [effectiveViewDays, weekStart, currentDate.getTime()]);
+  const displayDays = useMemo(() => Array.from({ length: effectiveViewDays }, (_, i) => addDays(displayStart, i)), [displayStart.getTime(), effectiveViewDays]);
 
   // Generate 15-minute intervals from 08:00 to 20:00
   const timeSlots = Array.from({ length: 12 * 4 + 1 }, (_, i) => {
@@ -75,37 +107,40 @@ export default function CalendarPage() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
   });
 
-  const fetchWeekAppointments = async () => {
+  const fetchWeekAppointments = useCallback(async () => {
     setLoading(true);
     const fetchEndDate = addDays(displayStart, effectiveViewDays);
 
     try {
-      const [{ data: dbData, error: dbError }, { data: patentiData }] = await Promise.all([
+      const [{ data: dbData, error: dbError }, { data: patentiData }, { data: slotsData }] = await Promise.all([
         supabase
           .from('appuntamenti')
           .select(`
-            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine,
+            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo,
             clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
           `)
           .gte('data', displayStart.toISOString())
           .lt('data', fetchEndDate.toISOString()),
-        supabase.from('patenti').select('id, tipo')
+        supabase.from('patenti').select('id, tipo'),
+        supabase.from('time_slots').select('*').gte('start_time', displayStart.toISOString()).lt('start_time', fetchEndDate.toISOString())
       ]);
 
       if (dbError) throw dbError;
-
-      const patentiMap = new Map((patentiData || []).map((p: any) => [p.id, p.tipo]));
+      
+      const patentiMap = new Map<string, string>((patentiData || []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
 
       const mappedAppointments = (dbData || []).map((row: any) => {
+        // Use data_solo for stable day alignment (avoids TZ shifting)
+        const dateStr = row.data_solo || row.data.split('T')[0];
         const rowDate = new Date(row.data);
         const patenteId = row.clienti?.patente_richiesta_id;
         
         return {
           id: row.id,
           cliente_id: row.clienti?.id || '',
-          appointment_date: format(rowDate, 'yyyy-MM-dd'),
+          appointment_date: dateStr,
           appointment_time: format(rowDate, 'HH:mm'),
           client_name: row.clienti ? `${row.clienti.cognome} ${row.clienti.nome}` : 'Sconosciuto',
           phone: row.clienti?.telefono || '',
@@ -119,7 +154,7 @@ export default function CalendarPage() {
           cost: row.importo || 0,
           license_type: patenteId ? (patentiMap.get(patenteId) || 'B') : 'B',
           gearbox_type: row.clienti?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
-          trainers: {
+          istruttore: {
             name: row.istruttori ? `${row.istruttori.cognome} ${row.istruttori.nome}` : 'Non ass.',
             color: row.istruttori?.colore || '#3b82f6'
           },
@@ -127,24 +162,25 @@ export default function CalendarPage() {
         };
       });
 
-      setAppointments(mappedAppointments as Appointment[]);
+      setAppointments(mappedAppointments);
+      // We could also set the slots data here if we want to show non-appointment blocks
     } catch (error) {
       console.error('Error fetching calendar data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, displayStart.getTime(), effectiveViewDays]);
 
   useEffect(() => {
     if (mounted) fetchWeekAppointments();
-  }, [currentDate, effectiveViewDays, mounted]);
+  }, [currentDate, effectiveViewDays, mounted, fetchWeekAppointments]);
 
-  const handleDragStart = (event: any) => {
-    setActiveId(event.active.id);
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
   };
 
-  const handleDragOver = (event: any) => {
-    setOverId(event.over?.id || null);
+  const handleDragOver = (event: DragOverEvent) => {
+    setOverId((event.over?.id as string) || null);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -174,7 +210,7 @@ export default function CalendarPage() {
       const targetApt = appointments.find(a => a.id === active.id);
       if (!targetApt) return;
 
-      const duration = (targetApt as any).duration || 30;
+      const duration = targetApt.duration || 30;
       const startDateTime = new Date(`${dateStr}T${timeStr}`);
       startDateTime.setSeconds(0, 0); // Zeroing for precision
       const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
@@ -216,22 +252,12 @@ export default function CalendarPage() {
 
   const activeAppointment = appointments.find(a => a.id === activeId);
 
-  const handleDeleteAppointment = async () => {
-    if (!selectedAppointment) return;
-    if (window.confirm('Sei sicuro di voler eliminare questo appuntamento?')) {
-      const { error } = await supabase
-        .from('appuntamenti')
-        .delete()
-        .eq('id', selectedAppointment.id);
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [newModalInitialData, setNewModalInitialData] = useState<{ date: string; time: string } | null>(null);
 
-      if (!error) {
-        setSelectedAppointment(null);
-        if (mounted) fetchWeekAppointments();
-        setToast({ message: 'Appuntamento eliminato', type: 'success' });
-      } else {
-        setToast({ message: 'Errore durante l\'eliminazione', type: 'error' });
-      }
-    }
+  const handleCellClick = (dateStr: string, slot: string) => {
+    setNewModalInitialData({ date: dateStr, time: slot });
+    setIsNewModalOpen(true);
   };
 
 
@@ -273,18 +299,21 @@ export default function CalendarPage() {
             <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
               <button
                 onClick={() => navigateWeek(-1)}
+                title="Settimana precedente"
                 className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
               >
                 <ChevronLeft size={20} />
               </button>
               <button
                 onClick={() => setCurrentDate(new Date())}
+                title="Vai a oggi"
                 className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-zinc-100"
               >
                 Oggi
               </button>
               <button
                 onClick={() => navigateWeek(1)}
+                title="Settimana successiva"
                 className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
               >
                 <ChevronRight size={20} />
@@ -297,12 +326,12 @@ export default function CalendarPage() {
           {/* Header Giorni */}
           <div 
             className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30"
-            style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` }}
+            style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` } as React.CSSProperties}
           >
             <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
               <Clock size={16} className="text-zinc-400" />
             </div>
-            {displayDays.map(day => (
+            {displayDays.map((day: Date) => (
               <div key={day.toString()} className={cn(
                 "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
                 isSameDay(day, new Date()) ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
@@ -341,7 +370,7 @@ export default function CalendarPage() {
                     gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))`,
                     zIndex: timeSlots.length - timeSlots.indexOf(slot),
                     position: 'relative'
-                  }}
+                  } as React.CSSProperties}
                 >
                   <div className={cn(
                     "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
@@ -349,7 +378,7 @@ export default function CalendarPage() {
                   )}>
                     {isFullHour ? slot : slot.split(':')[1]}
                   </div>
-                  {displayDays.map((day) => {
+                  {displayDays.map((day: Date) => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const cellId = `${dateStr}|${slot}`;
                     const cellAppointments = appointments.filter(a =>
@@ -358,12 +387,15 @@ export default function CalendarPage() {
 
                     return (
                       <DroppableCell key={cellId} id={cellId}>
-                        <div className="h-full w-full flex gap-0.5 p-0.5 relative">
+                        <div 
+                          className="h-full w-full flex gap-0.5 p-0.5 relative cursor-pointer"
+                          onClick={() => handleCellClick(dateStr, slot)}
+                        >
                           {cellAppointments.map((apt, idx) => {
                             const hasConflict = cellAppointments.some(other => 
                               other.id !== apt.id && 
-                              (apt as any).stato !== 'annullato' &&
-                              (other as any).stato !== 'annullato' &&
+                              apt.stato !== 'annullato' &&
+                              other.stato !== 'annullato' &&
                               (
                                 other.trainer_id === apt.trainer_id || 
                                 (other.vehicle_id_uuid && apt.vehicle_id_uuid && other.vehicle_id_uuid === apt.vehicle_id_uuid)
@@ -375,11 +407,11 @@ export default function CalendarPage() {
                                 key={apt.id}
                                 className={cn(
                                   "relative flex-1 min-w-[30px]",
-                                  (apt as any).stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
+                                  apt.stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
                                 )}
                                 style={{
                                   zIndex: cellAppointments.length - idx
-                                }}
+                                } as React.CSSProperties}
                               >
                                 <DraggableAppointment
                                   appointment={apt}
@@ -406,7 +438,7 @@ export default function CalendarPage() {
               <div
                 className="w-48 p-4 rounded-2xl text-white shadow-2xl border border-white/20 ring-4 ring-black/5"
                 style={{
-                  backgroundColor: activeAppointment.trainers?.color || '#3b82f6',
+                  backgroundColor: activeAppointment.istruttore?.color || '#3b82f6',
                 }}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -433,37 +465,30 @@ export default function CalendarPage() {
           ) : null}
         </DragOverlay>
 
-        {selectedAppointment && isEditingAppointment && (
-          <Modal
-            isOpen={true}
-            onClose={() => {
-              setIsEditingAppointment(false);
-              setSelectedAppointment(null);
-            }}
-            title="Modifica Appuntamento"
-          >
-            <div className="p-2 sm:p-4 bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 shadow-sm mt-2">
-              <AppointmentForm
-                appointmentId={selectedAppointment.id}
-                onSuccess={() => {
-                  setIsEditingAppointment(false);
-                  setSelectedAppointment(null);
-                  fetchWeekAppointments();
-                  setToast({ message: 'Appuntamento aggiornato', type: 'success' });
-                }}
-                onCancel={() => setIsEditingAppointment(false)}
-              />
-            </div>
-          </Modal>
-        )}
+        <NewAppointmentModal
+          isOpen={isNewModalOpen}
+          onClose={() => {
+            setIsNewModalOpen(false);
+            setNewModalInitialData(null);
+          }}
+          onSuccess={() => {
+            setIsNewModalOpen(false);
+            setNewModalInitialData(null);
+            fetchWeekAppointments();
+          }}
+          initialDate={newModalInitialData?.date}
+          initialTime={newModalInitialData?.time}
+        />
 
-        {selectedAppointment && !isEditingAppointment && (
-          <AppointmentDetailsModal
-            appointment={selectedAppointment}
+        {selectedAppointment && (
+          <DetailsModal
+            isOpen={true}
             onClose={() => setSelectedAppointment(null)}
-            onUpdate={fetchWeekAppointments}
-            onEdit={() => setIsEditingAppointment(true)}
-            onDelete={handleDeleteAppointment}
+            onSuccess={() => {
+              setSelectedAppointment(null);
+              fetchWeekAppointments();
+            }}
+            appointmentId={selectedAppointment.id}
           />
         )}
 

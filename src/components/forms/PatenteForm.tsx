@@ -92,13 +92,15 @@ export const PatenteForm = ({
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className={LABEL_CLS}>
+          <label htmlFor="tipo" className={LABEL_CLS}>
             <BadgeCheck size={14} /> Codice Categoria
           </label>
           <input
+            id="tipo"
             required
             disabled={!!tipoId}
             value={form.tipo}
+            title="Codice Categoria"
             onChange={e => setForm(prev => ({ ...prev, tipo: e.target.value.toUpperCase() as TipoPatente }))}
             className={`${INPUT_CLS} ${!!tipoId ? 'opacity-50 cursor-not-allowed' : ''} uppercase font-mono font-bold`}
             placeholder="es. B96"
@@ -106,16 +108,18 @@ export const PatenteForm = ({
           />
         </div>
         <div className="space-y-1.5">
-          <label className={LABEL_CLS}>
+          <label htmlFor="durata" className={LABEL_CLS}>
             <Clock size={14} /> Durata Default (min)
           </label>
           <input
+            id="durata"
             required
             type="number"
             min={15}
             max={240}
             step={5}
             value={form.durata}
+            title="Durata Default"
             onChange={e => setForm(prev => ({ ...prev, durata: Number(e.target.value) }))}
             className={INPUT_CLS}
           />
@@ -124,18 +128,22 @@ export const PatenteForm = ({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className={LABEL_CLS}>Nome Visualizzato</label>
+          <label htmlFor="nome" className={LABEL_CLS}>Nome Visualizzato</label>
           <input
+            id="nome"
             value={form.nome}
+            title="Nome Visualizzato"
             onChange={e => setForm(prev => ({ ...prev, nome: e.target.value }))}
             className={INPUT_CLS}
             placeholder="es. Patente B Standard"
           />
         </div>
         <div className="space-y-1.5">
-          <label className={LABEL_CLS}>Tipo Cambio Ammesso</label>
+          <label htmlFor="cambio" className={LABEL_CLS}>Tipo Cambio Ammesso</label>
           <select
+            id="cambio"
             value={form.cambio}
+            title="Seleziona Tipo Cambio"
             onChange={e => setForm(prev => ({ ...prev, cambio: e.target.value as CambioAmmesso }))}
             className={INPUT_CLS}
           >
@@ -191,6 +199,7 @@ export const PatenteForm = ({
         </div>
         <button
           type="button"
+          title="Attiva/Disattiva Categoria"
           onClick={() => setForm(prev => ({ ...prev, nascosta: !prev.nascosta }))}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${form.nascosta ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-purple-600'}`}
         >

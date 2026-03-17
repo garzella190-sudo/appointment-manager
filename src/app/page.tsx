@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Car, FileText, Phone, Calendar as CalendarIconSmall, Search } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
-import { Modal } from '@/components/Modal';
-import { AppointmentForm } from '@/components/forms/AppointmentForm';
-import { format, addDays, parseISO, isSameDay } from 'date-fns';
+import { format, addDays, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { AppointmentDetailsModal } from '@/components/AppointmentDetailsModal';
+import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
+import DetailsModal from '@/components/modals/DetailsModal';
 
 export default function Home() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -20,7 +19,6 @@ export default function Home() {
 
   // Popup state
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -33,10 +31,10 @@ export default function Home() {
         supabase
           .from('appuntamenti')
           .select(`
-            id, cliente_id, istruttore_id, data, durata, stato, note, importo,
-            clienti ( nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
-            istruttori ( nome, cognome ),
-            veicoli ( targa, nome, colore )
+            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine,
+            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
+            istruttori ( nome, cognome, colore ),
+            veicoli ( id, targa, nome, colore )
           `)
           .gte('data', startOfDayStr)
           .lte('data', endOfDayStr)
@@ -46,32 +44,36 @@ export default function Home() {
 
       if (dbError) throw dbError;
 
-      const patentiMap = new Map((patentiData || []).map((p: any) => [p.id, p.tipo]));
+      const patentiMap = new Map<string, string>((patentiData || []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
 
-      const mappedAppointments = (dbData || []).map((row: any) => {
+      const mappedAppointments: Appointment[] = (dbData || []).map((row: Record<string, any>) => {
         const rowDate = new Date(row.data);
-        const patenteId = row.clienti?.patente_richiesta_id;
+        const clienteObj = Array.isArray(row.clienti) ? row.clienti[0] : row.clienti;
+        const istruttoreObj = Array.isArray(row.istruttori) ? row.istruttori[0] : row.istruttori;
+        const veicoloObj = Array.isArray(row.veicoli) ? row.veicoli[0] : row.veicoli;
+        
+        const patenteId = clienteObj?.patente_richiesta_id;
 
         return {
           id: row.id,
-          cliente_id: row.cliente_id,
+          cliente_id: clienteObj?.id || '',
           appointment_date: format(rowDate, 'yyyy-MM-dd'),
           appointment_time: format(rowDate, 'HH:mm'),
-          client_name: row.clienti ? `${row.clienti.cognome} ${row.clienti.nome}` : 'Sconosciuto',
-          phone: row.clienti?.telefono || '',
+          client_name: clienteObj ? `${clienteObj.cognome} ${clienteObj.nome}` : 'Sconosciuto',
+          phone: clienteObj?.telefono || '',
           trainer_id: row.istruttore_id,
-          vehicle_id: row.veicoli ? `${row.veicoli.nome} (${row.veicoli.targa})` : 'Nessuno',
-          vehicle_color: row.veicoli?.colore,
+          vehicle_id: veicoloObj ? `${veicoloObj.nome} (${veicoloObj.targa})` : 'Nessuno',
+          vehicle_color: veicoloObj?.colore,
           duration: row.durata,
           notes: row.note,
           status: row.stato,
           stato: row.stato,
           cost: row.importo || 0,
           license_type: patenteId ? (patentiMap.get(patenteId) || 'B') : 'B',
-          gearbox_type: row.clienti?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
-          trainers: {
-            name: row.istruttori ? `${row.istruttori.cognome} ${row.istruttori.nome}` : 'Non ass.',
-            color: '#3b82f6'
+          gearbox_type: clienteObj?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
+          istruttore: {
+            name: istruttoreObj ? `${istruttoreObj.cognome} ${istruttoreObj.nome}` : 'Non ass.',
+            color: istruttoreObj?.colore || '#3b82f6'
           }
         };
       });
@@ -82,15 +84,16 @@ export default function Home() {
         const updated = mappedAppointments.find(a => a.id === selectedAppointment.id);
         if (updated) setSelectedAppointment(updated as unknown as Appointment);
       }
-    } catch (error) {
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
     } finally {
       setLoading(false);
     }
-  }, [currentDate, selectedAppointment?.id]);
+  }, [currentDate, supabase, selectedAppointment]);
 
   useEffect(() => {
     fetchAppointments();
-  }, [currentDate]);
+  }, [fetchAppointments]);
 
   // Search logic
   const filteredAppointments = useMemo(() => {
@@ -98,7 +101,7 @@ export default function Home() {
     const q = searchQuery.toLowerCase();
     return appointments.filter(a => 
       (a.client_name?.toLowerCase().includes(q)) || 
-      (a.trainers?.name?.toLowerCase().includes(q)) ||
+      (a.istruttore?.name?.toLowerCase().includes(q)) ||
       (a.phone && a.phone.includes(q))
     );
   }, [appointments, searchQuery]);
@@ -108,29 +111,8 @@ export default function Home() {
     fetchAppointments();
   };
 
-  const handleEditSuccess = () => {
-    setIsEditingAppointment(false);
-    fetchAppointments();
-  };
-
   const navigateDay = (direction: number) => {
     setCurrentDate(prev => addDays(prev, direction));
-  };
-
-  const handleDeleteAppointment = async (id: string) => {
-    if (window.confirm('Sei sicuro di voler eliminare questo appuntamento?')) {
-      const { error } = await supabase
-        .from('appuntamenti')
-        .delete()
-        .eq('id', id);
-
-      if (!error) {
-        setSelectedAppointment(null);
-        fetchAppointments();
-      } else {
-        alert('Errore durante l\'eliminazione');
-      }
-    }
   };
 
 
@@ -148,18 +130,21 @@ export default function Home() {
             <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
               <button
                 onClick={() => navigateDay(-1)}
+                title="Giorno precedente"
                 className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400 appearance-none"
               >
                 <ChevronLeft size={18} />
               </button>
               <button
                 onClick={() => setCurrentDate(new Date())}
+                title="Vai a oggi"
                 className="px-3 py-1 text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider"
               >
                 Oggi
               </button>
               <button
                 onClick={() => navigateDay(1)}
+                title="Giorno successivo"
                 className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400 appearance-none"
               >
                 <ChevronRight size={18} />
@@ -207,21 +192,21 @@ export default function Home() {
                 onClick={() => setSelectedAppointment(apt)}
                 className={cn(
                   "group relative p-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all",
-                  (apt as any).stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950"
+                  apt.stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950"
                 )}
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4 min-w-0">
                     <div 
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-white shrink-0 shadow-inner"
-                      style={{ backgroundColor: apt.trainers?.color || '#3b82f6' }}
+                      className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-white shadow-inner"
+                      style={{ backgroundColor: apt.istruttore?.color || '#3b82f6' } as React.CSSProperties}
                     >
                       <Clock size={22} className="stroke-[2.5]" />
                     </div>
                     <div className="min-w-0">
                       <h3 className={cn(
                         "font-bold text-zinc-900 dark:text-zinc-100 truncate",
-                        (apt as any).stato === 'annullato' && "line-through"
+                        apt.stato === 'annullato' && "line-through"
                       )}>
                         {apt.client_name}
                       </h3>
@@ -229,7 +214,7 @@ export default function Home() {
                         <span className="text-xs font-black text-blue-600 dark:text-blue-400">{apt.appointment_time.slice(0, 5)}</span>
                         <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
                           <User size={12} className="text-zinc-400" />
-                          <span className="truncate">{apt.trainers?.name}</span>
+                          <span className="truncate">{apt.istruttore?.name}</span>
                         </div>
                         <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-black uppercase tracking-wider">
                           {apt.license_type}
@@ -255,40 +240,18 @@ export default function Home() {
         )}
       </section>
 
-      <Modal
+      <NewAppointmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Nuovo Appuntamento"
-      >
-        <AppointmentForm onSuccess={handleSuccess} onCancel={() => setIsModalOpen(false)} />
-      </Modal>
+        onSuccess={handleSuccess}
+      />
 
-      {/* NEW MODAL INTEGRATION */}
-      {selectedAppointment && isEditingAppointment && (
-        <Modal
+      {selectedAppointment && (
+        <DetailsModal
           isOpen={true}
-          onClose={() => {
-            setIsEditingAppointment(false);
-          }}
-          title="Modifica Appuntamento"
-        >
-          <div className="p-1 sm:p-2 bg-white dark:bg-zinc-950 rounded-2xl mt-2">
-            <AppointmentForm
-              appointmentId={selectedAppointment.id}
-              onSuccess={handleEditSuccess}
-              onCancel={() => setIsEditingAppointment(false)}
-            />
-          </div>
-        </Modal>
-      )}
-
-      {selectedAppointment && !isEditingAppointment && (
-        <AppointmentDetailsModal
-          appointment={selectedAppointment}
           onClose={() => setSelectedAppointment(null)}
-          onEdit={() => setIsEditingAppointment(true)}
-          onDelete={handleDeleteAppointment}
-          onUpdate={fetchAppointments}
+          onSuccess={fetchAppointments}
+          appointmentId={selectedAppointment.id}
         />
       )}
     </div>

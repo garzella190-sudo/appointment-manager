@@ -37,6 +37,7 @@ const BottomNav = () => {
                 <button
                   key={item.name}
                   onClick={() => setIsModalOpen(true)}
+                  title={item.name}
                   className="bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-2xl -mt-14 shadow-lg shadow-blue-500/40 transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer outline-none ring-offset-2 focus:ring-2 focus:ring-blue-500"
                 >
                   <Icon size={28} strokeWidth={2.5} />
@@ -48,6 +49,7 @@ const BottomNav = () => {
               <Link
                 key={item.name}
                 href={item.href}
+                title={item.name}
                 className={cn(
                   "flex flex-col items-center gap-1 transition-all duration-300 hover:scale-110 active:scale-95 px-2",
                   isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"

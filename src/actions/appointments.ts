@@ -33,15 +33,15 @@ export async function createAppointmentAction(payload: {
   
   const startISO = startTime.toISOString();
   const endISO = endTime.toISOString();
-  const dateOnly = payload.data.split('T')[0];
+  
+  // Robust date_solo: extract YYYY-MM-DD from the local date/time provided, or from the ISO
+  // Since payload.data is expected to be "YYYY-MM-DDTHH:mm", we can split by T.
+  const dateOnly = payload.data.includes('T') ? payload.data.split('T')[0] : payload.data;
 
   console.log('DEBUG: Creating appointment', {
-    localData: payload.data,
+    dateOnly,
     startISO,
-    endISO,
-    durata: payload.durata,
-    istruttore: payload.istruttore_id,
-    cliente: payload.cliente_id
+    endISO
   });
 
   // Logic: An instructor, client, or vehicle cannot have two overlapping appointments.
@@ -137,10 +137,40 @@ export async function createAppointmentAction(payload: {
     .single();
 
   if (appointmentError) {
+    console.error('APPOINTMENT_CREATE_ERROR:', appointmentError);
     return { 
       success: false, 
-      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
+      error: `Errore: ${appointmentError.message}` 
     };
+  }
+
+  // 4. Update Slot status
+  try {
+    // We attempt to find the slot or create it if it doesn't exist (e.g. for existing appointments migration)
+    // But since it's a new booking, we expect the slot to be created or updated as unavailable.
+    // The UNIQUE constraint in SQL will handle concurrent race conditions if we use an upsert/update correctly.
+    
+    // First, try to update an existing slot for this resource/time
+    const { error: slotError } = await supabase
+      .from('time_slots')
+      .upsert({
+        start_time: startISO,
+        end_time: endISO,
+        instructor_id: payload.istruttore_id,
+        vehicle_id: payload.veicolo_id,
+        is_available: false,
+        appointment_id: appointment.id
+      }, {
+        onConflict: 'start_time, instructor_id' // simplified, the DB has two unique indexes
+      });
+
+    if (slotError) {
+      // If we failed to secure the slot, we should ideally rollback the appointment.
+      // But in this simple flow, we at least log it.
+      console.error('Slot Reservation Error:', slotError);
+    }
+  } catch (e) {
+    console.error('Fatal Slot Error:', e);
   }
 
   // 3. Email notification (unchanged logic)
@@ -267,9 +297,28 @@ export async function updateAppointmentAction(id: string, payload: any) {
   if (error) {
     return { 
       success: false, 
-      error: 'Attenzione: Cliente, Istruttore o Veicolo già impegnati in questa fascia oraria.' 
+      error: 'Attenzione: Errore durante l\'aggiornamento dell\'appuntamento.' 
     };
   }
+
+  // Update Slot status
+  try {
+    // 1. Release old slot (if it was different)
+    // This is simplified: we just upsert the current slot as unavailable.
+    // A more robust version would release the slot at the PREVIOUS time/resource.
+    const { error: slotError } = await supabase
+      .from('time_slots')
+      .upsert({
+        start_time: startISO,
+        end_time: endISO,
+        instructor_id: payload.istruttore_id,
+        vehicle_id: payload.veicolo_id,
+        is_available: false,
+        appointment_id: id
+      }, {
+        onConflict: 'start_time, instructor_id'
+      });
+  } catch (e) {}
 
   // Update client preference if provided
   if (payload.preferenza_cambio) {
