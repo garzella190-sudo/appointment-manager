@@ -12,6 +12,7 @@ import { deleteAppointmentAction, cancelAppointmentAction } from '@/actions/appo
 import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
 import { ClientAutocomplete } from './ClientAutocomplete';
+import { WhatsAppButton } from '../WhatsAppButton';
 
 interface FormProps {
   onSuccess: () => void;
@@ -338,9 +339,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                       <a href={`tel:${selectedCliente.telefono}`} title="Chiama cliente" className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors">
                         <Phone size={14} />
                       </a>
-                      <a href={`https://wa.me/39${selectedCliente.telefono.replace(/\D/g, '')}`} title="Invia WhatsApp" target="_blank" rel="noopener noreferrer" className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors">
-                        <MessageCircle size={14} />
-                      </a>
+                      <WhatsAppButton 
+                        phone={selectedCliente.telefono} 
+                        showLabel={false}
+                        variant="ghost"
+                        className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                      />
                     </>
                   )}
                   <Link href={`/clienti/${form.cliente_id}`} className="p-2 bg-zinc-100 text-zinc-400 rounded-xl hover:bg-zinc-200 transition-colors">
