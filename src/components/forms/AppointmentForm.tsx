@@ -343,7 +343,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                         phone={selectedCliente.telefono} 
                         showLabel={false}
                         variant="ghost"
-                        className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                        className="bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
                       />
                     </>
                   )}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Modal } from './Modal';
 import { generateWhatsAppLink } from '@/utils/whatsapp';
@@ -68,21 +68,41 @@ export const WhatsAppButton = ({
 
   return (
     <>
+    <div className={cn("inline-flex items-stretch overflow-hidden", className)}>
       <button
         type="button"
         onClick={handleClick}
         className={cn(
-          "flex items-center gap-1.5 transition-all font-semibold",
-          variant === 'primary' && "p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-md shadow-emerald-500/20",
-          variant === 'secondary' && "px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs hover:bg-emerald-100 dark:hover:bg-emerald-800/40",
-          variant === 'ghost' && "p-2 bg-transparent text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl",
-          className
+          "flex items-center gap-1.5 transition-all font-semibold rounded-none h-full",
+          variant === 'primary' && "p-2 bg-emerald-600 text-white hover:bg-emerald-700",
+          variant === 'secondary' && "px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs hover:bg-emerald-100 dark:hover:bg-emerald-800/40",
+          variant === 'ghost' && "p-2 bg-transparent text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20",
+          // Se la classe passata non ha padding, aggiungiamolo noi
+          !className?.includes('p-') && !className?.includes('px-') && "px-3"
         )}
-        title="Contatta su WhatsApp"
+        title={`WhatsApp (${preference === 'business' ? 'Business' : 'Personale'})`}
       >
         <MessageCircle size={iconSize} />
         {showLabel && label && <span>{label}</span>}
       </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowModal(true);
+        }}
+        className={cn(
+          "px-1.5 flex items-center justify-center transition-all border-l",
+          variant === 'primary' && "bg-emerald-600 text-white hover:bg-emerald-700 border-white/20",
+          variant === 'secondary' && "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-800/40",
+          variant === 'ghost' && "bg-transparent text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/20",
+        )}
+        title="Cambia app WhatsApp"
+      >
+        <ChevronDown size={iconSize + 2} />
+      </button>
+    </div>
 
       {showModal && (
         <Modal

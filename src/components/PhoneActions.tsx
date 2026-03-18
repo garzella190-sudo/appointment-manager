@@ -40,9 +40,10 @@ export const PhoneActions = ({ phone, className, secondary = false }: PhoneActio
         showLabel={secondary}
         variant={secondary ? 'ghost' : 'primary'}
         className={cn(
-          secondary
-            ? "px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-[10px] hover:bg-emerald-100 dark:hover:bg-emerald-800/40"
-            : "p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-800/40"
+          "rounded-xl overflow-hidden",
+          secondary 
+            ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px]"
+            : "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
         )}
       />
     </div>
