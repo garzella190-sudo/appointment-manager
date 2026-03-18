@@ -204,14 +204,6 @@ export default function SchedaClientePage() {
 
           {/* Quick links */}
           <div className="flex flex-wrap gap-2 mt-2">
-            {cliente.telefono && (
-              <a
-                href={`tel:${cliente.telefono.replace(/\s/g, '')}`}
-                className="flex items-center gap-1.5 px-3 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg text-xs font-semibold hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
-              >
-                <Phone size={12} /> {cliente.telefono}
-              </a>
-            )}
             {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
             {cliente.email && (
               <a
