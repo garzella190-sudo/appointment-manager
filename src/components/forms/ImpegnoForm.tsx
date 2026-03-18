@@ -72,7 +72,7 @@ export const ImpegnoForm = ({
   const handleAddTipo = async () => {
     if (!newTipoNome.trim()) return;
     setLoading(true);
-    const result = await createTipoImpegnoAction(newTipoNome.trim());
+    const result = await createTipoImpegnoAction({ nome: newTipoNome.trim() });
     setLoading(false);
     if (result.success && result.data) {
       setTipi(prev => [...prev, result.data!].sort((a,b) => a.nome.localeCompare(b.nome)));
