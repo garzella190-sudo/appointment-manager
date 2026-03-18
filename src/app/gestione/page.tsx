@@ -10,6 +10,7 @@ import { ImpegnoForm } from '@/components/forms/ImpegnoForm';
 import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { UserForm } from '@/components/forms/UserForm';
 import { PatenteForm } from '@/components/forms/PatenteForm';
+import { InstallPWA } from '@/components/InstallPWA';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { listUsersAction } from '@/actions/auth';
@@ -20,7 +21,7 @@ import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
   AlertTriangle, CheckCircle2, Phone, Mail, Search,
   Clock, EyeOff, Eye, Copy,
-  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2
+  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { User as AuthUser } from '@supabase/supabase-js';
@@ -790,7 +791,7 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
 };
 
 // ── Page principale ───────────────────────────────────────────
-type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti' | 'impegni';
+type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti' | 'impegni' | 'mobile';
 
 const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'veicoli', label: 'Veicoli', icon: Car, color: 'emerald' },
@@ -798,6 +799,7 @@ const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: st
   { id: 'impegni', label: 'Altri Impegni', icon: Clock, color: 'orange' },
   { id: 'patenti', label: 'Patenti', icon: BadgeCheck, color: 'purple' },
   { id: 'utenti', label: 'Utenti', icon: ShieldCheck, color: 'indigo' },
+  { id: 'mobile', label: 'App Mobile', icon: Smartphone, color: 'blue' },
 ];
 
 export default function GestionePage() {
@@ -873,6 +875,7 @@ export default function GestionePage() {
         {active === 'impegni' && <TabImpegni refreshKey={refreshKey} />}
         {active === 'patenti' && <TabPatenti refreshKey={refreshKey} />}
         {active === 'utenti' && <TabUtenti refreshKey={refreshKey} />}
+        {active === 'mobile' && <InstallPWA />}
       </div>
 
       <Modal

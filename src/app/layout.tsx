@@ -1,16 +1,27 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/hooks/useToast";
 import BottomNav from "@/components/BottomNav";
 import { Analytics } from "@vercel/analytics/next";
+import SWRegister from "@/components/SWRegister";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Agenda Appuntamenti",
   description: "Gestione appuntamenti premium",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Appointment Manager",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#3B82F6",
 };
 
 export default function RootLayout({
@@ -33,6 +44,7 @@ export default function RootLayout({
             </main>
             <BottomNav />
             <Analytics />
+            <SWRegister />
           </ToastProvider>
         </ThemeProvider>
       </body>
