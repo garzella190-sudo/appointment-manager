@@ -137,9 +137,18 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       const busyInstructors = busySlots?.map(s => s.instructor_id).filter(Boolean) as string[] || [];
       const busyVehicles = busySlots?.map(s => s.vehicle_id).filter(Boolean) as string[] || [];
 
-      setAvailableSlots({
-        instructor_ids: istruttori.map(i => i.id).filter(id => !busyInstructors.includes(id)),
-        vehicle_ids: veicoli.map(v => v.id).filter(id => !busyVehicles.includes(id))
+      const nextInstructorIds = istruttori.map(i => i.id).filter(id => !busyInstructors.includes(id));
+      const nextVehicleIds = veicoli.map(v => v.id).filter(id => !busyVehicles.includes(id));
+
+      // Stability check: only update if IDs actually changed
+      setAvailableSlots(prev => {
+        const isSameI = prev.instructor_ids.length === nextInstructorIds.length && 
+                        prev.instructor_ids.every((id, idx) => id === nextInstructorIds[idx]);
+        const isSameV = prev.vehicle_ids.length === nextVehicleIds.length && 
+                        prev.vehicle_ids.every((id, idx) => id === nextVehicleIds[idx]);
+        
+        if (isSameI && isSameV) return prev;
+        return { instructor_ids: nextInstructorIds, vehicle_ids: nextVehicleIds };
       });
     }
 
@@ -504,17 +513,46 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           {isView ? (
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
-                <button type="button" onClick={() => setMode('edit')} className="h-14 bg-blue-50 text-blue-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-blue-100/50 flex items-center justify-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMode('edit');
+                  }} 
+                  className="h-14 bg-blue-50 text-blue-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-blue-100/50 flex items-center justify-center gap-2"
+                >
                   <Edit3 size={16} /> MODIFICA
                 </button>
-                <button type="button" onClick={async () => { if (window.confirm("Annullare?")) { setLoading(true); await cancelAppointmentAction(appointmentId!); onSuccess(); } }} disabled={form.stato === 'annullato'}  className="h-14 bg-orange-50 text-orange-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-orange-100/50 disabled:opacity-30">
+                <button 
+                  type="button" 
+                  onClick={async (e) => { 
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (window.confirm("Annullare?")) { 
+                      setLoading(true); 
+                      await cancelAppointmentAction(appointmentId!); 
+                      onSuccess(); 
+                    } 
+                  }} 
+                  disabled={form.stato === 'annullato'}  
+                  className="h-14 bg-orange-50 text-orange-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-orange-100/50 disabled:opacity-30"
+                >
                   ANNULLA
                 </button>
               </div>
               <button type="button" onClick={async () => { if (window.confirm("Eliminare?")) { setLoading(true); await deleteAppointmentAction(appointmentId!); onSuccess(); } }} className="w-full h-14 bg-red-50 text-red-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-red-100/50 flex items-center justify-center gap-2">
                 <Trash2 size={16} /> ELIMINA
               </button>
-              <button type="button" onClick={onCancel} className="w-full h-14 bg-zinc-900 text-white font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-black">
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onCancel();
+                }} 
+                className="w-full h-14 bg-zinc-900 text-white font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-black"
+              >
                 CHIUDI
               </button>
               
@@ -531,7 +569,15 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               <button disabled={loading} type="submit" className="w-full h-14 rounded-2xl font-black text-white bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all uppercase text-[11px] tracking-widest flex items-center justify-center gap-3 active:scale-95">
                 {loading ? <Loader2 className="animate-spin" size={22} /> : (appointmentId ? 'SALVA MODIFICHE' : 'CONFERMA')}
               </button>
-              <button type="button" onClick={onCancel} className="w-full h-14 rounded-2xl font-bold text-zinc-400 hover:bg-zinc-100 transition-all uppercase text-[11px] tracking-widest">
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onCancel();
+                }} 
+                className="w-full h-14 rounded-2xl font-bold text-zinc-400 hover:bg-zinc-100 transition-all uppercase text-[11px] tracking-widest"
+              >
                 Indietro
               </button>
             </div>

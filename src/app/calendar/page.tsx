@@ -25,6 +25,8 @@ import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import { Clock } from 'lucide-react';
 
+const supabaseClient = createClient();
+
 export interface AppointmentRow {
   id: string;
   data: string;
@@ -59,7 +61,7 @@ export interface AppointmentRow {
 }
 
 export default function CalendarPage() {
-  const supabase = createClient();
+  const supabase = supabaseClient;
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +114,7 @@ export default function CalendarPage() {
     const fetchEndDate = addDays(displayStart, effectiveViewDays);
 
     try {
-      const [{ data: dbData, error: dbError }, { data: patentiData }, { data: slotsData }] = await Promise.all([
+      const [{ data: dbData, error: dbError }, { data: patentiData }] = await Promise.all([
         supabase
           .from('appuntamenti')
           .select(`
@@ -123,16 +125,14 @@ export default function CalendarPage() {
           `)
           .gte('data', displayStart.toISOString())
           .lt('data', fetchEndDate.toISOString()),
-        supabase.from('patenti').select('id, tipo'),
-        supabase.from('time_slots').select('*').gte('start_time', displayStart.toISOString()).lt('start_time', fetchEndDate.toISOString())
+        supabase.from('patenti').select('id, tipo')
       ]);
 
       if (dbError) throw dbError;
       
-      const patentiMap = new Map<string, string>((patentiData || []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
+      const patentiMap = new Map<string, string>((patentiData || []).map((p: any) => [p.id, p.tipo]));
 
       const mappedAppointments = (dbData || []).map((row: any) => {
-        // Use data_solo for stable day alignment (avoids TZ shifting)
         const dateStr = row.data_solo || row.data.split('T')[0];
         const rowDate = new Date(row.data);
         const patenteId = row.clienti?.patente_richiesta_id;
@@ -163,7 +163,6 @@ export default function CalendarPage() {
       });
 
       setAppointments(mappedAppointments);
-      // We could also set the slots data here if we want to show non-appointment blocks
     } catch (error) {
       console.error('Error fetching calendar data:', error);
     } finally {
@@ -192,13 +191,11 @@ export default function CalendarPage() {
       const [dateStr, timeStr] = (over.id as string).split('|');
       const formattedDate = format(parseISO(dateStr), 'dd/MM/yyyy');
 
-      // Show move info
       setToast({
         message: `Spostato al ${formattedDate} alle ore ${timeStr}`,
         type: 'success'
       });
 
-      // Update Local State Snappy
       setAppointments(prev => prev.map(apt => {
         if (apt.id === active.id) {
           return { ...apt, appointment_date: dateStr, appointment_time: timeStr };
@@ -206,26 +203,17 @@ export default function CalendarPage() {
         return apt;
       }));
 
-      // Update Supabase
       const targetApt = appointments.find(a => a.id === active.id);
       if (!targetApt) return;
 
       const duration = targetApt.duration || 30;
       const startDateTime = new Date(`${dateStr}T${timeStr}`);
-      startDateTime.setSeconds(0, 0); // Zeroing for precision
+      startDateTime.setSeconds(0, 0);
       const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
       endDateTime.setSeconds(0, 0);
       
       const startISO = startDateTime.toISOString();
       const endISO = endDateTime.toISOString();
-
-      console.log('DEBUG: Moving appointment', {
-        id: active.id,
-        localStart: `${dateStr} ${timeStr}`,
-        startISO,
-        endISO,
-        duration
-      });
 
       const { error } = await supabase
         .from('appuntamenti')
@@ -239,7 +227,7 @@ export default function CalendarPage() {
 
       if (error) {
         console.error('Error updating appointment position:', error);
-        if (mounted) fetchWeekAppointments(); // Revert on error
+        if (mounted) fetchWeekAppointments(); 
       }
     }
   };
@@ -260,246 +248,243 @@ export default function CalendarPage() {
     setIsNewModalOpen(true);
   };
 
-
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      modifiers={[snapCenterToCursor]}
-    >
-      <div className="p-4 sm:p-6 md:p-10 animate-fade-in max-w-7xl mx-auto">
-        <header className="mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 mt-1 capitalize">
-              {format(weekStart, 'MMMM yyyy', { locale: it })}
-            </p>
-          </div>
+    <>
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        modifiers={[snapCenterToCursor]}
+      >
+        <div className="p-4 sm:p-6 md:p-10 animate-fade-in max-w-7xl mx-auto">
+          <header className="mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
+              <p className="text-zinc-500 dark:text-zinc-400 mt-1 capitalize">
+                {format(weekStart, 'MMMM yyyy', { locale: it })}
+              </p>
+            </div>
 
-          <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
-            <div className="flex flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl shadow-inner overflow-x-auto scrollbar-hide">
-              {[1, 3, 5, 7].map((days) => (
+            <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
+              <div className="flex flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl shadow-inner overflow-x-auto scrollbar-hide">
+                {[1, 3, 5, 7].map((days) => (
+                  <button
+                    key={days}
+                    onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap",
+                      viewDays === days 
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" 
+                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    )}
+                  >
+                    {days} G
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
                 <button
-                  key={days}
-                  onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap",
-                    viewDays === days 
-                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" 
-                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                  )}
+                  onClick={() => navigateWeek(-1)}
+                  title="Settimana precedente"
+                  className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
                 >
-                  {days} G
+                  <ChevronLeft size={20} />
                 </button>
+                <button
+                  onClick={() => setCurrentDate(new Date())}
+                  title="Vai a oggi"
+                  className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-zinc-100"
+                >
+                  Oggi
+                </button>
+                <button
+                  onClick={() => navigateWeek(1)}
+                  title="Settimana successiva"
+                  className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="bg-white dark:bg-zinc-900/80 rounded-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+            <div 
+              className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30"
+              style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` } as React.CSSProperties}
+            >
+              <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
+                <Clock size={16} className="text-zinc-400" />
+              </div>
+              {displayDays.map((day: Date) => (
+                <div key={day.toString()} className={cn(
+                  "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
+                  isSameDay(day, new Date()) ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
+                )}>
+                  <span className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">
+                    {format(day, 'eee', { locale: it })}
+                  </span>
+                  <span className={cn(
+                    "text-lg font-black mt-1 inline-flex w-10 h-10 items-center justify-center rounded-full transition-all",
+                    isSameDay(day, new Date()) ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "text-zinc-900 dark:text-zinc-50"
+                  )}>
+                    {format(day, 'd')}
+                  </span>
+                </div>
               ))}
             </div>
 
-            <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
-              <button
-                onClick={() => navigateWeek(-1)}
-                title="Settimana precedente"
-                className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                onClick={() => setCurrentDate(new Date())}
-                title="Vai a oggi"
-                className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-zinc-100"
-              >
-                Oggi
-              </button>
-              <button
-                onClick={() => navigateWeek(1)}
-                title="Settimana successiva"
-                className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <div className="bg-white dark:bg-zinc-900/80 rounded-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden">
-          {/* Header Giorni */}
-          <div 
-            className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30"
-            style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` } as React.CSSProperties}
-          >
-            <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
-              <Clock size={16} className="text-zinc-400" />
-            </div>
-            {displayDays.map((day: Date) => (
-              <div key={day.toString()} className={cn(
-                "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
-                isSameDay(day, new Date()) ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
-              )}>
-                <span className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">
-                  {format(day, 'eee', { locale: it })}
-                </span>
-                <span className={cn(
-                  "text-lg font-black mt-1 inline-flex w-10 h-10 items-center justify-center rounded-full transition-all",
-                  isSameDay(day, new Date()) ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "text-zinc-900 dark:text-zinc-50"
-                )}>
-                  {format(day, 'd')}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Griglia Oraria */}
-          <div className="overflow-y-auto max-h-[700px] relative scrollbar-hide">
-            {loading && (
-              <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
-                <Loader2 className="animate-spin text-blue-600" size={40} />
-              </div>
-            )}
-
-            {timeSlots.map((slot) => {
-              const isFullHour = slot.endsWith(':00');
-              return (
-                <div 
-                  key={slot} 
-                  className={cn(
-                    "grid border-b last:border-0 h-10 transition-colors",
-                    isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
-                  )}
-                  style={{ 
-                    gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))`,
-                    zIndex: timeSlots.length - timeSlots.indexOf(slot),
-                    position: 'relative'
-                  } as React.CSSProperties}
-                >
-                  <div className={cn(
-                    "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
-                    isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
-                  )}>
-                    {isFullHour ? slot : slot.split(':')[1]}
-                  </div>
-                  {displayDays.map((day: Date) => {
-                    const dateStr = format(day, 'yyyy-MM-dd');
-                    const cellId = `${dateStr}|${slot}`;
-                    const cellAppointments = appointments.filter(a =>
-                      a.appointment_date === dateStr && a.appointment_time.slice(0, 5) === slot
-                    );
-
-                    return (
-                      <DroppableCell key={cellId} id={cellId}>
-                        <div 
-                          className="h-full w-full flex gap-0.5 p-0.5 relative cursor-pointer"
-                          onClick={() => handleCellClick(dateStr, slot)}
-                        >
-                          {cellAppointments.map((apt, idx) => {
-                            const hasConflict = cellAppointments.some(other => 
-                              other.id !== apt.id && 
-                              apt.stato !== 'annullato' &&
-                              other.stato !== 'annullato' &&
-                              (
-                                other.trainer_id === apt.trainer_id || 
-                                (other.vehicle_id_uuid && apt.vehicle_id_uuid && other.vehicle_id_uuid === apt.vehicle_id_uuid)
-                              )
-                            );
-
-                            return (
-                              <div
-                                key={apt.id}
-                                className={cn(
-                                  "relative flex-1 min-w-[30px]",
-                                  apt.stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
-                                )}
-                                style={{
-                                  zIndex: cellAppointments.length - idx
-                                } as React.CSSProperties}
-                              >
-                                <DraggableAppointment
-                                  appointment={apt}
-                                  isOverlapping={hasConflict}
-                                  onClick={setSelectedAppointment}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </DroppableCell>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <DragOverlay adjustScale={false} zIndex={100}>
-          {activeId && activeAppointment ? (
-            <div className="relative pointer-events-none">
-              {/* Draggable Preview */}
-              <div
-                className="w-48 p-4 rounded-2xl text-white shadow-2xl border border-white/20 ring-4 ring-black/5"
-                style={{
-                  backgroundColor: activeAppointment.istruttore?.color || '#3b82f6',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[9px] font-black bg-black/20 px-1.5 py-0.5 rounded uppercase">
-                    {activeAppointment.license_type}
-                  </span>
-                  <span className="text-[10px] font-bold opacity-80">
-                    {activeAppointment.appointment_time.slice(0, 5)}
-                  </span>
-                </div>
-                <p className="text-sm font-black leading-tight truncate">{activeAppointment.client_name}</p>
-              </div>
-
-              {/* Real-time Indicator Tooltip - Perfectly centered over the 48w (192px) container */}
-              {overId && (
-                <div className="absolute -top-14 left-0 w-48 flex justify-center pointer-events-none">
-                  <div className="bg-blue-600 text-white text-[11px] font-black py-2 px-4 rounded-2xl shadow-2xl whitespace-nowrap animate-bounce-subtle border border-white/20 flex items-center gap-2 ring-4 ring-blue-500/10">
-                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                    {format(parseISO(overId.split('|')[0]), 'dd MMMM', { locale: it })} • {overId.split('|')[1]}
-                  </div>
+            <div className="overflow-y-auto max-h-[700px] relative scrollbar-hide">
+              {loading && (
+                <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
+                  <Loader2 className="animate-spin text-blue-600" size={40} />
                 </div>
               )}
-            </div>
-          ) : null}
-        </DragOverlay>
 
-        <NewAppointmentModal
-          isOpen={isNewModalOpen}
-          onClose={() => {
-            setIsNewModalOpen(false);
-            setNewModalInitialData(null);
-          }}
+              {timeSlots.map((slot) => {
+                const isFullHour = slot.endsWith(':00');
+                return (
+                  <div 
+                    key={slot} 
+                    className={cn(
+                      "grid border-b last:border-0 h-10 transition-colors",
+                      isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
+                    )}
+                    style={{ 
+                      gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))`,
+                      zIndex: timeSlots.length - timeSlots.indexOf(slot),
+                      position: 'relative'
+                    } as React.CSSProperties}
+                  >
+                    <div className={cn(
+                      "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
+                      isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
+                    )}>
+                      {isFullHour ? slot : slot.split(':')[1]}
+                    </div>
+                    {displayDays.map((day: Date) => {
+                      const dateStr = format(day, 'yyyy-MM-dd');
+                      const cellId = `${dateStr}|${slot}`;
+                      const cellAppointments = appointments.filter(a =>
+                        a.appointment_date === dateStr && a.appointment_time.slice(0, 5) === slot
+                      );
+
+                      return (
+                        <DroppableCell key={cellId} id={cellId}>
+                          <div 
+                            className="h-full w-full flex gap-0.5 p-0.5 relative cursor-pointer"
+                            onClick={() => handleCellClick(dateStr, slot)}
+                          >
+                            {cellAppointments.map((apt, idx) => {
+                              const hasConflict = cellAppointments.some(other => 
+                                other.id !== apt.id && 
+                                apt.stato !== 'annullato' &&
+                                other.stato !== 'annullato' &&
+                                (
+                                  other.trainer_id === apt.trainer_id || 
+                                  (other.vehicle_id_uuid && apt.vehicle_id_uuid && other.vehicle_id_uuid === apt.vehicle_id_uuid)
+                                )
+                              );
+
+                              return (
+                                <div
+                                  key={apt.id}
+                                  className={cn(
+                                    "relative flex-1 min-w-[30px]",
+                                    apt.stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
+                                  )}
+                                  style={{
+                                    zIndex: cellAppointments.length - idx
+                                  } as React.CSSProperties}
+                                >
+                                  <DraggableAppointment
+                                    appointment={apt}
+                                    isOverlapping={hasConflict}
+                                    onClick={setSelectedAppointment}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </DroppableCell>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <DragOverlay adjustScale={false} zIndex={100}>
+            {activeId && activeAppointment ? (
+              <div className="relative pointer-events-none">
+                <div
+                  className="w-48 p-4 rounded-2xl text-white shadow-2xl border border-white/20 ring-4 ring-black/5"
+                  style={{
+                    backgroundColor: activeAppointment.istruttore?.color || '#3b82f6',
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[9px] font-black bg-black/20 px-1.5 py-0.5 rounded uppercase">
+                      {activeAppointment.license_type}
+                    </span>
+                    <span className="text-[10px] font-bold opacity-80">
+                      {activeAppointment.appointment_time.slice(0, 5)}
+                    </span>
+                  </div>
+                  <p className="text-sm font-black leading-tight truncate">{activeAppointment.client_name}</p>
+                </div>
+
+                {overId && (
+                  <div className="absolute -top-14 left-0 w-48 flex justify-center pointer-events-none">
+                    <div className="bg-blue-600 text-white text-[11px] font-black py-2 px-4 rounded-2xl shadow-2xl whitespace-nowrap animate-bounce-subtle border border-white/20 flex items-center gap-2 ring-4 ring-blue-500/10">
+                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                      {format(parseISO(overId.split('|')[0]), 'dd MMMM', { locale: it })} • {overId.split('|')[1]}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </div>
+      </DndContext>
+
+      <NewAppointmentModal
+        isOpen={isNewModalOpen}
+        onClose={() => {
+          setIsNewModalOpen(false);
+          setNewModalInitialData(null);
+        }}
+        onSuccess={() => {
+          setIsNewModalOpen(false);
+          setNewModalInitialData(null);
+          fetchWeekAppointments();
+        }}
+        initialDate={newModalInitialData?.date}
+        initialTime={newModalInitialData?.time}
+      />
+
+      {selectedAppointment && (
+        <DetailsModal
+          isOpen={true}
+          onClose={() => setSelectedAppointment(null)}
           onSuccess={() => {
-            setIsNewModalOpen(false);
-            setNewModalInitialData(null);
+            setSelectedAppointment(null);
             fetchWeekAppointments();
           }}
-          initialDate={newModalInitialData?.date}
-          initialTime={newModalInitialData?.time}
+          appointmentId={selectedAppointment.id}
         />
+      )}
 
-        {selectedAppointment && (
-          <DetailsModal
-            isOpen={true}
-            onClose={() => setSelectedAppointment(null)}
-            onSuccess={() => {
-              setSelectedAppointment(null);
-              fetchWeekAppointments();
-            }}
-            appointmentId={selectedAppointment.id}
-          />
-        )}
-
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
-        )}
-      </div>
-    </DndContext>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </>
   );
 }

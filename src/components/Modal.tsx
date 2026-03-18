@@ -44,16 +44,22 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       {/* Modal Panel - Proportional Sizing & Robust Centering */}
       <div 
         className={cn(
-          "relative bg-white w-full max-w-[620px] rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] flex flex-col max-h-[92vh] overflow-hidden transition-all duration-500 transform border border-white my-auto",
+          "relative bg-white w-full max-w-[620px] rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] flex flex-col max-h-[92vh] overflow-hidden transition-all duration-500 transform border border-white my-auto z-50",
           isOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-8"
         )}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Identico a Nuovo Appuntamento */}
         <div className="flex items-center justify-between p-8 sm:p-10 pb-4 shrink-0">
           <h2 className="text-[28px] font-black text-zinc-900 tracking-tight leading-none">{title}</h2>
           <button 
-            onClick={onClose}
-            className="p-3 text-zinc-400 hover:text-zinc-600 bg-zinc-50 hover:bg-zinc-100 rounded-[20px] transition-all hover:rotate-90 appearance-none"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            className="p-3 text-zinc-400 hover:text-zinc-600 bg-zinc-50 hover:bg-zinc-100 rounded-[20px] transition-all hover:rotate-90 appearance-none flex items-center justify-center"
           >
             <X size={24} />
             <span className="sr-only">Chiudi</span>

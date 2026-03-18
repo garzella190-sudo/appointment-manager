@@ -89,7 +89,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [currentDate, supabase, selectedAppointment]);
+  }, [currentDate]);
 
   useEffect(() => {
     fetchAppointments();
