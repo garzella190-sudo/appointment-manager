@@ -1,6 +1,6 @@
 {
-  "name": "Appointment Manager",
-  "short_name": "AppManager",
+  "name": "Agenda Guide",
+  "short_name": "AgendaGuide",
   "description": "Gestione Appuntamenti Scuola Guida",
   "start_url": "/",
   "display": "standalone",

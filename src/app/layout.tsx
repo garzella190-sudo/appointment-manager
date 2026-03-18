@@ -10,13 +10,13 @@ import SWRegister from "@/components/SWRegister";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Agenda Appuntamenti",
-  description: "Gestione appuntamenti premium",
+  title: "Agenda Guide",
+  description: "Gestione guide e appuntamenti",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Appointment Manager",
+    title: "Agenda Guide",
   },
 };
 

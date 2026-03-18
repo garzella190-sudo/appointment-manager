@@ -26,7 +26,7 @@ export const InstallPWA = () => {
         </div>
         <div>
           <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Installa l'App</h2>
-          <p className="text-sm text-zinc-500">Porta Appointment Manager sempre con te</p>
+          <p className="text-sm text-zinc-500">Porta Agenda Guide sempre con te</p>
         </div>
       </div>
 
