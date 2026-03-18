@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Modal } from './Modal';
+import { generateWhatsAppLink } from '@/utils/whatsapp';
 
 interface WhatsAppButtonProps {
   phone: string;
@@ -36,21 +37,14 @@ export const WhatsAppButton = ({
   }, []);
 
   const openWA = (pref: 'standard' | 'business') => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const isAndroid = /android/i.test(navigator.userAgent);
+    const isBusiness = pref === 'business';
+    const link = generateWhatsAppLink(phone, isBusiness);
     
-    // Assicuriamoci che il numero abbia il prefisso 39 se mancante (Italia default)
-    const fullPhone = cleanPhone.startsWith('39') ? cleanPhone : `39${cleanPhone}`;
-
-    if (isAndroid) {
-      if (pref === 'business') {
-        window.location.href = `intent://send?phone=${fullPhone}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end;`;
-      } else {
-        window.location.href = `intent://send?phone=${fullPhone}#Intent;package=com.whatsapp;scheme=whatsapp;end;`;
-      }
+    // Su desktop usiamo window.open, sugli intent Android/iOS a volte serve window.location.href
+    if (link.startsWith('intent://') || link.startsWith('whatsapp://')) {
+      window.location.href = link;
     } else {
-      // Fallback Universale (iOS / Web / Mac / Windows)
-      window.open(`https://wa.me/${fullPhone}`, '_blank');
+      window.open(link, '_blank');
     }
   };
 
