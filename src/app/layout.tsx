@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ToastProvider } from "@/hooks/useToast";
 import BottomNav from "@/components/BottomNav";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -26,11 +27,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <main className="min-h-screen">
-            {children}
-          </main>
-          <BottomNav />
-          <Analytics />
+          <ToastProvider>
+            <main className="min-h-screen">
+              {children}
+            </main>
+            <BottomNav />
+            <Analytics />
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Phone, Mail, Trash2, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 import { TipoPatente, Patente } from '@/lib/database.types';
 import { 
   createIstruttoreAction, 
@@ -56,6 +57,7 @@ export const IstruttoreForm = ({
     veicolo_id: defaultValues?.veicolo_id ?? '',
   });
   const [serverError, setServerError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     async function fetchData() {
@@ -119,8 +121,10 @@ export const IstruttoreForm = ({
     setLoading(false);
     
     if (result.success) {
+      showToast(istruttoreId ? 'Anagrafica istruttore aggiornata' : 'Nuovo istruttore creato con successo', 'success');
       onSuccess();
     } else {
+      showToast(result.error || 'Errore nel salvataggio dell\'istruttore', 'error');
       setServerError(result.error || 'Si è verificato un errore nel salvataggio.');
     }
   };
@@ -134,8 +138,10 @@ export const IstruttoreForm = ({
     setLoading(false);
 
     if (result.success) {
+      showToast('Istruttore eliminato correttamente', 'info');
       onSuccess();
     } else {
+      showToast(result.error || "Errore durante l'eliminazione", 'error');
       setServerError(result.error || "Errore durante l'eliminazione.");
     }
   };

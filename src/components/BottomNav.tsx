@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Calendar, Home, UserCircle, PlusCircle, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Modal } from './Modal';
@@ -10,6 +10,7 @@ import { AppointmentForm } from './forms/AppointmentForm';
 
 const BottomNav = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   if (pathname === '/login') {
@@ -79,9 +80,7 @@ const BottomNav = () => {
         <AppointmentForm 
           onSuccess={() => {
             setIsModalOpen(false);
-            // Non possiamo forzare il refresh di altre pagine facilmente da qui senza un gestore di stato o context,
-            // ma l'utente vedrà i dati aggiornati navigando o con il refresh automatico di Next.js se configurato.
-            window.location.reload(); 
+            router.refresh(); 
           }} 
           onCancel={() => setIsModalOpen(false)} 
         />

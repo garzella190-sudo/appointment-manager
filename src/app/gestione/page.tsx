@@ -2,19 +2,24 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Veicolo, Patente, TipoPatente } from '@/lib/database.types';
+import { Veicolo, Patente, TipoPatente, ImpegnoDettagliato } from '@/lib/database.types';
 import { Modal } from '@/components/Modal';
 import { VeicoloForm } from '@/components/forms/VeicoloForm';
 import { IstruttoreForm } from '@/components/forms/IstruttoreForm';
+import { ImpegnoForm } from '@/components/forms/ImpegnoForm';
+import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { UserForm } from '@/components/forms/UserForm';
 import { PatenteForm } from '@/components/forms/PatenteForm';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { listUsersAction } from '@/actions/auth';
 import { deleteVeicoloAction } from '@/actions/veicoli';
 import { deleteIstruttoreAction } from '@/actions/istruttori';
+import { deleteAppointmentAction } from '@/actions/appointment_actions';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
   AlertTriangle, CheckCircle2, Phone, Mail, Search,
-  Clock, EyeOff, Eye,
+  Clock, EyeOff, Eye, Copy,
   Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -582,12 +587,215 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
   );
 };
 
+// ── Tab: Impegni (Altri Impegni) ─────────────────────────────
+const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
+  const [loading, setLoading] = useState(true);
+  const [impegni, setImpegni] = useState<any[]>([]);
+  const [istruttori, setIstruttori] = useState<any[]>([]);
+  const [selectedIstruttoreId, setSelectedIstruttoreId] = useState<string>('all');
+  const [showStorico, setShowStorico] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const [{ data: aptData, error: aptError }, { data: istData }] = await Promise.all([
+      supabase
+        .from('appuntamenti')
+        .select(`
+          id, data, durata, stato, note, istruttore_id, 
+          clienti!inner(id, nome, cognome),
+          istruttori(id, nome, cognome, colore)
+        `)
+        .eq('clienti.nome', 'UFFICIO')
+        .order('data', { ascending: false }),
+      supabase.from('istruttori').select('id, nome, cognome').order('cognome')
+    ]);
+    
+    setIstruttori(istData ?? []);
+
+    if (aptError) {
+      console.error("Error fetching impegni:", aptError);
+      setImpegni([]);
+    } else {
+      const mapped = (aptData || []).map((a: any) => ({
+        id: a.id,
+        tipo: a.clienti.cognome,
+        data: a.data,
+        durata: a.durata,
+        note: a.note,
+        istruttore: a.istruttori,
+        istruttore_id: a.istruttore_id,
+        ora_inizio: format(new Date(a.data), 'HH:mm'),
+      }));
+      setImpegni(mapped);
+    }
+    setLoading(false);
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Eliminare questo impegno?")) return;
+    const result = await deleteAppointmentAction(id);
+    if (result.success) {
+      fetch();
+    } else {
+      alert(result.error || "Errore durante l'eliminazione.");
+    }
+  };
+
+  const handleClone = (i: ImpegnoDettagliato) => {
+    // Apriamo il form con gli stessi valori ma senza ID per creare un nuovo record
+    const clone = { ...i };
+    delete (clone as any).id;
+    delete (clone as any).created_at;
+    delete (clone as any).updated_at;
+    // Impostiamo la data a oggi per default nel clone
+    clone.data = new Date().toISOString().split('T')[0];
+    
+    setEditing(clone as any);
+    setModalOpen(true);
+  };
+
+  useEffect(() => { fetch(); }, [fetch, refreshKey]);
+
+  const filtered = impegni.filter(i => {
+    if (selectedIstruttoreId !== 'all' && i.istruttore_id !== selectedIstruttoreId) return false;
+    
+    const impegnoDate = new Date(i.data);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (showStorico) {
+      return impegnoDate < today;
+    } else {
+      return impegnoDate >= today;
+    }
+  });
+
+  const openEdit = (i: any) => { setEditing(i); setModalOpen(true); };
+  const onSuccess = () => { setModalOpen(false); fetch(); };
+
+  return (
+    <div className="space-y-4">
+      {/* FILTRI */}
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-3xl shadow-sm">
+        <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-2xl w-full sm:w-fit">
+          <button 
+            onClick={() => setShowStorico(false)}
+            className={cn(
+              "flex-1 px-4 py-2 rounded-xl text-xs font-bold transition-all",
+              !showStorico ? "bg-white dark:bg-zinc-700 text-orange-600 shadow-sm" : "text-zinc-500"
+            )}
+          >
+            In Programma
+          </button>
+          <button 
+            onClick={() => setShowStorico(true)}
+            className={cn(
+              "flex-1 px-4 py-2 rounded-xl text-xs font-bold transition-all",
+              showStorico ? "bg-white dark:bg-zinc-700 text-orange-600 shadow-sm" : "text-zinc-500"
+            )}
+          >
+            Storico
+          </button>
+        </div>
+
+        <select 
+          value={selectedIstruttoreId}
+          onChange={(e) => setSelectedIstruttoreId(e.target.value)}
+          className="w-full sm:w-[200px] bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl py-2 px-4 text-xs font-semibold outline-none focus:ring-2 focus:ring-orange-500/20"
+        >
+          <option value="all">Tutti gli Istruttori</option>
+          {istruttori.map(ist => (
+            <option key={ist.id} value={ist.id}>{ist.cognome} {ist.nome}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="relative">
+        {loading ? (
+          <div className="py-20 flex items-center justify-center font-bold text-zinc-400">
+            <Loader2 className="animate-spin text-orange-500 mr-2" size={24} /> Caricamento impegni...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-16 text-center">
+            <Clock size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
+            <p className="text-zinc-400">
+              {selectedIstruttoreId !== 'all' ? 'Nessun impegno trovato per questo istruttore.' : 'Nessun impegno trovato.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {filtered.map(i => (
+            <div 
+              key={i.id} 
+              onClick={() => openEdit(i)}
+              className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:bg-zinc-50 transition-all font-semibold"
+            >
+              <div className="flex items-center gap-4">
+                <div 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-zinc-100"
+                  style={{ backgroundColor: `${i.istruttore?.colore || '#ccc'}15`, color: i.istruttore?.colore || '#ccc' }}
+                >
+                  <Clock size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                      {i.tipo}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 bg-zinc-100 rounded-lg text-zinc-500">
+                      {i.istruttore?.cognome} {i.istruttore?.nome}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-[11px] text-zinc-400">
+                    <span>{new Date(i.data).toLocaleDateString('it-IT')}</span>
+                    <span>{i.ora_inizio.slice(0, 5)}</span>
+                    <span className="bg-blue-50 text-blue-600 px-1.5 rounded">{i.durata} min</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleClone(i); }} 
+                  title="Copia come formato"
+                  className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl"
+                >
+                  <Copy size={16} />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleDelete(i.id); }} 
+                  title="Elimina"
+                  className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl"
+                >
+                  <Trash2 size={16} />
+                </button>
+                <Pencil size={18} className="text-zinc-300 group-hover:text-emerald-500" />
+              </div>
+            </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Modifica Impegno">
+        <AppointmentForm 
+          appointmentId={editing?.id} 
+          onSuccess={onSuccess} 
+          onCancel={() => setModalOpen(false)} 
+        />
+      </Modal>
+    </div>
+  );
+};
+
 // ── Page principale ───────────────────────────────────────────
-type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti';
+type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti' | 'impegni';
 
 const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'veicoli', label: 'Veicoli', icon: Car, color: 'emerald' },
   { id: 'istruttori', label: 'Istruttori', icon: Users, color: 'blue' },
+  { id: 'impegni', label: 'Altri Impegni', icon: Clock, color: 'orange' },
   { id: 'patenti', label: 'Patenti', icon: BadgeCheck, color: 'purple' },
   { id: 'utenti', label: 'Utenti', icon: ShieldCheck, color: 'indigo' },
 ];
@@ -611,6 +819,7 @@ export default function GestionePage() {
       case 'istruttori': return 'Nuovo Istruttore';
       case 'patenti': return 'Nuova Patente';
       case 'utenti': return 'Nuovo Utente';
+      case 'impegni': return 'Nuovo Impegno';
       default: return 'Nuovo';
     }
   };
@@ -661,6 +870,7 @@ export default function GestionePage() {
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
         {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} />}
         {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} />}
+        {active === 'impegni' && <TabImpegni refreshKey={refreshKey} />}
         {active === 'patenti' && <TabPatenti refreshKey={refreshKey} />}
         {active === 'utenti' && <TabUtenti refreshKey={refreshKey} />}
       </div>
@@ -682,6 +892,14 @@ export default function GestionePage() {
             key="global-add-istruttori"
             onSuccess={handleAddSuccess} 
             onCancel={() => setIsAddModalOpen(false)} 
+          />
+        )}
+        {active === 'impegni' && (
+          <AppointmentForm 
+            key="global-add-impegni"
+            onSuccess={handleAddSuccess} 
+            onCancel={() => setIsAddModalOpen(false)} 
+            defaultIsImpegno={true}
           />
         )}
         {active === 'patenti' && (

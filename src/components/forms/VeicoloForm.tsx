@@ -8,6 +8,7 @@ import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import { createVeicoloAction, updateVeicoloAction, deleteVeicoloAction } from '@/actions/veicoli';
 import DatePicker from '@/components/DatePicker';
 import { Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 
 
 interface VeicoloFormProps {
@@ -44,6 +45,7 @@ export const VeicoloForm = ({
   });
   const [patenti, setPatenti] = useState<Patente[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   // Sincronizza lo stato quando cambiano i defaultValues (importante se il modal non viene smontato)
   useEffect(() => {
@@ -104,8 +106,10 @@ export const VeicoloForm = ({
     setLoading(false);
     
     if (result.success) {
+      showToast(veicoloId ? 'Veicolo aggiornato con successo!' : 'Veicolo creato con successo!', 'success');
       onSuccess();
     } else {
+      showToast(result.error || 'Errore nel salvataggio del veicolo', 'error');
       setServerError(result.error || 'Si è verificato un errore nel salvataggio.');
     }
   };
@@ -119,8 +123,10 @@ export const VeicoloForm = ({
     setLoading(false);
 
     if (result.success) {
+      showToast('Veicolo eliminato definitivamente', 'info');
       onSuccess();
     } else {
+      showToast(result.error || "Errore durante l'eliminazione", 'error');
       setServerError(result.error || "Errore durante l'eliminazione.");
     }
   };

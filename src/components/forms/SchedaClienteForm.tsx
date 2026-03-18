@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Phone, Mail, BadgeCheck, AlertCircle, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 import { Cliente, Patente, TipoPatente, TipoCambio } from '@/lib/database.types';
 import { 
   createClienteAction, 
@@ -51,6 +52,7 @@ export const SchedaClienteForm = ({
     riceve_whatsapp:      defaultValues?.riceve_whatsapp ?? true,
   });
   const [serverError, setServerError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -63,10 +65,31 @@ export const SchedaClienteForm = ({
     const payloadCognome = form.cognome.trim().split(/\\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
     const payloadEmail = form.email ? form.email.trim().toLowerCase() : null;
 
+    const payloadTelefono = form.telefono?.trim() || null;
+
+    // Duplicate Check logic with safer array joining
+    const predicates = [`and(nome.eq."${payloadNome}",cognome.eq."${payloadCognome}")`];
+    if (payloadTelefono) predicates.push(`telefono.eq."${payloadTelefono}"`);
+    if (payloadEmail)    predicates.push(`email.eq."${payloadEmail}"`);
+    
+    const { data: duplicates } = await supabase
+      .from('clienti')
+      .select('id')
+      .or(predicates.join(','))
+      .filter('id', 'neq', clienteId || '00000000-0000-0000-0000-000000000000')
+      .limit(1);
+
+    if (duplicates && duplicates.length > 0) {
+      showToast("Un altro cliente con lo stesso nome, telefono o email è già registrato.", "error");
+      setServerError("Cliente duplicato trovato.");
+      setLoading(false);
+      return;
+    }
+
     const payload = {
       nome:                 payloadNome,
       cognome:              payloadCognome,
-      telefono:             form.telefono?.trim() || null,
+      telefono:             payloadTelefono,
       email:                payloadEmail,
       patente_richiesta_id: form.patente_richiesta_id || null,
       preferenza_cambio:    (form.preferenza_cambio as TipoCambio) || null,
@@ -81,8 +104,10 @@ export const SchedaClienteForm = ({
     setLoading(false);
 
     if (result.success) {
+      showToast(clienteId ? 'Scheda cliente aggiornata' : 'Nuovo cliente registrato con successo', 'success');
       onSuccess(result.id as string);
     } else {
+      showToast(result.error || 'Errore nel salvataggio del cliente', 'error');
       setServerError(result.error || 'Si è verificato un errore nel salvataggio.');
     }
   };
@@ -96,8 +121,10 @@ export const SchedaClienteForm = ({
     setLoading(false);
 
     if (result.success) {
+      showToast('Cliente eliminato definitivamente', 'info');
       onSuccess(clienteId);
     } else {
+      showToast(result.error || "Errore durante l'eliminazione", 'error');
       setServerError(result.error || "Errore durante l'eliminazione.");
     }
   };
@@ -133,16 +160,6 @@ export const SchedaClienteForm = ({
             placeholder="Esempio: 333 1234567"
             type="tel"
           />
-          {form.telefono && (
-            <a
-              href={`tel:${form.telefono.replace(/\s/g, '')}`}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-sm font-semibold hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors"
-              title="Chiama"
-            >
-              <Phone size={15} />
-              Chiama
-            </a>
-          )}
         </div>
       </div>
 

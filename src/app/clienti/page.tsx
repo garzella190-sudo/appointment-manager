@@ -35,7 +35,7 @@ export default function ClientiPage() {
     if (!window.confirm("Sei sicuro di voler eliminare questo cliente? L'azione è irreversibile e cancellerà anche tutti i suoi appuntamenti.")) return;
     const result = await deleteClienteAction(id);
     if (result.success) {
-      fetchData();
+      await fetchData();
     } else {
       alert(result.error || "Errore durante l'eliminazione.");
     }
@@ -119,7 +119,7 @@ export default function ClientiPage() {
                   onClick={() => router.push(`/clienti/${cliente.id}`)}
                   className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group cursor-pointer hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-all"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     {/* Avatar */}
                     <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-bold text-lg flex items-center justify-center shrink-0">
                       {initials}
@@ -131,10 +131,14 @@ export default function ClientiPage() {
                       </h4>
                       <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                         {cliente.telefono && (
-                          <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          <a 
+                            href={`tel:${cliente.telefono.replace(/\D/g, '')}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-bold hover:underline"
+                          >
                             <Phone size={11} />
                             {cliente.telefono}
-                          </span>
+                          </a>
                         )}
                         {cliente.telefono && <PhoneActions phone={cliente.telefono} secondary />}
                         {cliente.email && (
@@ -152,10 +156,10 @@ export default function ClientiPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(e, cliente.id); }}
-                      className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                      className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-100"
                       title="Elimina cliente"
                     >
                       <Trash2 size={18} />

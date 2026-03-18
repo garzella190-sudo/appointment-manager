@@ -25,7 +25,7 @@ const DetailsModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Dettagli Guida"
+      title="Dettagli Appuntamento"
     >
       <div className="mt-2">
         <AppointmentForm

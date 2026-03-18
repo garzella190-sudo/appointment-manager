@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search, Car, Phone } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,8 @@ export default function Home() {
           cliente_id: clienteObj?.id || '',
           appointment_date: format(rowDate, 'yyyy-MM-dd'),
           appointment_time: format(rowDate, 'HH:mm'),
-          client_name: clienteObj ? `${clienteObj.cognome} ${clienteObj.nome}` : 'Sconosciuto',
+          client_name: clienteObj?.nome === 'UFFICIO' ? clienteObj.cognome : (clienteObj ? `${clienteObj.cognome} ${clienteObj.nome}` : 'Sconosciuto'),
+          is_impegno: clienteObj?.nome === 'UFFICIO',
           phone: clienteObj?.telefono || '',
           trainer_id: row.istruttore_id,
           vehicle_id: veicoloObj ? `${veicoloObj.nome} (${veicoloObj.targa})` : 'Nessuno',
@@ -205,24 +206,56 @@ export default function Home() {
                     </div>
                     <div className="min-w-0">
                       <h3 className={cn(
-                        "font-bold text-zinc-900 dark:text-zinc-100 truncate",
+                        "font-bold text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-2",
                         apt.stato === 'annullato' && "line-through"
                       )}>
                         {apt.client_name}
+                        {apt.is_impegno && (
+                          <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[8px] font-black rounded-md border border-blue-100/50 dark:border-blue-400/20 uppercase tracking-tighter shrink-0">
+                            Impegno
+                          </span>
+                        )}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1.5">
                         <span className="text-xs font-black text-blue-600 dark:text-blue-400">{apt.appointment_time.slice(0, 5)}</span>
                         <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
                           <User size={12} className="text-zinc-400" />
                           <span className="truncate">{apt.istruttore?.name}</span>
                         </div>
-                        <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-black uppercase tracking-wider">
-                          {apt.license_type}
-                        </span>
+                        
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                          <Clock size={10} className="shrink-0" />
+                          <span>{apt.duration} min</span>
+                        </div>
+                        
+                        {!apt.is_impegno && (
+                          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-[10px] font-bold uppercase tracking-wider min-w-0">
+                            <Car size={10} className="shrink-0" />
+                            <span className="truncate max-w-[120px]">{apt.vehicle_id}</span>
+                          </div>
+                        )}
+
+                        {!apt.is_impegno && (
+                          <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                            {apt.license_type}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <ChevronRight size={20} className="text-zinc-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <div className="flex items-center gap-3 shrink-0">
+                    {!apt.is_impegno && apt.phone && (
+                      <a
+                        href={`tel:${apt.phone.replace(/\s/g, '')}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-100 transition-colors"
+                        title="Chiama cliente"
+                      >
+                        <Phone size={18} />
+                      </a>
+                    )}
+                    <ChevronRight size={20} className="text-zinc-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
+                  </div>
                 </div>
               </div>
             ))}

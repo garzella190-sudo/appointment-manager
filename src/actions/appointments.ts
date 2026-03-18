@@ -9,7 +9,9 @@ import { it } from 'date-fns/locale';
 // Initialized lazily inside the action
 
 export async function createAppointmentAction(payload: {
-  cliente_id: string;
+  cliente_id?: string;
+  is_impegno?: boolean;
+  nome_impegno?: string;
   istruttore_id: string;
   veicolo_id: string | null;
   data: string; // ISO string
@@ -24,6 +26,38 @@ export async function createAppointmentAction(payload: {
 }) {
   const supabase = await createClient();
   const resendApiKey = process.env.RESEND_API_KEY;
+
+  let finalClienteId = payload.cliente_id;
+
+  // 1. Fictitious Client Logic for Impegni
+  if (payload.is_impegno && payload.nome_impegno) {
+    const { data: existing } = await supabase
+      .from('clienti')
+      .select('id')
+      .eq('cognome', payload.nome_impegno)
+      .eq('nome', 'UFFICIO')
+      .single();
+    
+    if (existing) {
+      finalClienteId = existing.id;
+    } else {
+      const { data: created, error: createError } = await supabase
+        .from('clienti')
+        .insert({ 
+          nome: 'UFFICIO', 
+          cognome: payload.nome_impegno.toUpperCase() 
+        })
+        .select()
+        .single();
+      
+      if (createError) {
+        return { success: false, error: "Errore creazione slot impegno: " + createError.message };
+      }
+      finalClienteId = created.id;
+    }
+  }
+
+  if (!finalClienteId) return { success: false, error: "Cliente non specificato." };
 
   // 0. Universal Overlap Check
   const startTime = new Date(payload.data);
@@ -66,7 +100,7 @@ export async function createAppointmentAction(payload: {
     .from('appuntamenti')
     .select('id')
     .neq('stato', 'annullato')
-    .eq('cliente_id', payload.cliente_id)
+    .eq('cliente_id', finalClienteId)
     .lt('inizio', endISO)
     .gt('fine', startISO);
 
@@ -93,7 +127,7 @@ export async function createAppointmentAction(payload: {
   const { data: cliente, error: clienteError } = await supabase
     .from('clienti')
     .select('email, nome, cognome, riceve_email, riceve_whatsapp')
-    .eq('id', payload.cliente_id)
+    .eq('id', finalClienteId)
     .single();
 
   const clientData = cliente || { 
@@ -115,7 +149,7 @@ export async function createAppointmentAction(payload: {
     const { error: updateError } = await supabase
       .from('clienti')
       .update(updates)
-      .eq('id', payload.cliente_id);
+      .eq('id', finalClienteId);
     
     if (!updateError) {
       if (updates.email) finalEmail = payload.email_fallback;
@@ -123,12 +157,13 @@ export async function createAppointmentAction(payload: {
   }
 
   // 2. Insert appointment (with inizio and fine)
-  const { email_fallback, preferenza_cambio, ...dbPayload } = payload;
+  const { email_fallback, preferenza_cambio, is_impegno, nome_impegno, ...dbPayload } = payload;
   
   const { data: appointment, error: appointmentError } = await supabase
     .from('appuntamenti')
     .insert({
       ...dbPayload,
+      cliente_id: finalClienteId,
       inizio: startISO,
       fine: endISO,
       data_solo: dateOnly // Helper column for performance
@@ -218,6 +253,33 @@ export async function createAppointmentAction(payload: {
 export async function updateAppointmentAction(id: string, payload: any) {
   const supabase = await createClient();
   
+  let finalClienteId = payload.cliente_id;
+
+  if (payload.is_impegno && payload.nome_impegno) {
+    const { data: existing } = await supabase
+      .from('clienti')
+      .select('id')
+      .eq('cognome', payload.nome_impegno)
+      .eq('nome', 'UFFICIO')
+      .single();
+    
+    if (existing) {
+      finalClienteId = existing.id;
+    } else {
+      const { data: created } = await supabase
+        .from('clienti')
+        .insert({ 
+          nome: 'UFFICIO', 
+          cognome: payload.nome_impegno.toUpperCase() 
+        })
+        .select()
+        .single();
+      finalClienteId = created?.id;
+    }
+  }
+
+  if (!finalClienteId) return { success: false, error: "Cliente non specificato." };
+
   // 0. Universal Overlap Check
   const startTime = new Date(payload.data);
   startTime.setSeconds(0, 0); // Zeroing for precision
@@ -257,7 +319,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
     .select('id')
     .neq('id', id)
     .neq('stato', 'annullato')
-    .eq('cliente_id', payload.cliente_id)
+    .eq('cliente_id', finalClienteId)
     .lt('inizio', endISO)
     .gt('fine', startISO);
 
@@ -281,11 +343,12 @@ export async function updateAppointmentAction(id: string, payload: any) {
     }
   }
 
-  const { email_fallback, preferenza_cambio, ...dbPayload } = payload;
+  const { email_fallback, preferenza_cambio, is_impegno, nome_impegno, ...dbPayload } = payload;
   const { data, error } = await supabase
     .from('appuntamenti')
     .update({
       ...dbPayload,
+      cliente_id: finalClienteId,
       inizio: startISO,
       fine: endISO,
       data_solo: dateOnly
@@ -325,7 +388,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
     await supabase
       .from('clienti')
       .update({ preferenza_cambio: payload.preferenza_cambio })
-      .eq('id', payload.cliente_id);
+      .eq('id', payload.cliente_id || finalClienteId);
   }
 
   revalidatePath('/calendar');

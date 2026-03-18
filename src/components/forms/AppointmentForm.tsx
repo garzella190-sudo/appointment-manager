@@ -13,6 +13,10 @@ import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
 import { ClientAutocomplete } from './ClientAutocomplete';
 import { WhatsAppButton } from '../WhatsAppButton';
+import { useToast } from '@/hooks/useToast';
+import { Modal } from '../Modal';
+import { SchedaClienteForm } from './SchedaClienteForm';
+import { Plus } from 'lucide-react';
 
 interface FormProps {
   onSuccess: () => void;
@@ -21,6 +25,7 @@ interface FormProps {
   initialTime?: string;
   appointmentId?: string;
   initialMode?: 'create' | 'edit' | 'view';
+  defaultIsImpegno?: boolean;
 }
 
 // Fixed Premium Light Aesthetic Tokens
@@ -28,10 +33,18 @@ const INPUT_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 ou
 const LABEL_CLS = 'text-[11px] font-bold text-zinc-400 uppercase tracking-[0.1em] flex items-center gap-2 ml-1 mb-2';
 const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 flex items-center h-12 text-sm font-semibold text-zinc-900 transition-all cursor-default overflow-hidden';
 
-export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, appointmentId, initialMode = 'create' }: FormProps) => {
+const TIME_OPTIONS = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
+  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00',
+  '20:30', '21:00', '21:30', '22:00'
+];
+
+export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
   const [mode, setMode] = useState<'create' | 'edit' | 'view'>(appointmentId ? initialMode : 'create');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const { showToast } = useToast();
 
   // Data Options
   const [clienti, setClienti] = useState<Cliente[]>([]);
@@ -40,6 +53,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   const [patenti, setPatenti] = useState<Patente[]>([]);
 
   // Form State
+  const [isImpegno, setIsImpegno] = useState(defaultIsImpegno);
+  const [nomeImpegno, setNomeImpegno] = useState('');
+
   const [form, setForm] = useState({
     cliente_id: '',
     istruttore_id: '',
@@ -59,6 +75,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   
   const [durationMode, setDurationMode] = useState<'30' | '60' | 'custom'>('60');
   const [serverError, setServerError] = useState<string | null>(null);
+  const [addingCliente, setAddingCliente] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<{ instructor_ids: string[], vehicle_ids: string[] }>({ 
     instructor_ids: [], 
     vehicle_ids: [] 
@@ -107,7 +124,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             else if (duration === 60) setDurationMode('60');
             else setDurationMode('custom');
             
-            setSelectedCliente(sortedClienti.find(c => c.id === apt.cliente_id) || null);
+            if (apt.cliente_id) {
+              const client = sortedClienti.find(c => c.id === apt.cliente_id);
+              if (client?.nome === 'UFFICIO') {
+                setIsImpegno(true);
+                setNomeImpegno(client.cognome);
+              }
+              setSelectedCliente(client || null);
+            }
             setSelectedIstruttore(sortedIstruttori.find(i => i.id === apt.istruttore_id) || null);
             setSelectedVeicolo(sortedVeicoli.find(v => v.id === apt.veicolo_id) || null);
           }
@@ -281,6 +305,34 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       return '--:--';
     }
   }, [form.ora, form.durata]);
+  
+  const suggestedImpegni = useMemo(() => {
+    const ufficioClients = clienti.filter(c => c.nome === 'UFFICIO');
+    return Array.from(new Set(ufficioClients.map(c => c.cognome))).filter(Boolean).sort();
+  }, [clienti]);
+
+  const handleHoraFineChange = (newFine: string) => {
+    try {
+      const [startH, startM] = form.ora.split(':').map(Number);
+      const [endH, endM] = newFine.split(':').map(Number);
+      
+      const start = new Date();
+      start.setHours(startH, startM, 0, 0);
+      
+      const end = new Date();
+      end.setHours(endH, endM, 0, 0);
+      
+      let diff = (end.getTime() - start.getTime()) / 1000 / 60;
+      if (diff < 0) diff += 24 * 60; 
+      
+      setForm(prev => ({ ...prev, durata: diff }));
+      if (diff === 30) setDurationMode('30');
+      else if (diff === 60) setDurationMode('60');
+      else setDurationMode('custom');
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const isCompleted = useMemo(() => {
     if (form.stato === 'annullato') return false;
@@ -295,26 +347,36 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.cliente_id) return alert('Seleziona un cliente');
+    if (!isImpegno && !form.cliente_id) return alert('Seleziona un cliente');
+    if (isImpegno && !nomeImpegno.trim()) return alert('Inserisci il nome dell\'impegno');
     if (!form.istruttore_id) return alert('Seleziona un istruttore');
+    
     setLoading(true);
     const startDateTime = new Date(`${form.data}T${form.ora}`).toISOString();
     const payload = {
-      cliente_id: form.cliente_id,
+      cliente_id: isImpegno ? undefined : form.cliente_id,
+      is_impegno: isImpegno,
+      nome_impegno: isImpegno ? nomeImpegno : undefined,
       istruttore_id: form.istruttore_id,
-      veicolo_id: form.veicolo_id || null,
+      veicolo_id: isImpegno ? null : (form.veicolo_id || null),
       data: startDateTime,
       durata: form.durata,
       stato: form.stato,
       note: form.note || null,
       importo: null,
-      send_email: true,
-      send_whatsapp: true,
-      preferenza_cambio: form.cambio,
+      send_email: !isImpegno,
+      send_whatsapp: !isImpegno,
+      preferenza_cambio: isImpegno ? null : form.cambio,
     };
     const result = appointmentId ? await updateAppointmentAction(appointmentId, payload) : await createAppointmentAction(payload);
     setLoading(false);
-    if (result && result.error) return setServerError(result.error);
+    
+    if (result && result.error) {
+      showToast(result.error, 'error');
+      return setServerError(result.error);
+    }
+    
+    showToast(appointmentId ? 'Appuntamento aggiornato con successo!' : 'Appuntamento creato con successo!', 'success');
     onSuccess?.();
   };
 
@@ -326,26 +388,78 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     <div className="animate-fade-in p-1">
       <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* CLIENTE */}
+        {/* TIPO APPUNTAMENTO TOGGLE */}
+        <div className="flex bg-[#F4F4F4] p-1 rounded-2xl h-12 items-center shadow-inner">
+          <button 
+            type="button" 
+            onClick={() => setIsImpegno(false)} 
+            className={cn(
+              "flex-1 h-10 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest", 
+              !isImpegno ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400"
+            )}
+          >
+            Guida Cliente
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setIsImpegno(true)} 
+            className={cn(
+              "flex-1 h-10 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest", 
+              isImpegno ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400"
+            )}
+          >
+            Altro Impegno
+          </button>
+        </div>
+
+        {/* CLIENTE O NOME IMPEGNO */}
         <div className="space-y-2">
-          <label className={LABEL_CLS}><User size={13} /> CLIENTE</label>
-          {isView ? (
+          <label className={LABEL_CLS}>
+            {isImpegno ? <ShieldCheck size={13} /> : <User size={13} />} 
+            {isImpegno ? 'NOME IMPEGNO' : 'CLIENTE'}
+          </label>
+          
+          {isImpegno ? (
+            <div className="relative group">
+              <input
+                list="suggested-impegni"
+                required
+                disabled={isView}
+                value={nomeImpegno}
+                onChange={(e) => setNomeImpegno(e.target.value)}
+                className={isView ? VIEW_BLOCK_CLS : INPUT_CLS}
+                placeholder="Es: Teoria B, Riunione, Ferie..."
+              />
+              <datalist id="suggested-impegni">
+                {suggestedImpegni.map(name => <option key={name} value={name} />)}
+              </datalist>
+            </div>
+          ) : (
+            isView ? (
             <div className={VIEW_BLOCK_CLS}>
-              <span className="flex-1 truncate">{selectedCliente ? `${selectedCliente.cognome} ${selectedCliente.nome}` : 'Nessun cliente'}</span>
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="flex items-baseline gap-2 min-w-0">
+                  <p className="truncate font-bold">{selectedCliente ? `${selectedCliente.cognome} ${selectedCliente.nome}` : 'Nessun cliente'}</p>
+                  {selectedCliente?.telefono && (
+                    <a 
+                      href={`tel:${selectedCliente.telefono.replace(/\D/g, '')}`} 
+                      className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black hover:underline shrink-0"
+                    >
+                      {selectedCliente.telefono}
+                    </a>
+                  )}
+                </div>
+              </div>
               {selectedCliente && (
-                <div className="flex gap-1.5 ml-2 shrink-0">
+                <div className="flex gap-1.5 shrink-0">
                   {selectedCliente.telefono && (
-                    <>
-                      <a href={`tel:${selectedCliente.telefono}`} title="Chiama cliente" className="p-2 bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors">
-                        <Phone size={14} />
-                      </a>
-                      <WhatsAppButton 
-                        phone={selectedCliente.telefono} 
-                        showLabel={false}
-                        variant="ghost"
-                        className="bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
-                      />
-                    </>
+                    <WhatsAppButton 
+                      phone={selectedCliente.telefono} 
+                      appointmentData={{ date: form.data, time: form.ora, duration: form.durata }}
+                      showLabel={false}
+                      variant="ghost"
+                      className="bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                    />
                   )}
                   <Link href={`/clienti/${form.cliente_id}`} className="p-2 bg-zinc-100 text-zinc-400 rounded-xl hover:bg-zinc-200 transition-colors">
                     <ExternalLink size={14} />
@@ -354,42 +468,100 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               )}
             </div>
           ) : (
-            <ClientAutocomplete 
-              clients={clienti}
-              onSelect={handleClienteChange}
-              defaultValue={selectedCliente}
-              placeholder="Cerca per cognome o nome..."
-            />
+            <div className="flex items-center gap-2">
+              <ClientAutocomplete 
+                clients={clienti}
+                onSelect={handleClienteChange}
+                defaultValue={selectedCliente}
+                className="flex-1"
+                placeholder="Cerca per cognome o nome..."
+              />
+              <button
+                type="button"
+                onClick={() => setAddingCliente(true)}
+                className="shrink-0 w-12 h-12 bg-purple-50 text-purple-600 rounded-[16px] flex items-center justify-center hover:bg-purple-100 transition-all border border-purple-100/50"
+                title="Aggiungi nuovo cliente"
+              >
+                  <Plus size={20} />
+                </button>
+              </div>
+            )
           )}
         </div>
 
-        {/* DATA */}
-        <div className="space-y-2">
-          <label className={LABEL_CLS}>📅 DATA DEL GUIDA</label>
-          {isView ? (
-            <div className={VIEW_BLOCK_CLS}>{format(parseISO(form.data), 'dd MMMM yyyy', { locale: it })}</div>
-          ) : (
-            <DatePicker selected={form.data ? new Date(form.data) : new Date()} onChange={(date) => date && setForm(prev => ({ ...prev, data: date.toISOString().split('T')[0] }))} required />
-          )}
-        </div>
-        
-        {/* TEMPI */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
+        {/* Modal Quick-Add Cliente */}
+        <Modal 
+          isOpen={addingCliente} 
+          onClose={() => setAddingCliente(false)} 
+          title="Veloce: Nuovo Cliente"
+        >
+          <SchedaClienteForm
+            patenti={patenti}
+            onCancel={() => setAddingCliente(false)}
+            onSuccess={async (newId) => {
+              // Refresh client list
+              const { data } = await supabase.from('clienti').select('*').order('cognome');
+              const sorted = data ?? [];
+              setClienti(sorted);
+              
+              const newClient = sorted.find(c => c.id === newId);
+              if (newClient) {
+                handleClienteChange(newClient);
+              }
+              setAddingCliente(false);
+              showToast('Cliente aggiunto e selezionato', 'success');
+            }}
+          />
+        </Modal>
+
+        {/* DATA E ORARI */}
+        <div className="flex flex-col sm:flex-row gap-4 items-end">
+          <div className="space-y-2 w-full sm:w-fit min-w-[160px]">
+            <label className={LABEL_CLS}>📅 DATA</label>
+            {isView ? (
+              <div className={VIEW_BLOCK_CLS}>{format(parseISO(form.data), 'dd MMMM yyyy', { locale: it })}</div>
+            ) : (
+              <DatePicker selected={form.data ? new Date(form.data) : new Date()} onChange={(date) => date && setForm(prev => ({ ...prev, data: date.toISOString().split('T')[0] }))} required />
+            )}
+          </div>
+          <div className="space-y-2 flex-1 w-full">
             <label className={LABEL_CLS}>🕒 INIZIO</label>
-            {isView ? <div className={VIEW_BLOCK_CLS}>{form.ora}</div> : <input required type="time" title="Ora di inizio" aria-label="Ora di inizio" value={form.ora} onChange={(e) => setForm(prev => ({ ...prev, ora: e.target.value }))} className={cn(INPUT_CLS, 'text-center')} />}
+            {isView ? (
+              <div className={VIEW_BLOCK_CLS}>{form.ora}</div>
+            ) : (
+              <select 
+                required 
+                value={form.ora} 
+                onChange={(e) => setForm(prev => ({ ...prev, ora: e.target.value }))} 
+                className={cn(INPUT_CLS, 'text-center cursor-pointer')}
+              >
+                {!TIME_OPTIONS.includes(form.ora) && <option value={form.ora}>{form.ora}</option>}
+                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            )}
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1 w-full">
             <label className={LABEL_CLS}>🏁 FINE</label>
-            <div className={cn(VIEW_BLOCK_CLS, 'text-blue-600 font-bold border-blue-50 bg-blue-50/20 justify-center')}>
-              {oraFine}
-            </div>
+            {isView ? (
+              <div className={cn(VIEW_BLOCK_CLS, 'text-blue-600 font-bold border-blue-50 bg-blue-50/20 justify-center')}>
+                {oraFine}
+              </div>
+            ) : (
+              <select 
+                required 
+                value={oraFine} 
+                onChange={(e) => handleHoraFineChange(e.target.value)} 
+                className={cn(INPUT_CLS, 'text-center cursor-pointer text-blue-600 font-bold border-blue-50 bg-blue-50/20')}
+              >
+                {!TIME_OPTIONS.includes(oraFine) && <option value={oraFine}>{oraFine}</option>}
+                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            )}
           </div>
         </div>
 
-        {/* PATENTE & DURATA */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
+        {!isImpegno && (
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
             <label className={LABEL_CLS}><ShieldCheck size={13} /> PATENTE</label>
             {isView ? (
               <div className={VIEW_BLOCK_CLS}>{patenti.find(p => p.id === form.patente_id)?.tipo || 'B'}</div>
@@ -399,6 +571,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               </select>
             )}
           </div>
+        )}
+
+        {/* DURATA E CAMBIO */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
           <div className="space-y-2">
             <label className={LABEL_CLS}><Clock size={13} /> DURATA (MIN)</label>
             {isView ? (
@@ -447,18 +623,19 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               </div>
             )}
           </div>
-        </div>
-
-        {/* CAMBIO */}
-        <div className="space-y-2">
-          <label className={LABEL_CLS}>⚙️ TIPO CAMBIO</label>
-          <div className="flex bg-zinc-100 border border-zinc-100 p-1 rounded-2xl w-full sm:w-[320px] shadow-sm">
-            {(['manuale', 'automatico'] as const).map(opt => (
-              <button key={opt} disabled={isView} type="button" onClick={() => setForm(prev => ({ ...prev, cambio: opt }))} className={cn("flex-1 h-11 rounded-xl text-xs font-black transition-all", form.cambio === opt ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400")}>
-                {opt.charAt(0).toUpperCase() + opt.slice(1)}
-              </button>
-            ))}
-          </div>
+          
+          {!isImpegno && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+              <label className={LABEL_CLS}>⚙️ TIPO CAMBIO</label>
+              <div className="flex bg-zinc-100 border border-zinc-100 p-1 rounded-2xl h-12 items-center shadow-sm">
+                {(['manuale', 'automatico'] as const).map(opt => (
+                  <button key={opt} disabled={isView} type="button" onClick={() => setForm(prev => ({ ...prev, cambio: opt }))} className={cn("flex-1 h-10 rounded-xl text-[10px] font-black transition-all", form.cambio === opt ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400 uppercase")}>
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ISTRUTTORE & VEICOLO */}
@@ -484,18 +661,20 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               </select>
             )}
           </div>
-          <div className="space-y-2">
-            <label className={LABEL_CLS}><Car size={13} /> VEICOLO</label>
-            {isView ? (
-              <div className={VIEW_BLOCK_CLS}>{selectedVeicolo?.nome || 'Senza veicolo'}</div>
-            ) : (
-              <select value={form.veicolo_id} title="Seleziona Veicolo" onChange={(e) => { const veh = veicoli.find(v => v.id === e.target.value); setSelectedVeicolo(veh || null); setForm(prev => ({ ...prev, veicolo_id: e.target.value })); }} className={INPUT_CLS}>
-                <option value="">Seleziona veicolo...</option>
-                <option value="">Senza veicolo</option>
-                {availableVeicoli.map(v => <option key={v.id} value={v.id}>{v.nome} ({v.targa})</option>)}
-              </select>
-            )}
-          </div>
+          {!isImpegno && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+              <label className={LABEL_CLS}><Car size={13} /> VEICOLO</label>
+              {isView ? (
+                <div className={VIEW_BLOCK_CLS}>{selectedVeicolo?.nome || 'Senza veicolo'}</div>
+              ) : (
+                <select value={form.veicolo_id} title="Seleziona Veicolo" onChange={(e) => { const veh = veicoli.find(v => v.id === e.target.value); setSelectedVeicolo(veh || null); setForm(prev => ({ ...prev, veicolo_id: e.target.value })); }} className={INPUT_CLS}>
+                  <option value="">Seleziona veicolo...</option>
+                  <option value="">Senza veicolo</option>
+                  {availableVeicoli.map(v => <option key={v.id} value={v.id}>{v.nome} ({v.targa})</option>)}
+                </select>
+              )}
+            </div>
+          )}
         </div>
 
         {/* NOTE */}
@@ -535,8 +714,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                     e.stopPropagation();
                     if (window.confirm("Annullare?")) { 
                       setLoading(true); 
-                      await cancelAppointmentAction(appointmentId!); 
-                      onSuccess(); 
+                      const result = await cancelAppointmentAction(appointmentId!); 
+                      if (result.success) {
+                        showToast('Appuntamento annullato', 'info');
+                        onSuccess(); 
+                      } else {
+                        showToast(result.error || 'Errore durante l\'annullamento', 'error');
+                        setLoading(false);
+                      }
                     } 
                   }} 
                   disabled={form.stato === 'annullato'}  
@@ -545,7 +730,23 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   ANNULLA
                 </button>
               </div>
-              <button type="button" onClick={async () => { if (window.confirm("Eliminare?")) { setLoading(true); await deleteAppointmentAction(appointmentId!); onSuccess(); } }} className="w-full h-14 bg-red-50 text-red-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-red-100/50 flex items-center justify-center gap-2">
+              <button 
+                type="button" 
+                onClick={async () => { 
+                  if (window.confirm("Eliminare?")) { 
+                    setLoading(true); 
+                    const result = await deleteAppointmentAction(appointmentId!); 
+                    if (result.success) {
+                      showToast('Appuntamento eliminato definitivamente', 'info');
+                      onSuccess(); 
+                    } else {
+                      showToast(result.error || 'Errore durante l\'eliminazione', 'error');
+                      setLoading(false);
+                    }
+                  } 
+                }} 
+                className="w-full h-14 bg-red-50 text-red-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-red-100/50 flex items-center justify-center gap-2"
+              >
                 <Trash2 size={16} /> ELIMINA
               </button>
               <button 

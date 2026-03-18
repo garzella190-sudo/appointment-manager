@@ -63,6 +63,10 @@ export async function updateClienteAction(id: string, payload: {
 export async function deleteClienteAction(id: string) {
   const supabase = await createClient();
 
+  // Manual Cascade: Delete all appointments first
+  await supabase.from('appuntamenti').delete().eq('cliente_id', id);
+
+  // Then delete the client
   const { error } = await supabase.from('clienti').delete().eq('id', id);
 
   if (error) {

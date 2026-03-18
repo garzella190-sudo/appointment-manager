@@ -121,3 +121,28 @@ export interface AppuntamentoDettagliato extends Appuntamento {
 export interface ClienteDettagliato extends Cliente {
   patente_richiesta: Patente | null;
 }
+
+// ── Impegni ──────────────────────────────────────────────────
+export interface TipoImpegno {
+  id: string;
+  nome: string;
+  durata_default: number | null;
+  note_default: string | null;
+  created_at: string;
+}
+
+export interface Impegno {
+  id: string;
+  istruttore_id: string | null; // NULL per impegni generali
+  tipo: string;
+  data: string;       // ISO date
+  ora_inizio: string; // HH:mm:ss or HH:mm
+  durata: number;     // minuti
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ImpegnoDettagliato extends Impegno {
+  istruttore: Pick<Istruttore, 'id' | 'nome' | 'cognome' | 'colore'>;
+}

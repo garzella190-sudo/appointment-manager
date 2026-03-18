@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, BadgeCheck, Clock, Car, Eye, EyeOff } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 import { TipoPatente, CambioAmmesso, Veicolo } from '@/lib/database.types';
 
 interface PatenteFormProps {
@@ -28,6 +29,7 @@ export const PatenteForm = ({
 }: PatenteFormProps) => {
   const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState<Veicolo[]>([]);
+  const { showToast } = useToast();
   const [form, setForm] = useState({
     tipo: defaultValues?.tipo || '' as TipoPatente,
     nome: defaultValues?.nome || '',
@@ -73,8 +75,12 @@ export const PatenteForm = ({
     }, { onConflict: 'tipo' });
 
     setLoading(false);
-    if (error) alert(error.message);
-    else onSuccess();
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast(tipoId ? 'Categoria aggiornata correttamente' : 'Nuova categoria aggiunta', 'success');
+      onSuccess();
+    }
   };
 
   const toggleVehicle = (id: string) => {

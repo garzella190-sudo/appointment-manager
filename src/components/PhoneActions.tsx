@@ -9,9 +9,19 @@ interface PhoneActionsProps {
   phone: string;
   className?: string;
   secondary?: boolean;
+  appointmentData?: {
+    date: string;
+    time: string;
+    duration: number;
+  };
 }
 
-export const PhoneActions = ({ phone, className, secondary = false }: PhoneActionsProps) => {
+export const PhoneActions = ({ 
+  phone, 
+  className, 
+  secondary = false,
+  appointmentData
+}: PhoneActionsProps) => {
   if (!phone) return null;
 
   const cleanPhone = phone.replace(/\D/g, '');
@@ -21,24 +31,12 @@ export const PhoneActions = ({ phone, className, secondary = false }: PhoneActio
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <a
-        href={`tel:${cleanPhone}`}
-        className={cn(
-          "flex items-center gap-1.5 transition-all font-semibold",
-          secondary 
-            ? "px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg text-[10px] hover:bg-green-100 dark:hover:bg-green-800/40"
-            : "p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl hover:bg-green-100 dark:hover:bg-green-800/40"
-        )}
-        title="Chiama"
-      >
-        <Phone size={iconSize} />
-        {secondary && <span>Chiama</span>}
-      </a>
       <WhatsAppButton 
         phone={phone} 
         label={secondary ? "WhatsApp" : ""} 
         showLabel={secondary}
         variant={secondary ? 'ghost' : 'primary'}
+        appointmentData={appointmentData}
         className={cn(
           "rounded-xl overflow-hidden",
           secondary 

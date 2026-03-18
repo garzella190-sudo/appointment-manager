@@ -41,7 +41,13 @@ const InfoRow = ({
       <div className="flex-1 min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{label}</p>
         {href ? (
-          <a href={href} className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline truncate block">
+          <a 
+            href={href} 
+            className={cn(
+              "text-sm font-medium hover:underline truncate block",
+              label.toLowerCase().includes('telefono') ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"
+            )}
+          >
             {value}
           </a>
         ) : (
@@ -198,8 +204,16 @@ export default function SchedaClientePage() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 truncate">
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 truncate flex items-baseline gap-3">
             {cliente.cognome} {cliente.nome}
+            {cliente.telefono && (
+              <a 
+                href={`tel:${cliente.telefono.replace(/\s/g, '')}`}
+                className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline shrink-0"
+              >
+                {cliente.telefono}
+              </a>
+            )}
           </h1>
 
           {/* Quick links */}
@@ -269,14 +283,33 @@ export default function SchedaClientePage() {
             <form onSubmit={async (e) => {
               e.preventDefault();
               setSaving(true);
-              const payloadNome = formState.nome.trim().split(/\\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-              const payloadCognome = formState.cognome.trim().split(/\\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+              const payloadNome = formState.nome.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+              const payloadCognome = formState.cognome.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
               const payloadEmail = formState.email ? formState.email.trim().toLowerCase() : null;
+              const payloadTelefono = formState.telefono?.trim() || null;
+
+              // Duplicate Check logic with safer array joining
+              const predicates = [`and(nome.eq."${payloadNome}",cognome.eq."${payloadCognome}")`];
+              if (payloadTelefono) predicates.push(`telefono.eq."${payloadTelefono}"`);
+              if (payloadEmail)    predicates.push(`email.eq."${payloadEmail}"`);
+
+              const { data: duplicates } = await supabase
+                .from('clienti')
+                .select('id')
+                .or(predicates.join(','))
+                .neq('id', cliente.id)
+                .limit(1);
+
+              if (duplicates && duplicates.length > 0) {
+                alert("Un altro cliente con lo stesso nome, telefono o email è già registrato.");
+                setSaving(false);
+                return;
+              }
 
               const { error } = await supabase.from('clienti').update({
                 nome: payloadNome,
                 cognome: payloadCognome,
-                telefono: formState.telefono?.trim() || null,
+                telefono: payloadTelefono,
                 email: payloadEmail,
                 patente_richiesta_id: formState.patente_richiesta_id || null,
                 preferenza_cambio: formState.preferenza_cambio || null,
@@ -357,7 +390,6 @@ export default function SchedaClientePage() {
             /* Vista sola lettura */
             <div>
               <InfoRow icon={Mail}       label="Email"   value={cliente.email}    href={cliente.email ? `mailto:${cliente.email}` : undefined} />
-              <InfoRow icon={Phone}      label="Telefono" value={cliente.telefono} href={cliente.telefono ? `tel:${cliente.telefono.replace(/\s/g,'')}` : undefined} />
               <InfoRow icon={BadgeCheck} label="Patente richiesta" value={patente ? (patente.nome_visualizzato || patente.tipo) : 'Nessuna'} />
               <InfoRow icon={Car}        label="Preferenza Cambio" value={cliente.preferenza_cambio ? (cliente.preferenza_cambio.charAt(0).toUpperCase() + cliente.preferenza_cambio.slice(1)) : 'Indifferente'} />
 

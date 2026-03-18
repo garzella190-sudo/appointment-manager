@@ -3,7 +3,7 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, StickyNote } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -50,12 +50,17 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick }: Dr
     >
       <div>
         <div className="flex items-start justify-between gap-1">
-          <p className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
+          <p className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight truncate">
             {appointment.client_name}
           </p>
-          {isOverlapping && (
-            <AlertTriangle size={14} className="text-red-600 dark:text-red-400 shrink-0" />
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {appointment.notes && appointment.notes.trim() !== '' && (
+              <StickyNote size={14} className="text-blue-500/70 dark:text-blue-400/70" />
+            )}
+            {isOverlapping && (
+              <AlertTriangle size={14} className="text-red-600 dark:text-red-400 shrink-0" />
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 mt-1 sm:mt-1.5">
           <span className="text-[10px] sm:text-xs font-bold uppercase py-0.5 px-1.5 bg-white dark:bg-black/20 rounded text-zinc-800 dark:text-zinc-200">
