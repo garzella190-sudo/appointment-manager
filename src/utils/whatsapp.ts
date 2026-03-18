@@ -6,7 +6,7 @@ export const generateWhatsAppLink = (phone: string, isBusiness: boolean = false)
   // Pulisci il numero mantenendo solo i numeri
   let cleanPhone = phone.replace(/\D/g, '');
   
-  // Aggiungi il prefisso internazionale se manca (Istruttore/Cliente default Italia 39)
+  // Aggiungi il prefisso internazionale se manca (presumiamo Italia 39)
   if (!cleanPhone.startsWith('39') && cleanPhone.length >= 9) {
     cleanPhone = `39${cleanPhone}`;
   }
@@ -20,11 +20,19 @@ export const generateWhatsAppLink = (phone: string, isBusiness: boolean = false)
   const isAndroid = /Android/i.test(userAgent);
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
 
-  if (isBusiness) {
-    if (isAndroid) {
-      // FORZATURA ANDROID: Usa l'intent specifico per il pacchetto Business (com.whatsapp.w4b)
-      return `intent://send/?phone=${cleanPhone}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end;`;
+  // LOGICA ANDROID: Forza il pacchetto specifico se possibile
+  if (isAndroid) {
+    if (isBusiness) {
+      // FORZATURA ANDROID BUSINESS: Usa l'intent specifico per w4b
+      return `intent://send?phone=${cleanPhone}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end;`;
+    } else {
+      // FORZATURA ANDROID STANDARD: Usa l'intent specifico per whatsapp classico
+      return `intent://send?phone=${cleanPhone}#Intent;package=com.whatsapp;scheme=whatsapp;end;`;
     }
+  }
+
+  // LOGICA BUSINESS (ALTRI DISPOSITIVI)
+  if (isBusiness) {
     if (isIOS) {
        // FORZATURA iOS: Usa lo schema custom diretto invece dell'universal link wa.me
        return `whatsapp://send?phone=${cleanPhone}`;
@@ -33,6 +41,6 @@ export const generateWhatsAppLink = (phone: string, isBusiness: boolean = false)
     return `https://api.whatsapp.com/send?phone=${cleanPhone}`;
   }
 
-  // Comportamento Standard (Personale) - Utilizza wa.me che è l'universal link ufficiale
+  // COMPORTAMENTO STANDARD (Personale) - Utilizza wa.me
   return `https://wa.me/${cleanPhone}`;
 };
