@@ -62,15 +62,22 @@ export async function updateClienteAction(id: string, payload: {
 
 export async function deleteClienteAction(id: string) {
   const supabase = await createClient();
+  const now = new Date().toISOString();
 
-  // Manual Cascade: Delete all appointments first
-  await supabase.from('appuntamenti').delete().eq('cliente_id', id);
+  // Soft delete associated appointments
+  await supabase
+    .from('appuntamenti')
+    .update({ eliminato_il: now })
+    .eq('cliente_id', id);
 
-  // Then delete the client
-  const { error } = await supabase.from('clienti').delete().eq('id', id);
+  // Soft delete the client
+  const { error } = await supabase
+    .from('clienti')
+    .update({ eliminato_il: now })
+    .eq('id', id);
 
   if (error) {
-    console.error('Error deleting client:', error.message);
+    console.error('Error soft-deleting client:', error.message);
     return { success: false, error: error.message };
   }
 

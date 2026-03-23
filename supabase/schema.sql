@@ -38,6 +38,7 @@ CREATE TABLE patenti (
   durata_default     INTEGER        NOT NULL DEFAULT 50,  -- minuti
   cambio_ammesso     cambio_ammesso NOT NULL DEFAULT 'manuale',
   veicoli_abilitati  UUID[]         NOT NULL DEFAULT '{}', -- FK → veicoli.id (denormalizzato, vedi nota)
+  eliminato_il       TIMESTAMPTZ    NULL,
   created_at         TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );
@@ -54,6 +55,7 @@ CREATE TABLE veicoli (
   data_revisione   DATE         NOT NULL,
   tipo_patente     tipo_patente NOT NULL,
   cambio_manuale   BOOLEAN      NOT NULL DEFAULT TRUE,
+  eliminato_il     TIMESTAMPTZ  NULL,
   created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -71,6 +73,7 @@ CREATE TABLE clienti (
   email                 VARCHAR(255) NULL,
   patente_richiesta_id  UUID         NULL REFERENCES patenti(id) ON DELETE SET NULL,
   preferenza_cambio     VARCHAR(20)  NULL, -- 'manuale', 'automatico'
+  eliminato_il          TIMESTAMPTZ  NULL,
   created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
@@ -89,6 +92,7 @@ CREATE TABLE istruttori (
   telefono           VARCHAR(20)   NULL,
   email              VARCHAR(255)  NULL UNIQUE,
   patenti_abilitate  tipo_patente[] NOT NULL DEFAULT '{}',
+  eliminato_il       TIMESTAMPTZ   NULL,
   created_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
@@ -109,6 +113,7 @@ CREATE TABLE appuntamenti (
   stato            stato_appuntamento  NOT NULL DEFAULT 'programmato',
   importo          NUMERIC(8,2)        NULL,                               -- es. 35.00 €
   note             TEXT                NULL,
+  eliminato_il     TIMESTAMPTZ         NULL,
   created_at       TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
 
@@ -159,25 +164,21 @@ ALTER TABLE istruttori     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appuntamenti   ENABLE ROW LEVEL SECURITY;
 
 -- Policy esempio: accesso completo agli utenti autenticati e anon (per development)
-DROP POLICY IF EXISTS "Accesso autenticati" ON patenti;
-DROP POLICY IF EXISTS "Accesso anon" ON patenti;
-CREATE POLICY "Accesso totale" ON patenti FOR ALL TO public USING (true);
+-- Policy restringente: Accesso solo agli utenti autenticati
+DROP POLICY IF EXISTS "Accesso totale" ON patenti;
+CREATE POLICY "Accesso totale" ON patenti FOR ALL TO authenticated USING (true);
 
-DROP POLICY IF EXISTS "Accesso autenticati" ON veicoli;
 DROP POLICY IF EXISTS "Accesso totale" ON veicoli;
-CREATE POLICY "Accesso totale" ON veicoli FOR ALL TO public USING (true);
+CREATE POLICY "Accesso totale" ON veicoli FOR ALL TO authenticated USING (true);
 
-DROP POLICY IF EXISTS "Accesso autenticati" ON clienti;
 DROP POLICY IF EXISTS "Accesso totale" ON clienti;
-CREATE POLICY "Accesso totale" ON clienti FOR ALL TO public USING (true);
+CREATE POLICY "Accesso totale" ON clienti FOR ALL TO authenticated USING (true);
 
-DROP POLICY IF EXISTS "Accesso autenticati" ON istruttori;
 DROP POLICY IF EXISTS "Accesso totale" ON istruttori;
-CREATE POLICY "Accesso totale" ON istruttori FOR ALL TO public USING (true);
+CREATE POLICY "Accesso totale" ON istruttori FOR ALL TO authenticated USING (true);
 
-DROP POLICY IF EXISTS "Accesso autenticati" ON appuntamenti;
 DROP POLICY IF EXISTS "Accesso totale" ON appuntamenti;
-CREATE POLICY "Accesso totale" ON appuntamenti FOR ALL TO public USING (true);
+CREATE POLICY "Accesso totale" ON appuntamenti FOR ALL TO authenticated USING (true);
 
 -- ── Dati di esempio – Patenti standard italiane ──────────────
 
@@ -198,3 +199,39 @@ INSERT INTO patenti (tipo, nome_visualizzato, durata_default) VALUES
   ('D',   'Patente D',   90),
   ('D1E', 'Patente D1E', 90),
   ('DE',  'Patente DE',  90);
+
+-- ── Tipi Impegno ─────────────────────────────────────────────
+
+CREATE TABLE tipi_impegno (
+  id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nome            VARCHAR(100) NOT NULL UNIQUE,
+  durata_default  INTEGER      NULL,
+  note_default    TEXT         NULL,
+  eliminato_il    TIMESTAMPTZ  NULL,
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE tipi_impegno ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Accesso totale" ON tipi_impegno FOR ALL TO authenticated USING (true);
+
+-- ── Impegni ──────────────────────────────────────────────────
+
+CREATE TABLE impegni (
+  id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+  istruttore_id  UUID         NULL REFERENCES istruttori(id) ON DELETE SET NULL,
+  tipo           VARCHAR(100) NOT NULL,
+  data           DATE         NOT NULL,
+  ora_inizio     TIME         NOT NULL,
+  durata         INTEGER      NOT NULL,
+  note           TEXT         NULL,
+  eliminato_il   TIMESTAMPTZ  NULL,
+  created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE impegni ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Accesso totale" ON impegni FOR ALL TO authenticated USING (true);
+
+CREATE TRIGGER trg_impegni_updated_at
+  BEFORE UPDATE ON impegni
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();

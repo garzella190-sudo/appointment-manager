@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+const supabase = createClient();
 import { Loader2, Phone, Mail, Trash2, AlertCircle, Car, Pencil, User } from 'lucide-react';
-import CustomSelect from './CustomSelect';
+import Select from './Select';
 import { useToast } from '@/hooks/useToast';
 import { TipoPatente, Patente } from '@/lib/database.types';
 import { 
@@ -12,6 +13,7 @@ import {
   deleteIstruttoreAction 
 } from '@/actions/istruttori';
 import { cn } from '@/lib/utils';
+import { ConfirmBubble } from '../ConfirmBubble';
 
 
 interface IstruttoreFormProps {
@@ -68,8 +70,8 @@ export const IstruttoreForm = ({
   useEffect(() => {
     async function fetchData() {
       const [vRes, pRes] = await Promise.all([
-        supabase.from('veicoli').select('id, nome, targa').order('nome'),
-        supabase.from('patenti').select('*').eq('nascosta', false).order('tipo')
+        supabase.from('veicoli').select('id, nome, targa').is('eliminato_il', null).order('nome'),
+        supabase.from('patenti').select('*').is('eliminato_il', null).eq('nascosta', false).order('tipo')
       ]);
       if (vRes.data) setVehicles(vRes.data);
       if (pRes.data) setPatenti(pRes.data);
@@ -137,7 +139,7 @@ export const IstruttoreForm = ({
 
   const handleDelete = async () => {
     if (!istruttoreId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? L'azione è irreversibile.")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? I dati rimarranno nel database ma non saranno più visibili nell'applicazione.")) return;
 
     setLoading(true);
     const result = await deleteIstruttoreAction(istruttoreId);
@@ -336,7 +338,7 @@ export const IstruttoreForm = ({
               : 'Nessun veicolo assigned'}
           </div>
         ) : (
-          <CustomSelect
+          <Select
             options={[
               { id: '', label: 'Nessun veicolo assegnato' },
               ...vehicles.map(v => ({
@@ -371,15 +373,33 @@ export const IstruttoreForm = ({
               <Pencil size={18} />
               Modifica
             </button>
-            <button
-                type="button"
-                onClick={handleDelete}
-                disabled={loading}
-                className="px-6 py-4 rounded-2xl font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center"
-                title="Elimina"
-              >
-                <Trash2 size={18} />
-              </button>
+            <ConfirmBubble
+              title="Elimina Istruttore"
+              message="Sei sicuro di voler eliminare questo istruttore? I dati rimarranno nel database ma non saranno più visibili."
+              confirmLabel="Elimina"
+              onConfirm={async () => {
+                setLoading(true);
+                const result = await deleteIstruttoreAction(istruttoreId!);
+                setLoading(false);
+                if (result.success) {
+                  showToast('Istruttore eliminato correttamente', 'info');
+                  onSuccess();
+                } else {
+                  showToast(result.error || "Errore durante l'eliminazione", 'error');
+                  setServerError(result.error || "Errore durante l'eliminazione.");
+                }
+              }}
+              trigger={
+                <button
+                  type="button"
+                  disabled={loading}
+                  className="px-6 py-4 rounded-2xl font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center"
+                  title="Elimina"
+                >
+                  <Trash2 size={18} />
+                </button>
+              }
+            />
           </>
         ) : (
           <>

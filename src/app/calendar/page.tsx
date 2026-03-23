@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, User, Calendar as CalendarIcon } from 'lucide-react';
-import CustomSelect from '@/components/forms/CustomSelect';
+import Select from '@/components/forms/Select';
 import {
   DndContext,
   DragEndEvent,
@@ -14,7 +14,7 @@ import {
   DragOverlay
 } from '@dnd-kit/core';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
-import { startOfWeek, addDays, format, isSameDay, parseISO } from 'date-fns';
+import { startOfWeek, addDays, format, isSameDay, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
@@ -76,22 +76,56 @@ export default function CalendarPage() {
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
   const [showWeekends, setShowWeekends] = useState(true);
+  const [granularity, setGranularity] = useState<15 | 30 | 60>(15);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Usa l'hook per gestire responsive in modo solido dopo l'idratazione
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
+    
+    // Caricamento impostazioni da localStorage
+    const savedInstructorId = localStorage.getItem('calendar_selectedInstructorId');
+    const savedViewDays = localStorage.getItem('calendar_viewDays');
+    const savedShowWeekends = localStorage.getItem('calendar_showWeekends');
+    const savedDate = localStorage.getItem('calendar_currentDate');
+
+    if (savedInstructorId !== null) setSelectedInstructorId(savedInstructorId);
+    if (savedViewDays !== null) setViewDays(parseInt(savedViewDays) as any);
+    if (savedShowWeekends !== null) setShowWeekends(savedShowWeekends === 'true');
+    if (savedDate !== null) {
+      try {
+        setCurrentDate(new Date(savedDate));
+      } catch (e) {
+        console.error("Errore nel ripristino della data:", e);
+      }
+    }
+
     const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setViewDays(3);
-      } else {
-        setViewDays(7);
+      // Solo se non abbiamo una preferenza salvata o se cambiamo breakpoint in modo significativo?
+      // In realtà, la regola d'oro è "ricorda sempre la visualizzazione scelta".
+      // Se l'utente non ha mai salvato nulla, usiamo il responsive.
+      if (!savedViewDays) {
+        if (window.innerWidth < 768) {
+          setViewDays(3);
+        } else {
+          setViewDays(7);
+        }
       }
     };
     handleResize(); // Chiamata iniziale
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Salvataggio impostazioni in localStorage
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('calendar_selectedInstructorId', selectedInstructorId);
+    localStorage.setItem('calendar_viewDays', viewDays.toString());
+    localStorage.setItem('calendar_showWeekends', showWeekends.toString());
+    localStorage.setItem('calendar_currentDate', currentDate.toISOString());
+  }, [selectedInstructorId, viewDays, showWeekends, currentDate, mounted]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -133,9 +167,9 @@ export default function CalendarPage() {
     return days;
   }, [displayStart, viewDays, showWeekends, currentDate.getTime()]);
 
-  // Generate 15-minute intervals from 08:00 to 20:00
-  const timeSlots = Array.from({ length: 12 * 4 + 1 }, (_, i) => {
-    const totalMinutes = i * 15;
+  // Generate intervals from 08:00 to 22:00 based on granularity
+  const timeSlots = Array.from({ length: Math.floor((14 * 60) / granularity) + 1 }, (_, i) => {
+    const totalMinutes = i * granularity;
     const h = Math.floor(totalMinutes / 60) + 8;
     const m = totalMinutes % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
@@ -155,10 +189,11 @@ export default function CalendarPage() {
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
           `)
+          .is('eliminato_il', null)
           .gte('data', displayStart.toISOString())
           .lt('data', fetchEndDate.toISOString()),
-        supabase.from('patenti').select('id, tipo'),
-        supabase.from('istruttori').select('id, nome, cognome').order('cognome')
+        supabase.from('patenti').select('id, tipo').is('eliminato_il', null),
+        supabase.from('istruttori').select('id, nome, cognome').is('eliminato_il', null).order('cognome')
       ]);
 
       if (dbError) throw dbError;
@@ -207,6 +242,40 @@ export default function CalendarPage() {
   useEffect(() => {
     if (mounted) fetchWeekAppointments();
   }, [currentDate, effectiveViewDays, mounted, fetchWeekAppointments]);
+
+  // Auto-scroll to current time on load
+  useEffect(() => {
+    if (!loading && mounted && scrollContainerRef.current) {
+      // Small timeout to ensure DOM is ready after loading state change
+      const timer = setTimeout(() => {
+        const now = new Date();
+        const currentH = now.getHours();
+        const currentM = now.getMinutes();
+        
+        // Clamp time within 08:00 - 22:00
+        let targetH = currentH;
+        let targetM = Math.floor(currentM / granularity) * granularity;
+        
+        if (targetH < 8) {
+          targetH = 8;
+          targetM = 0;
+        } else if (targetH >= 22) {
+          targetH = 22;
+          targetM = 0;
+        }
+        
+        const targetSlot = `${targetH.toString().padStart(2, '0')}:${targetM.toString().padStart(2, '0')}`;
+        
+        const element = document.getElementById(`slot-${targetSlot}`);
+        if (element && scrollContainerRef.current) {
+          const container = scrollContainerRef.current;
+          const scrollPos = element.offsetTop - (container.clientHeight / 2) + (element.clientHeight / 2);
+          container.scrollTo({ top: scrollPos, behavior: 'smooth' });
+        }
+      }, 500); // 500ms to be safe with animations
+      return () => clearTimeout(timer);
+    }
+  }, [loading, mounted]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -291,16 +360,17 @@ export default function CalendarPage() {
         onDragEnd={handleDragEnd}
         modifiers={[snapCenterToCursor]}
       >
-        <div className="p-4 sm:p-6 md:p-10 animate-fade-in max-w-7xl mx-auto">
-          <header className="mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col h-full w-full overflow-hidden">
+          <header className="px-2 sm:px-4 md:px-6 py-2 pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
-              <p className="text-zinc-500 dark:text-zinc-400 mt-1 capitalize">
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
+              <p className="text-zinc-500 dark:text-zinc-400 mt-0.5 capitalize text-xs font-medium">
                 {format(weekStart, 'MMMM yyyy', { locale: it })}
               </p>
             </div>
 
             <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
+              {/* ... (pulsanti vista) */}
               <div className="flex flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl shadow-inner overflow-x-auto scrollbar-hide">
                 {[1, 3, 5, 7].map((days) => (
                   <button
@@ -342,6 +412,9 @@ export default function CalendarPage() {
                 </button>
               </div>
 
+              {/* Granularity filter removed as per user request */}
+
+
               {viewDays !== 7 && (
                 <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl">
                   <button
@@ -353,13 +426,13 @@ export default function CalendarPage() {
                         : "bg-white dark:bg-zinc-700 text-blue-600 shadow-sm"
                     )}
                   >
-                    Filtro Sab-Dom: {showWeekends ? 'Sì' : 'No'}
+                    Sab-Dom: {showWeekends ? 'Sì' : 'No'}
                   </button>
                 </div>
               )}
 
-              <div className="min-w-[180px]">
-                <CustomSelect
+              <div className="min-w-[150px]">
+                <Select
                   options={[
                     { id: '', label: 'Tutti gli istruttori' },
                     ...istruttori.map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}` }))
@@ -374,126 +447,133 @@ export default function CalendarPage() {
             </div>
           </header>
 
-          <div className="bg-white dark:bg-zinc-900/80 rounded-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden">
-            <div 
-              className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30"
-              style={{ gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))` } as React.CSSProperties}
-            >
-              <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
-                <Clock size={16} className="text-zinc-400" />
-              </div>
-              {displayDays.map((day: Date) => {
-                const isHoliday = isItalianHoliday(day) || isWeekend(day);
-                const isToday = isSameDay(day, new Date());
-                return (
-                  <div key={day.toString()} className={cn(
-                    "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
-                    isToday ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
-                  )}>
-                    <span className={cn(
-                      "block text-[10px] uppercase font-bold tracking-wider font-mono",
-                      isHoliday ? "text-red-500" : "text-zinc-400"
-                    )}>
-                      {format(day, 'eee', { locale: it })}
-                    </span>
-                    <span className={cn(
-                      "text-lg font-black mt-1 inline-flex w-10 h-10 items-center justify-center rounded-full transition-all",
-                      isToday 
-                        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" 
-                        : isHoliday
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-zinc-900 dark:text-zinc-50"
-                    )}>
-                      {format(day, 'd')}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="overflow-y-auto max-h-[700px] relative scrollbar-hide">
-              {loading && (
-                <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
-                  <Loader2 className="animate-spin text-blue-600" size={40} />
+          <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-24 overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px]">
+              {/* Intestazione Giorni Fissa */}
+              <div 
+                className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0"
+                style={{ gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))` } as React.CSSProperties}
+              >
+                <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
+                  <Clock size={16} className="text-zinc-400" />
                 </div>
-              )}
-
-              {timeSlots.map((slot) => {
-                const isFullHour = slot.endsWith(':00');
-                return (
-                  <div 
-                    key={slot} 
-                    className={cn(
-                      "grid border-b last:border-0 h-10 transition-colors",
-                      isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
-                    )}
-                    style={{ 
-                      gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))`,
-                      zIndex: timeSlots.length - timeSlots.indexOf(slot),
-                      position: 'relative'
-                    } as React.CSSProperties}
-                  >
-                    <div className={cn(
-                      "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
-                      isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
+                {displayDays.map((day: Date) => {
+                  const isHoliday = isItalianHoliday(day) || isWeekend(day);
+                  const isToday = isSameDay(day, new Date());
+                  return (
+                    <div key={day.toString()} className={cn(
+                      "p-1 sm:p-2 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
+                      isToday ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
                     )}>
-                      {isFullHour ? slot : slot.split(':')[1]}
+                      <span className={cn(
+                        "block text-[10px] uppercase font-bold tracking-wider font-mono",
+                        isHoliday ? "text-red-500" : "text-zinc-400"
+                      )}>
+                        {format(day, 'eee', { locale: it })}
+                      </span>
+                      <span className={cn(
+                        "text-sm font-black mt-0 inline-flex w-7 h-7 items-center justify-center rounded-full transition-all",
+                        isToday 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" 
+                          : isHoliday
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-zinc-900 dark:text-zinc-50"
+                      )}>
+                        {format(day, 'd')}
+                      </span>
                     </div>
-                    {displayDays.map((day: Date) => {
-                      const dateStr = format(day, 'yyyy-MM-dd');
-                      const cellId = `${dateStr}|${slot}`;
-                      const cellAppointments = appointments.filter(a =>
-                        a.appointment_date === dateStr && 
-                        a.appointment_time.slice(0, 5) === slot &&
-                        (!selectedInstructorId || a.trainer_id === selectedInstructorId)
-                      );
+                  );
+                })}
+              </div>
 
-                      return (
-                        <DroppableCell key={cellId} id={cellId}>
-                          <div 
-                            className="h-full w-full flex gap-0.5 p-0.5 relative cursor-pointer"
-                            onClick={() => handleCellClick(dateStr, slot)}
-                          >
-                            {cellAppointments.map((apt, idx) => {
-                              const hasConflict = cellAppointments.some(other => 
-                                other.id !== apt.id && 
-                                apt.stato !== 'annullato' &&
-                                other.stato !== 'annullato' &&
-                                (
-                                  other.trainer_id === apt.trainer_id || 
-                                  (other.vehicle_id_uuid && apt.vehicle_id_uuid && other.vehicle_id_uuid === apt.vehicle_id_uuid)
-                                )
-                              );
-
-                              return (
-                                <div
-                                  key={apt.id}
-                                  className={cn(
-                                    "relative flex-1 min-w-[30px]",
-                                    apt.stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10 [&>div]:!text-red-700/60 [&>div]:!border-red-500/20 [&>*]:!line-through dark:[&>div]:!bg-red-900/20 dark:[&>div]:!text-red-400"
-                                  )}
-                                  style={{
-                                    zIndex: cellAppointments.length - idx
-                                  } as React.CSSProperties}
-                                >
-                                  <DraggableAppointment
-                                    appointment={apt}
-                                    isOverlapping={hasConflict}
-                                    onClick={setSelectedAppointment}
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </DroppableCell>
-                      );
-                    })}
+              {/* Corpo Scorrevole */}
+              <div 
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto scroll-container scrollbar-hide relative pb-4"
+              >
+                {loading && (
+                  <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
+                    <Loader2 className="animate-spin text-blue-600" size={40} />
                   </div>
-                );
-              })}
+                )}
+
+                {timeSlots.map((slot) => {
+                  const isFullHour = slot.endsWith(':00');
+                  return (
+                    <div 
+                      key={slot} 
+                      id={`slot-${slot}`}
+                      className={cn(
+                        "grid border-b last:border-0 min-h-[40px] transition-colors",
+                        isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
+                      )}
+                      style={{ 
+                        gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))`,
+                        zIndex: timeSlots.length - timeSlots.indexOf(slot),
+                        position: 'relative'
+                      } as React.CSSProperties}
+                    >
+                      <div className={cn(
+                        "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
+                        isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
+                      )}>
+                        {isFullHour ? slot : slot.split(':')[1]}
+                      </div>
+                      {displayDays.map((day: Date) => {
+                        const dateStr = format(day, 'yyyy-MM-dd');
+                        const cellId = `${dateStr}|${slot}`;
+                        
+                        const dayAppointments = appointments.filter(a => a.appointment_date === dateStr);
+                        const slotStartTime = slot; // "HH:mm"
+                        const slotEndTime = format(addMinutes(parseISO(`2000-01-01T${slot}`), granularity), "HH:mm");
+                        
+                        const cellAppointments = dayAppointments
+                          .filter(apt => {
+                            const aptTime = apt.appointment_time.slice(0, 5);
+                            return (
+                              aptTime >= slotStartTime && 
+                              aptTime < slotEndTime &&
+                              (!selectedInstructorId || apt.trainer_id === selectedInstructorId)
+                            );
+                          })
+                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+
+                        return (
+                          <DroppableCell key={cellId} id={cellId}>
+                            <div 
+                              className="w-full flex flex-col gap-0 relative cursor-pointer min-h-[40px]"
+                              onClick={() => handleCellClick(dateStr, slot)}
+                            >
+                              {cellAppointments.map((apt, idx) => {
+                                const hasConflict = cellAppointments.length > 1; // Simplified for UI clearity in stacking
+                                return (
+                                  <div
+                                    key={apt.id}
+                                    className={cn(
+                                      "relative w-full",
+                                      apt.stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10"
+                                    )}
+                                  >
+                                    <DraggableAppointment
+                                      appointment={apt}
+                                      isOverlapping={hasConflict}
+                                      onClick={setSelectedAppointment}
+                                      isStacked={cellAppointments.length > 1}
+                                      granularity={15}
+                                      isFirst={idx === 0}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </DroppableCell>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
             </div>
           </div>
-
           <DragOverlay adjustScale={false} zIndex={100}>
             {activeId && activeAppointment ? (
               <div className="relative pointer-events-none">
@@ -526,7 +606,8 @@ export default function CalendarPage() {
             ) : null}
           </DragOverlay>
         </div>
-      </DndContext>
+      </div>
+    </DndContext>
 
       <NewAppointmentModal
         isOpen={isNewModalOpen}

@@ -18,8 +18,9 @@ src/
 ├── components/     # Componenti UI riutilizzabili
 │   ├── forms/      # Form universali (AppointmentForm, ClienteForm, etc.)
 │   ├── modals/     # Popup e Modali (DetailsModal, NewAppointmentModal)
-│   └── calendar/   # Sottocomponenti specifici per la griglia calendario
-├── hooks/          # Custom hooks (es. useAvailability, useAuth)
+│   ├── calendar/   # Sottocomponenti specifici per la griglia calendario
+│   └── BottomNav.tsx # Navigazione principale unificata (Profilo + Nav + Logout)
+├── hooks/          # Custom hooks (es. useAvailability, useAuth, useToast)
 ├── lib/            # Configurazioni core (Supabase client, Database Types)
 ├── types/          # Definizioni TypeScript extra
 └── utils/          # Funzioni helper e formattatori (date, valuta, whatsapp)
@@ -57,17 +58,20 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions`.
 
 ---
 
-## 🎨 STILE E UI (STRICT DESIGN)
-L'identità visiva è "Premium, Clean & Dynamic".
+## 🎨 STILE E UI (ULTRA-COMPACT DESIGN)
+L'identità visiva è "Premium, Clean & Dynamic" con un focus estremo sul recupero dello spazio verticale.
 
 - **Framework**: Tailwind CSS (Utility-first).
-- **Dynamic Theme**: Supporto obbligatorio per la Light/Dark mode usando il prefisso `dark:`.
+- **Single Nav Bar**: La `TopNav` è stata eliminata. Tutte le funzioni (Profilo Utente, Navigazione, Logout) sono integrate in una `BottomNav` unificata.
 - **Geometrie**:
   - **Cards & Inputs**: `rounded-[16px]` o `rounded-xl`.
   - **Modali**: `rounded-[32px]` per angoli molto profondi ed eleganti.
+- **Dettagli Ultra-Compact**:
+  - **Top Nav**: Assente. Il contenuto inizia a `pt-0`.
+  - **Calendario**: Cerchi date `w-7 h-7`, titoli minimali, granularità variabile (15/30/60 min).
 - **Colori**:
   - Background neutri (`bg-[#F4F4F4]` in light mode).
-  - Accenti di colore basati sugli istruttori (per distinguere le guide nel calendario).
+  - Accenti di colore basati sugli istruttori.
 - **Input Guidelines**: Mai usare "testo nudo" per visualizzare dati nei dettagli; usare box grigio chiaro (`bg-zinc-100` o f4f4f4) per racchiudere ogni campo valore.
 
 ---

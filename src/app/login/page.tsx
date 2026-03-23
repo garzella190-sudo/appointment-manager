@@ -42,7 +42,7 @@ export default function LoginPage() {
       }
 
       // Se è tutto ok, ti spedisce al calendario!
-      router.push('/calendar');
+      router.push('/');
       router.refresh();
     }
   };

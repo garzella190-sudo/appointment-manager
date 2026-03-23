@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+const supabase = createClient();
 import { Cliente, Patente, Istruttore, AppuntamentoConDettagli } from '@/lib/database.types';
 import { StoricoPagamentiTable } from '@/components/StoricoPagamentiTable';
 import {
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
-import CustomSelect from '@/components/forms/CustomSelect';
+import Select from '@/components/forms/Select';
 
 const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] dark:bg-zinc-900/50 rounded-[16px] px-4 flex items-center h-12 text-sm font-semibold text-zinc-900 dark:text-zinc-100 transition-all cursor-default overflow-hidden';
 const LABEL_CLS = 'text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest ml-1 mb-1.5 flex items-center gap-2';
@@ -350,7 +351,7 @@ export default function SchedaClientePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label htmlFor="patente" className={LABEL_CLS}>Patente Richiesta</label>
-                  <CustomSelect
+                  <Select
                     options={patenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
                     value={formState.patente_richiesta_id}
                     onChange={(val) => setFormState(p => ({ ...p, patente_richiesta_id: val }))}
@@ -359,7 +360,7 @@ export default function SchedaClientePage() {
                 </div>
                 <div className="space-y-1.5">
                   <label htmlFor="cambio" className={LABEL_CLS}>Tipo Cambio</label>
-                  <CustomSelect
+                  <Select
                     options={[
                       { id: 'manuale', label: 'Meccanico (Manuale)' },
                       { id: 'automatico', label: 'Automatico' }

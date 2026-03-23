@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+const supabase = createClient();
 import { Loader2, BadgeCheck, Clock, Car, Eye, EyeOff, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
-import CustomSelect from './CustomSelect';
+import Select from './Select';
 import { TipoPatente, CambioAmmesso, Veicolo } from '@/lib/database.types';
 
 interface PatenteFormProps {
@@ -55,7 +56,7 @@ export const PatenteForm = ({
 
   useEffect(() => {
     const fetchVehicles = async () => {
-      const { data } = await supabase.from('veicoli').select('*').order('nome');
+      const { data } = await supabase.from('veicoli').select('*').is('eliminato_il', null).order('nome');
       setVehicles(data || []);
     };
     fetchVehicles();
@@ -147,7 +148,7 @@ export const PatenteForm = ({
         </div>
         <div className="space-y-1.5">
           <label htmlFor="cambio" className={LABEL_CLS}>Tipo Cambio Ammesso</label>
-          <CustomSelect
+          <Select
             options={[
               { id: 'manuale', label: 'Manuale' },
               { id: 'automatico', label: 'Automatico' },

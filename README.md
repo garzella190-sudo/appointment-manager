@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Appointment Manager - Agenda Guide
 
-## Getting Started
+Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco veicoli, ottimizzata per un utilizzo "Mobile-First" ed ultra-compatto.
 
-First, run the development server:
+## 🚀 Funzionalità Principali
+- **Agenda Giornaliera**: Vista lista con scroll automatico all'orario attuale.
+- **Calendario Interattivo**: Griglia multi-giorno (1, 3, 5, 7 giorni) con granularità variabile (15, 30, 60 minuti).
+- **Gestione Master**: Anagrafica clienti, istruttori e veicoli con controllo scadenze.
+- **PWA Ready**: Installabile su dispositivi mobili con supporto offline di base.
+- **WhatsApp Integration**: Invio rapido di promemoria e chat dirette.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🎨 Design System
+- **Ultra-Compact UI**: Navigazione unificata in una singola barra inferiore (BottomNav) che integra il profilo utente e il logout.
+- **Massimizzazione Spazio**: Rimozione di barre superiori fisse e logica di stretch-up per sfruttare ogni pixel verticale.
+- **Premium Look**: Colori armoniosi basati sugli istruttori, geometrie arrotondate (32px) e micro-animazioni.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Tech Stack
+- **Framework**: Next.js 15 (App Router).
+- **Database/Auth**: Supabase.
+- **Stile**: Tailwind CSS.
+- **Componenti**: Lucide React, Date-fns, DND-Kit.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📦 Installazione
+1. Clona il repository.
+2. `npm install`
+3. Configura le variabili d'ambiente in `.env.local` per Supabase.
+4. `npm run dev`

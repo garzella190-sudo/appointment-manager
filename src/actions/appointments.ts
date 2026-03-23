@@ -86,6 +86,7 @@ export async function createAppointmentAction(payload: {
   const { data: instructorBusy } = await supabase
     .from('appuntamenti')
     .select('id')
+    .is('eliminato_il', null)
     .neq('stato', 'annullato')
     .eq('istruttore_id', payload.istruttore_id)
     .lt('inizio', endISO)
@@ -99,6 +100,7 @@ export async function createAppointmentAction(payload: {
   const { data: clientBusy } = await supabase
     .from('appuntamenti')
     .select('id')
+    .is('eliminato_il', null)
     .neq('stato', 'annullato')
     .eq('cliente_id', finalClienteId)
     .lt('inizio', endISO)
@@ -113,6 +115,7 @@ export async function createAppointmentAction(payload: {
     const { data: vehicleBusy } = await supabase
       .from('appuntamenti')
       .select('id')
+      .is('eliminato_il', null)
       .neq('stato', 'annullato')
       .eq('veicolo_id', payload.veicolo_id)
       .lt('inizio', endISO)
@@ -179,34 +182,6 @@ export async function createAppointmentAction(payload: {
     };
   }
 
-  // 4. Update Slot status
-  try {
-    // We attempt to find the slot or create it if it doesn't exist (e.g. for existing appointments migration)
-    // But since it's a new booking, we expect the slot to be created or updated as unavailable.
-    // The UNIQUE constraint in SQL will handle concurrent race conditions if we use an upsert/update correctly.
-    
-    // First, try to update an existing slot for this resource/time
-    const { error: slotError } = await supabase
-      .from('time_slots')
-      .upsert({
-        start_time: startISO,
-        end_time: endISO,
-        instructor_id: payload.istruttore_id,
-        vehicle_id: payload.veicolo_id,
-        is_available: false,
-        appointment_id: appointment.id
-      }, {
-        onConflict: 'start_time, instructor_id' // simplified, the DB has two unique indexes
-      });
-
-    if (slotError) {
-      // If we failed to secure the slot, we should ideally rollback the appointment.
-      // But in this simple flow, we at least log it.
-      console.error('Slot Reservation Error:', slotError);
-    }
-  } catch (e) {
-    console.error('Fatal Slot Error:', e);
-  }
 
   // 3. Email notification (unchanged logic)
   if (finalEmail && (payload.send_email ?? clientData.riceve_email) && resendApiKey) {
@@ -303,6 +278,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
   const { data: instructorBusy } = await supabase
     .from('appuntamenti')
     .select('id')
+    .is('eliminato_il', null)
     .neq('id', id)
     .neq('stato', 'annullato')
     .eq('istruttore_id', payload.istruttore_id)
@@ -317,6 +293,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
   const { data: clientBusy } = await supabase
     .from('appuntamenti')
     .select('id')
+    .is('eliminato_il', null)
     .neq('id', id)
     .neq('stato', 'annullato')
     .eq('cliente_id', finalClienteId)
@@ -332,6 +309,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
     const { data: vehicleBusy } = await supabase
       .from('appuntamenti')
       .select('id')
+      .is('eliminato_il', null)
       .neq('id', id)
       .neq('stato', 'annullato')
       .eq('veicolo_id', payload.veicolo_id)
@@ -364,24 +342,6 @@ export async function updateAppointmentAction(id: string, payload: any) {
     };
   }
 
-  // Update Slot status
-  try {
-    // 1. Release old slot (if it was different)
-    // This is simplified: we just upsert the current slot as unavailable.
-    // A more robust version would release the slot at the PREVIOUS time/resource.
-    const { error: slotError } = await supabase
-      .from('time_slots')
-      .upsert({
-        start_time: startISO,
-        end_time: endISO,
-        instructor_id: payload.istruttore_id,
-        vehicle_id: payload.veicolo_id,
-        is_available: false,
-        appointment_id: id
-      }, {
-        onConflict: 'start_time, instructor_id'
-      });
-  } catch (e) {}
 
   // Update client preference if provided
   if (payload.preferenza_cambio) {

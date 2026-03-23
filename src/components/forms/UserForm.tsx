@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { createUserAction, updateUserAction } from '@/actions/auth';
 import { Loader2, UserPlus, Shield, User, Mail, Lock } from 'lucide-react';
-import CustomSelect from './CustomSelect';
+import Select from './Select';
 
 interface UserFormProps {
   user?: any; // Se presente, siamo in modalità edit
@@ -106,7 +106,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide ml-1 flex items-center gap-1.5">
           <Shield size={12} /> Ruolo
         </label>
-        <CustomSelect
+        <Select
           options={[
             { id: 'segreteria', label: 'Segreteria' },
             { id: 'istruttore', label: 'Istruttore' },

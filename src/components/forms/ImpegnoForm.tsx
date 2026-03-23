@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+const supabase = createClient();
 import { Loader2, Calendar, Clock, User, Type, FileText, Trash2, AlertCircle, Plus } from 'lucide-react';
-import CustomSelect from './CustomSelect';
+import Select from './Select';
+import { ConfirmBubble } from '../ConfirmBubble';
 import { useToast } from '@/hooks/useToast';
 import { Istruttore, Impegno, TipoImpegno } from '@/lib/database.types';
 import { 
@@ -56,7 +58,7 @@ export const ImpegnoForm = ({
   useEffect(() => {
     async function fetchData() {
       const [iRes, tRes] = await Promise.all([
-        supabase.from('istruttori').select('*').order('cognome'),
+        supabase.from('istruttori').select('*').is('eliminato_il', null).order('cognome'),
         getTipiImpegnoAction()
       ]);
       if (iRes.data) setIstruttori(iRes.data);
@@ -119,7 +121,7 @@ export const ImpegnoForm = ({
 
   const handleDelete = async () => {
     if (!impegnoId) return;
-    if (!window.confirm("Eliminare questo impegno?")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo impegno? I dati rimarranno nel database ma non saranno più visibili nell'applicazione.")) return;
 
     setLoading(true);
     const result = await deleteImpegnoAction(impegnoId);
@@ -145,7 +147,7 @@ export const ImpegnoForm = ({
       {/* Istruttore */}
       <div className="space-y-1.5">
         <label className={LABEL_CLS}><User size={13} /> Istruttore</label>
-        <CustomSelect
+        <Select
           options={istruttori.map(i => ({
             id: i.id,
             label: `${i.cognome} ${i.nome}`,
@@ -164,7 +166,7 @@ export const ImpegnoForm = ({
         <label className={LABEL_CLS}><Type size={13} /> Tipo Impegno</label>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <CustomSelect
+            <Select
               options={tipi.map(t => ({ id: t.nome, label: t.nome }))}
               value={form.tipo}
               onChange={(val) => setForm(prev => ({ ...prev, tipo: val }))}
@@ -300,15 +302,32 @@ export const ImpegnoForm = ({
       </div>
 
       {impegnoId && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={loading}
-          className="w-full py-3 rounded-xl font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center gap-2"
-        >
-          <Trash2 size={16} />
-          Elimina Impegno
-        </button>
+        <ConfirmBubble
+          title="Elimina Impegno"
+          message="Sei sicuro di voler eliminare questo impegno? I dati rimarranno nel database ma non saranno più visibili."
+          confirmLabel="Elimina"
+          onConfirm={async () => {
+            setLoading(true);
+            const result = await deleteImpegnoAction(impegnoId!);
+            setLoading(false);
+            if (result.success) {
+              showToast('Impegno eliminato correttamente', 'info');
+              onSuccess();
+            } else {
+              showToast(result.error || "Errore durante l'eliminazione", 'error');
+            }
+          }}
+          trigger={
+            <button
+              type="button"
+              disabled={loading}
+              className="w-full py-3 rounded-xl font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center gap-2"
+            >
+              <Trash2 size={16} />
+              Elimina Impegno
+            </button>
+          }
+        />
       )}
     </form>
   );

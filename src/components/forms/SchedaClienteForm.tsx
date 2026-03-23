@@ -1,11 +1,13 @@
-'use client';
+'use client'; 
 
 import React, { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
+const supabase = createClient();
 import { Loader2, Phone, Mail, BadgeCheck, AlertCircle, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { Cliente, Patente, TipoPatente, TipoCambio } from '@/lib/database.types';
-import CustomSelect from './CustomSelect';
+import Select from './Select';
+import { ConfirmBubble } from '../ConfirmBubble';
 import { 
   createClienteAction, 
   updateClienteAction, 
@@ -76,6 +78,7 @@ export const SchedaClienteForm = ({
     const { data: duplicates } = await supabase
       .from('clienti')
       .select('id')
+      .is('eliminato_il', null)
       .or(predicates.join(','))
       .filter('id', 'neq', clienteId || '00000000-0000-0000-0000-000000000000')
       .limit(1);
@@ -115,7 +118,7 @@ export const SchedaClienteForm = ({
 
   const handleDelete = async () => {
     if (!clienteId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo cliente? L'azione è irreversibile e cancellerà anche tutti i suoi appuntamenti.")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo cliente? I dati rimarranno nel database ma non saranno più visibili nell'applicazione.")) return;
 
     setLoading(true);
     const result = await deleteClienteAction(clienteId);
@@ -191,7 +194,7 @@ export const SchedaClienteForm = ({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Patente Richiesta</label>
-          <CustomSelect
+          <Select
             options={patenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
             value={form.patente_richiesta_id || ''}
             onChange={(val) => setForm(prev => ({ ...prev, patente_richiesta_id: val }))}
@@ -202,7 +205,7 @@ export const SchedaClienteForm = ({
 
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Tipo Cambio</label>
-          <CustomSelect
+          <Select
             options={[
               { id: 'manuale', label: 'Meccanico (Manuale)' },
               { id: 'automatico', label: 'Automatico' }
@@ -259,15 +262,33 @@ export const SchedaClienteForm = ({
         </button>
       </div>
       {clienteId && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={loading}
-          className="w-full mt-3 py-3 rounded-xl font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center gap-2"
-        >
-          <Trash2 size={16} />
-          Elimina Cliente
-        </button>
+        <ConfirmBubble
+          title="Elimina Cliente"
+          message="Sei sicuro di voler eliminare questo cliente? I dati rimarranno nel database ma non saranno più visibili."
+          confirmLabel="Elimina"
+          onConfirm={async () => {
+            setLoading(true);
+            const result = await deleteClienteAction(clienteId!);
+            setLoading(false);
+            if (result.success) {
+              showToast('Cliente eliminato correttamente', 'info');
+              onSuccess(clienteId!);
+            } else {
+              showToast(result.error || "Errore durante l'eliminazione", 'error');
+              setServerError(result.error || "Errore durante l'eliminazione.");
+            }
+          }}
+          trigger={
+            <button
+              type="button"
+              disabled={loading}
+              className="w-full mt-3 py-3 rounded-xl font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-sm flex items-center justify-center gap-2"
+            >
+              <Trash2 size={16} />
+              Elimina Cliente
+            </button>
+          }
+        />
       )}
     </form>
   );

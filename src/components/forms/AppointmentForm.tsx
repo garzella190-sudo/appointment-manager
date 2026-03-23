@@ -1,8 +1,9 @@
-'use client';
+'use client'; 
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+const supabase = createClient();
+import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil } from 'lucide-react';
 import { format, addMinutes, parseISO, isAfter } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Cliente, Istruttore, Veicolo, Patente, StatoAppuntamento } from '@/lib/database.types';
@@ -11,14 +12,14 @@ import { createAppointmentAction, updateAppointmentAction } from '@/actions/appo
 import { deleteAppointmentAction, cancelAppointmentAction, updateAppointmentNoteAction } from '@/actions/appointment_actions';
 import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
-import { createClient } from '@/utils/supabase/client';
 import { ClientAutocomplete } from './ClientAutocomplete';
 import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
 import { Modal } from '../Modal';
 import { SchedaClienteForm } from './SchedaClienteForm';
 import { Plus, ChevronDown, Check } from 'lucide-react';
-import CustomSelect from './CustomSelect';
+import Select from './Select';
+import { ConfirmBubble } from '../ConfirmBubble';
 
 interface FormProps {
   onSuccess: () => void;
@@ -35,12 +36,12 @@ const INPUT_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 ou
 const LABEL_CLS = 'text-[11px] font-bold text-zinc-400 uppercase tracking-[0.1em] flex items-center gap-2 ml-1 mb-2';
 const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 flex items-center h-12 text-sm font-semibold text-zinc-900 transition-all cursor-default overflow-hidden';
 
-const TIME_OPTIONS = [
-  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
-  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00',
-  '20:30', '21:00', '21:30', '22:00'
-];
+const TIME_OPTIONS = Array.from({ length: (22 - 8) * 4 + 1 }, (_, i) => {
+  const totalMinutes = i * 15;
+  const h = Math.floor(totalMinutes / 60) + 8;
+  const m = totalMinutes % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+});
 
 export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
   const [mode, setMode] = useState<'create' | 'edit' | 'view'>(appointmentId ? initialMode : 'create');
@@ -85,6 +86,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     vehicle_ids: [] 
   });
   const [isUpdatingNote, setIsUpdatingNote] = useState(false);
+  const [isEditingNote, setIsEditingNote] = useState(false);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize notes
@@ -100,11 +102,11 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       setFetching(true);
       try {
         const [cRes, iRes, vRes, pRes, impRes] = await Promise.all([
-          supabase.from('clienti').select('*').neq('nome', 'UFFICIO').order('cognome'),
-          supabase.from('istruttori').select('*').order('cognome'),
-          supabase.from('veicoli').select('*').order('nome'),
-          supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
-          supabase.from('clienti').select('cognome').eq('nome', 'UFFICIO'),
+          supabase.from('clienti').select('*').is('eliminato_il', null).neq('nome', 'UFFICIO').order('cognome'),
+          supabase.from('istruttori').select('*').is('eliminato_il', null).order('cognome'),
+          supabase.from('veicoli').select('*').is('eliminato_il', null).order('nome'),
+          supabase.from('patenti').select('*').is('eliminato_il', null).eq('nascosta', false).order('tipo'),
+          supabase.from('clienti').select('cognome').is('eliminato_il', null).eq('nome', 'UFFICIO'),
         ]);
 
         // Extract unique impegno names
@@ -144,15 +146,15 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             else setDurationMode('custom');
             
             if (apt.cliente_id) {
-              const client = sortedClienti.find(c => c.id === apt.cliente_id);
+              const client = (sortedClienti as Cliente[]).find((c: Cliente) => c.id === apt.cliente_id);
               if (client?.nome === 'UFFICIO') {
                 setIsImpegno(true);
                 setNomeImpegno(client.cognome);
               }
               setSelectedCliente(client || null);
             }
-            setSelectedIstruttore(sortedIstruttori.find(i => i.id === apt.istruttore_id) || null);
-            setSelectedVeicolo(sortedVeicoli.find(v => v.id === apt.veicolo_id) || null);
+            setSelectedIstruttore((sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === apt.istruttore_id) || null);
+            setSelectedVeicolo((sortedVeicoli as Veicolo[]).find((v: Veicolo) => v.id === apt.veicolo_id) || null);
           }
         } else {
           // New appointment: auto-fill from logged-in user's instructor association
@@ -161,13 +163,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             const { data: { user } } = await browserSupabase.auth.getUser();
             const linkedInstrId = user?.user_metadata?.istruttore_id;
             if (linkedInstrId) {
-              const instr = sortedIstruttori.find(i => i.id === linkedInstrId);
+              const instr = (sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === linkedInstrId);
               if (instr) {
                 setSelectedIstruttore(instr);
                 // Auto-select instructor's default vehicle (for patente B)
                 const instrVehicleId = instr.veicolo_id;
                 if (instrVehicleId) {
-                  const veh = sortedVeicoli.find(v => v.id === instrVehicleId);
+                  const veh = (sortedVeicoli as Veicolo[]).find((v: Veicolo) => v.id === instrVehicleId);
                   if (veh) {
                     setSelectedVeicolo(veh);
                     setForm(prev => ({ ...prev, istruttore_id: linkedInstrId, veicolo_id: instrVehicleId }));
@@ -197,31 +199,39 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     async function checkAvailability() {
       if (!form.data || !form.ora) return;
       
-      const startISO = new Date(`${form.data}T${form.ora}`).toISOString();
-      // Check for BUSY slots (is_available = false)
-      const { data: busySlots } = await supabase
-        .from('time_slots')
-        .select('instructor_id, vehicle_id')
-        .eq('start_time', startISO)
-        .eq('is_available', false)
-        .not('appointment_id', 'eq', appointmentId || '00000000-0000-0000-0000-000000000000'); // exclude current if editing
+      const startDate = new Date(`${form.data}T${form.ora}`);
+      const startISO = startDate.toISOString();
+      const endISO = new Date(startDate.getTime() + form.durata * 60000).toISOString();
 
-      const busyInstructors = busySlots?.map(s => s.instructor_id).filter(Boolean) as string[] || [];
-      const busyVehicles = busySlots?.map(s => s.vehicle_id).filter(Boolean) as string[] || [];
+      try {
+        // Query appuntamenti directly for overlaps
+        const { data: overlapping } = await supabase
+          .from('appuntamenti')
+          .select('istruttore_id, veicolo_id')
+          .is('eliminato_il', null)
+          .neq('id', appointmentId || '00000000-0000-0000-0000-000000000000')
+          .neq('stato', 'annullato')
+          .lt('inizio', endISO)
+          .gt('fine', startISO);
 
-      const nextInstructorIds = istruttori.map(i => i.id).filter(id => !busyInstructors.includes(id));
-      const nextVehicleIds = veicoli.map(v => v.id).filter(id => !busyVehicles.includes(id));
+        const busyInstructors = overlapping?.map((a: any) => a.istruttore_id).filter(Boolean) as string[] || [];
+        const busyVehicles = overlapping?.map((a: any) => a.veicolo_id).filter(Boolean) as string[] || [];
 
-      // Stability check: only update if IDs actually changed
-      setAvailableSlots(prev => {
-        const isSameI = prev.instructor_ids.length === nextInstructorIds.length && 
-                        prev.instructor_ids.every((id, idx) => id === nextInstructorIds[idx]);
-        const isSameV = prev.vehicle_ids.length === nextVehicleIds.length && 
-                        prev.vehicle_ids.every((id, idx) => id === nextVehicleIds[idx]);
-        
-        if (isSameI && isSameV) return prev;
-        return { instructor_ids: nextInstructorIds, vehicle_ids: nextVehicleIds };
-      });
+        const nextInstructorIds = istruttori.map(i => i.id).filter(id => !busyInstructors.includes(id));
+        const nextVehicleIds = veicoli.map(v => v.id).filter(id => !busyVehicles.includes(id));
+
+        setAvailableSlots(prev => {
+          const isSameI = prev.instructor_ids.length === nextInstructorIds.length && 
+                          prev.instructor_ids.every((id, idx) => id === nextInstructorIds[idx]);
+          const isSameV = prev.vehicle_ids.length === nextVehicleIds.length && 
+                          prev.vehicle_ids.every((id, idx) => id === nextVehicleIds[idx]);
+          
+          if (isSameI && isSameV) return prev;
+          return { instructor_ids: nextInstructorIds, vehicle_ids: nextVehicleIds };
+        });
+      } catch (err) {
+        console.error('Error checking availability:', err);
+      }
     }
 
     if (!fetching) {
@@ -572,24 +582,98 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           
           {/* NOTE (Auto-resizing) - Moved here if IS Impegno */}
           {isImpegno && (
-            <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-top-2">
-              <label className={cn(LABEL_CLS, "flex justify-between items-center")}>
-                <span className="flex items-center gap-2">📝 NOTE</span>
-                {isUpdatingNote && <Loader2 className="animate-spin text-blue-500" size={12} />}
-              </label>
-              <textarea 
-                ref={noteRef}
-                rows={1} 
-                value={form.note} 
-                onChange={(e) => setForm(prev => ({ ...prev, note: e.target.value }))} 
-                onBlur={isView ? handleNoteBlur : undefined}
-                className={cn(
-                   isView ? "bg-zinc-50/50 border-zinc-100 hover:border-zinc-200 focus:bg-white" : INPUT_CLS,
-                   'resize-none py-4 leading-relaxed transition-all rounded-[16px] px-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 w-full min-h-[48px]',
-                   isView && "italic text-zinc-500"
-                )} 
-                placeholder="Note aggiuntive per l'impegno..." 
-              />
+            <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-top-2 group">
+              <div className="flex justify-between items-center">
+                <label className={LABEL_CLS}>📝 NOTE</label>
+                <div className="flex items-center gap-1">
+                  {isUpdatingNote && <Loader2 className="animate-spin text-blue-500 mr-2" size={12} />}
+                  
+                  {isView && (
+                    <div className="flex gap-1 opacity-100 transition-opacity">
+                      {!isEditingNote && form.note && (
+                         <>
+                           <button 
+                             type="button" 
+                             onClick={() => setIsEditingNote(true)}
+                             className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-all"
+                             title="Modifica nota"
+                           >
+                             <Pencil size={14} />
+                           </button>
+                           
+                           <ConfirmBubble
+                             title="Elimina nota"
+                             message="Vuoi cancellare questa nota?"
+                             confirmLabel="Elimina"
+                             onConfirm={async () => {
+                               setIsUpdatingNote(true);
+                               const res = await updateAppointmentNoteAction(appointmentId!, null);
+                               setIsUpdatingNote(false);
+                               if (res.success) {
+                                 setForm(prev => ({ ...prev, note: '' }));
+                                 showToast('Nota eliminata', 'success');
+                               }
+                             }}
+                             trigger={
+                               <button 
+                                 type="button" 
+                                 className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg transition-all"
+                                 title="Elimina nota"
+                               >
+                                 <Trash2 size={14} />
+                               </button>
+                             }
+                           />
+                         </>
+                      )}
+                      {(isEditingNote || !form.note) && (
+                        <button 
+                          type="button" 
+                          onClick={async () => {
+                            if (!noteRef.current) return;
+                            setIsUpdatingNote(true);
+                            const res = await updateAppointmentNoteAction(appointmentId!, noteRef.current.value);
+                            setIsUpdatingNote(false);
+                            if (res.success) {
+                              setForm(prev => ({ ...prev, note: noteRef.current?.value || '' }));
+                              setIsEditingNote(false);
+                              showToast('Nota salvata', 'success');
+                            }
+                          }}
+                          className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
+                          title="Salva nota"
+                        >
+                          <Save size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {(isEditingNote || !form.note || !isView) ? (
+                <textarea 
+                  ref={noteRef}
+                  rows={1} 
+                  defaultValue={form.note} 
+                  onChange={(e) => {
+                    if (!isView) setForm(prev => ({ ...prev, note: e.target.value }));
+                  }}
+                  className={cn(
+                    INPUT_CLS,
+                    'resize-none py-4 leading-relaxed transition-all rounded-[16px] px-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 w-full min-h-[48px]',
+                    isView && "bg-white border-blue-100 ring-2 ring-blue-500/5 shadow-inner"
+                  )} 
+                  placeholder="Note aggiuntive per l'impegno..." 
+                />
+              ) : (
+                <div 
+                  onClick={() => setIsEditingNote(true)}
+                  className="w-full bg-[#F4F4F4]/50 border border-transparent rounded-[16px] px-4 py-3 text-sm font-semibold text-zinc-600 italic cursor-pointer hover:bg-white hover:border-zinc-200 transition-all min-h-[48px] flex items-center"
+                >
+                  {form.note}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -605,11 +689,11 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             onCancel={() => setAddingCliente(false)}
             onSuccess={async (newId) => {
               // Refresh client list
-              const { data } = await supabase.from('clienti').select('*').order('cognome');
+              const { data } = await supabase.from('clienti').select('*').is('eliminato_il', null).order('cognome');
               const sorted = data ?? [];
               setClienti(sorted);
               
-              const newClient = sorted.find(c => c.id === newId);
+              const newClient = (sorted as Cliente[]).find((c: Cliente) => c.id === newId);
               if (newClient) {
                 handleClienteChange(newClient);
               }
@@ -634,10 +718,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             {isView ? (
               <div className={VIEW_BLOCK_CLS}>{form.ora}</div>
             ) : (
-              <CustomSelect
+              <Select
                 options={TIME_OPTIONS.map(t => ({ id: t, label: t }))}
                 value={form.ora}
-                onChange={(val) => setForm(prev => ({ ...prev, ora: val }))}
+                onChange={(val: string) => setForm(prev => ({ ...prev, ora: val }))}
                 className="w-full"
               />
             )}
@@ -649,7 +733,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 {oraFine}
               </div>
             ) : (
-              <CustomSelect
+              <Select
                 options={TIME_OPTIONS.map(t => ({ id: t, label: t }))}
                 value={oraFine}
                 onChange={handleHoraFineChange}
@@ -661,24 +745,98 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
         {/* NOTE (Auto-resizing) - Moved here if NOT Impegno, or moved up if IS Impegno */}
         {!isImpegno && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-            <label className={cn(LABEL_CLS, "flex justify-between items-center")}>
-              <span className="flex items-center gap-2">📝 NOTE</span>
-              {isUpdatingNote && <Loader2 className="animate-spin text-blue-500" size={12} />}
-            </label>
-            <textarea 
-              ref={noteRef}
-              rows={1} 
-              value={form.note} 
-              onChange={(e) => setForm(prev => ({ ...prev, note: e.target.value }))} 
-              onBlur={isView ? handleNoteBlur : undefined}
-              className={cn(
-                 isView ? "bg-zinc-50/50 border-zinc-100 hover:border-zinc-200 focus:bg-white" : INPUT_CLS,
-                 'resize-none py-4 leading-relaxed transition-all rounded-[16px] px-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 w-full min-h-[48px]',
-                 isView && "italic text-zinc-500"
-              )} 
-              placeholder="Note aggiuntive..." 
-            />
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-2 group">
+            <div className="flex justify-between items-center">
+              <label className={LABEL_CLS}>📝 NOTE</label>
+              <div className="flex items-center gap-1">
+                {isUpdatingNote && <Loader2 className="animate-spin text-blue-500 mr-2" size={12} />}
+                
+                {isView && (
+                  <div className="flex gap-1 opacity-100 transition-opacity">
+                    {!isEditingNote && form.note && (
+                       <>
+                         <button 
+                           type="button" 
+                           onClick={() => setIsEditingNote(true)}
+                           className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-all"
+                           title="Modifica nota"
+                         >
+                           <Pencil size={14} />
+                         </button>
+                         
+                         <ConfirmBubble
+                           title="Elimina nota"
+                           message="Vuoi cancellare questa nota?"
+                           confirmLabel="Elimina"
+                           onConfirm={async () => {
+                             setIsUpdatingNote(true);
+                             const res = await updateAppointmentNoteAction(appointmentId!, null);
+                             setIsUpdatingNote(false);
+                             if (res.success) {
+                               setForm(prev => ({ ...prev, note: '' }));
+                               showToast('Nota eliminata', 'success');
+                             }
+                           }}
+                           trigger={
+                             <button 
+                               type="button" 
+                               className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg transition-all"
+                               title="Elimina nota"
+                             >
+                               <Trash2 size={14} />
+                             </button>
+                           }
+                         />
+                       </>
+                    )}
+                    {(isEditingNote || !form.note) && (
+                      <button 
+                        type="button" 
+                        onClick={async () => {
+                          if (!noteRef.current) return;
+                          setIsUpdatingNote(true);
+                          const res = await updateAppointmentNoteAction(appointmentId!, noteRef.current.value);
+                          setIsUpdatingNote(false);
+                          if (res.success) {
+                            setForm(prev => ({ ...prev, note: noteRef.current?.value || '' }));
+                            setIsEditingNote(false);
+                            showToast('Nota salvata', 'success');
+                          }
+                        }}
+                        className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
+                        title="Salva nota"
+                      >
+                        <Save size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(isEditingNote || !form.note || !isView) ? (
+              <textarea 
+                ref={noteRef}
+                rows={1} 
+                defaultValue={form.note} 
+                onChange={(e) => {
+                  if (!isView) setForm(prev => ({ ...prev, note: e.target.value }));
+                }}
+                className={cn(
+                  INPUT_CLS,
+                  'resize-none py-4 leading-relaxed transition-all rounded-[16px] px-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 w-full min-h-[48px]',
+                  isView && "bg-white border-blue-100 ring-2 ring-blue-500/5 shadow-inner"
+                )} 
+                placeholder="Note aggiuntive..." 
+              />
+            ) : (
+              <div 
+                onClick={() => setIsEditingNote(true)}
+                className="w-full bg-[#F4F4F4]/50 border border-transparent rounded-[16px] px-4 py-3 text-sm font-semibold text-zinc-600 italic cursor-pointer hover:bg-white hover:border-zinc-200 transition-all min-h-[48px] flex items-center"
+              >
+                {form.note}
+              </div>
+            )}
           </div>
         )}
 
@@ -690,7 +848,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               {isView ? (
                 <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
               ) : durationMode !== 'custom' ? (
-                <CustomSelect
+                <Select
                   options={[
                     { id: '30', label: '30 min' },
                     { id: '60', label: '60 min' },
@@ -737,10 +895,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               {isView ? (
                 <div className={VIEW_BLOCK_CLS}>{patenti.find(p => p.id === form.patente_id)?.tipo || 'B'}</div>
               ) : (
-                <CustomSelect
+                <Select
                   options={patenti.map(p => ({ id: p.id, label: p.tipo }))}
                   value={form.patente_id}
-                  onChange={(val) => setForm(prev => ({ ...prev, patente_id: val }))}
+                  onChange={(val: string) => setForm(prev => ({ ...prev, patente_id: val }))}
                   placeholder="Seleziona Patente"
                 />
               )}
@@ -770,7 +928,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
                 </div>
               ) : (
-                <CustomSelect
+                <Select
                   options={istruttori.map(i => {
                     const isBusy = !availableSlots.instructor_ids.includes(i.id);
                     return {
@@ -795,7 +953,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               {isView ? (
                 <div className={VIEW_BLOCK_CLS}>{selectedVeicolo?.nome || 'Senza veicolo'}</div>
               ) : (
-              <CustomSelect
+              <Select
                 options={[
                   { id: '', label: 'Senza veicolo' },
                   ...availableVeicoli.map(v => {
@@ -810,8 +968,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   })
                 ]}
                 value={form.veicolo_id}
-                onChange={(val) => {
-                  const veh = veicoli.find(v => v.id === val);
+                onChange={(val: string) => {
+                  const veh = veicoli.find((v: Veicolo) => v.id === val);
                   setSelectedVeicolo(veh || null);
                   setForm(prev => ({ ...prev, veicolo_id: val }));
                 }}
@@ -831,7 +989,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
                 </div>
               ) : (
-                <CustomSelect
+                <Select
                   options={istruttori.map(i => {
                     const isBusy = !availableSlots.instructor_ids.includes(i.id);
                     return {
@@ -856,7 +1014,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               {isView ? (
                 <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
               ) : durationMode !== 'custom' ? (
-                <CustomSelect
+                <Select
                   options={[
                     { id: '30', label: '30 min' },
                     { id: '60', label: '60 min' },
@@ -920,48 +1078,56 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 >
                   <Edit3 size={16} /> MODIFICA
                 </button>
-                <button 
-                  type="button" 
-                  onClick={async (e) => { 
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (window.confirm("Annullare?")) { 
-                      setLoading(true); 
-                      const result = await cancelAppointmentAction(appointmentId!); 
-                      if (result.success) {
-                        showToast('Appuntamento annullato', 'info');
-                        onSuccess(); 
-                      } else {
-                        showToast(result.error || 'Errore durante l\'annullamento', 'error');
-                        setLoading(false);
-                      }
-                    } 
-                  }} 
-                  disabled={form.stato === 'annullato'}  
-                  className="h-14 bg-orange-50 text-orange-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-orange-100/50 disabled:opacity-30"
-                >
-                  ANNULLA
-                </button>
-              </div>
-              <button 
-                type="button" 
-                onClick={async () => { 
-                  if (window.confirm("Eliminare?")) { 
+                <ConfirmBubble
+                  title="Annulla appuntamento"
+                  message="Vuoi annullare questa guida? L'azione è reversibile solo manualmente."
+                  confirmLabel="Annulla Guida"
+                  onConfirm={async () => {
                     setLoading(true); 
-                    const result = await deleteAppointmentAction(appointmentId!); 
+                    const result = await cancelAppointmentAction(appointmentId!); 
                     if (result.success) {
-                      showToast('Appuntamento eliminato definitivamente', 'info');
+                      showToast('Appuntamento annullato', 'info');
                       onSuccess(); 
                     } else {
-                      showToast(result.error || 'Errore durante l\'eliminazione', 'error');
+                      showToast(result.error || 'Errore durante l\'annullamento', 'error');
                       setLoading(false);
                     }
-                  } 
-                }} 
-                className="w-full h-14 bg-red-50 text-red-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-red-100/50 flex items-center justify-center gap-2"
-              >
-                <Trash2 size={16} /> ELIMINA
-              </button>
+                  }}
+                  trigger={
+                    <button 
+                      type="button" 
+                      disabled={form.stato === 'annullato'}  
+                      className="h-14 bg-orange-50 text-orange-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-orange-100/50 disabled:opacity-30"
+                    >
+                      ANNULLA
+                    </button>
+                  }
+                />
+              </div>
+              <ConfirmBubble
+                title="Elimina definitivamente"
+                message="Sei sicuro di voler eliminare questo record? Non potrai tornare indietro."
+                confirmLabel="Elimina"
+                onConfirm={async () => {
+                  setLoading(true); 
+                  const result = await deleteAppointmentAction(appointmentId!); 
+                  if (result.success) {
+                    showToast('Appuntamento eliminato definitivamente', 'info');
+                    onSuccess(); 
+                  } else {
+                    showToast(result.error || 'Errore durante l\'eliminazione', 'error');
+                    setLoading(false);
+                  }
+                }}
+                trigger={
+                  <button 
+                    type="button" 
+                    className="w-full h-14 bg-red-50 text-red-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-red-100/50 flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={16} /> ELIMINA
+                  </button>
+                }
+              />
               <button 
                 type="button" 
                 onClick={(e) => {

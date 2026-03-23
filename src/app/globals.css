@@ -29,7 +29,10 @@
   }
 }
 
+html,
 body {
+  height: 100%;
+  overflow: hidden;
   background-color: var(--background);
   color: var(--foreground);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -215,3 +218,20 @@ body {
 }
 
 /* Fine Overrides Premium */
+
+/* Utility per Layout Fisso */
+.scroll-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+/* Nascondi scrollbar ma mantieni funzionalità se desiderato */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

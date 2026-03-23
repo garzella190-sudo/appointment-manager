@@ -13,7 +13,7 @@ interface Option {
   color?: string;
 }
 
-interface CustomSelectProps {
+interface SelectProps {
   options: any[]; // generic enough for now, but we'll map them
   value: string;
   onChange: (value: string) => void;
@@ -23,7 +23,7 @@ interface CustomSelectProps {
   searchable?: boolean;
 }
 
-export const CustomSelect = ({ 
+const Select = ({ 
   options, 
   value, 
   onChange, 
@@ -31,7 +31,7 @@ export const CustomSelect = ({
   icon: Icon, 
   className,
   searchable = false
-}: CustomSelectProps) => {
+}: SelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -140,4 +140,4 @@ export const CustomSelect = ({
   );
 };
 
-export default CustomSelect;
+export default Select;

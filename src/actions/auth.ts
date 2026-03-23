@@ -78,3 +78,13 @@ export async function updateUserAction(userId: string, data: {
   return { success: true, user: updated.user };
 }
 
+
+export async function signOutAction() {
+  const supabase = await createAdminClient(); // Or use the standard server client if preferred for session
+  // Actually, for signout we should use the standard server client to clear cookies
+  // I'll import createClient from @/utils/supabase/server inside the function or at top
+  const { createClient: createServerClient } = await import('@/utils/supabase/server');
+  const supabaseServer = await createServerClient();
+  await supabaseServer.auth.signOut();
+  return { success: true };
+}

@@ -11,9 +11,12 @@ interface DraggableAppointmentProps {
   appointment: Appointment;
   isOverlapping?: boolean;
   onClick?: (appointment: Appointment) => void;
+  isStacked?: boolean;
+  isFirst?: boolean;
+  granularity?: number;
 }
 
-export const DraggableAppointment = ({ appointment, isOverlapping, onClick }: DraggableAppointmentProps) => {
+export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isStacked, isFirst, granularity = 15 }: DraggableAppointmentProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: appointment.id,
     data: appointment
@@ -35,14 +38,16 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick }: Dr
         if (onClick) onClick(appointment);
       }}
       className={cn(
-        "absolute inset-x-0.5 top-0 p-1.5 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] shadow-sm flex flex-col justify-between border-l-4",
+        "relative w-full p-1.5 mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] shadow-sm flex flex-col justify-between border-l-4",
         isDragging ? "invisible" : "hover:scale-[1.02] hover:shadow-lg hover:z-[30]",
         appointment.is_unavailability ? "bg-zinc-200 dark:bg-zinc-700/50" : "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md",
         isOverlapping && "ring-2 ring-red-500 animate-pulse bg-red-500/10 dark:bg-red-500/20"
       )}
       style={{ 
         ...style,
-        height: `${(appointment.duration / 15) * 40 - 2}px`,
+        height: isStacked ? 'auto' : `${(appointment.duration / 15) * 40 - 2}px`,
+        minHeight: isStacked ? '36px' : undefined,
+        marginTop: (isStacked && !isFirst) ? '-4px' : undefined,
         borderLeftColor: isOverlapping ? '#ef4444' : (appointment.istruttore?.color || '#3b82f6'),
         boxShadow: isOverlapping ? '0 0 20px rgba(239, 68, 68, 0.2)' : `0 4px 12px -2px ${appointment.istruttore?.color}20`,
         borderRight: appointment.vehicle_color ? `4px solid ${appointment.vehicle_color}` : undefined,
