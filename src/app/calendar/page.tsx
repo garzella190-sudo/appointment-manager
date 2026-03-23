@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, User, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, User, Calendar as CalendarIcon, StickyNote } from 'lucide-react';
 import Select from '@/components/forms/Select';
 import {
   DndContext,
@@ -591,7 +591,12 @@ export default function CalendarPage() {
                       {activeAppointment.appointment_time.slice(0, 5)}
                     </span>
                   </div>
-                  <p className="text-sm font-black leading-tight truncate">{activeAppointment.client_name}</p>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="text-sm font-black leading-tight truncate">{activeAppointment.client_name}</p>
+                    {activeAppointment.notes && activeAppointment.notes.trim() !== '' && (
+                      <StickyNote size={14} className="text-white fill-white/20 shrink-0" />
+                    )}
+                  </div>
                 </div>
 
                 {overId && (

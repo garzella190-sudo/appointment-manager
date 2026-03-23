@@ -7,6 +7,7 @@ import { Calendar, Home, UserCircle, PlusCircle, Wrench, User, LogOut } from 'lu
 import { cn } from '@/lib/utils';
 import { Modal } from './Modal';
 import { AppointmentForm } from './forms/AppointmentForm';
+import { ConfirmBubble } from './ConfirmBubble';
 import { signOutAction } from '@/actions/auth';
 
 interface BottomNavProps {
@@ -27,12 +28,10 @@ const BottomNav = ({ user }: BottomNavProps) => {
   }
 
   const handleLogout = async () => {
-    if (confirm('Sei sicuro di voler uscire?')) {
-      setIsLoggingOut(true);
-      await signOutAction();
-      router.push('/login');
-      router.refresh();
-    }
+    setIsLoggingOut(true);
+    await signOutAction();
+    router.push('/login');
+    router.refresh();
   };
 
   const navItems = [
@@ -83,6 +82,10 @@ const BottomNav = ({ user }: BottomNavProps) => {
                   key={item.name}
                   href={item.href}
                   title={item.name}
+                  onClick={() => {
+                    // Force refresh on every navigation click for "security/freshness" on mobile
+                    router.refresh();
+                  }}
                   className={cn(
                     "flex flex-col items-center gap-0.5 transition-all duration-300 hover:scale-110 active:scale-95 px-1 sm:px-2",
                     isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
@@ -104,15 +107,22 @@ const BottomNav = ({ user }: BottomNavProps) => {
           </div>
 
           {/* Logout - Right */}
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="flex flex-col items-center gap-0.5 px-2 text-red-500 hover:text-red-600 transition-all active:scale-90 disabled:opacity-50"
-            title="Esci"
-          >
-            <LogOut size={20} strokeWidth={2.5} />
-            <span className="text-[9px] sm:text-[10px] font-bold tracking-tight">Esci</span>
-          </button>
+          <ConfirmBubble
+            title="Esci dall'app"
+            message="Vuoi terminare la sessione attuale?"
+            confirmLabel="Esci"
+            onConfirm={handleLogout}
+            trigger={
+              <button
+                disabled={isLoggingOut}
+                className="flex flex-col items-center gap-0.5 px-2 text-red-500 hover:text-red-600 transition-all active:scale-90 disabled:opacity-50"
+                title="Esci"
+              >
+                <LogOut size={20} strokeWidth={2.5} />
+                <span className="text-[9px] sm:text-[10px] font-bold tracking-tight">Esci</span>
+              </button>
+            }
+          />
         </div>
       </nav>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search, Car, Phone } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Appointment } from '@/types';
@@ -280,6 +280,11 @@ export default function Home() {
                           {apt.is_impegno && (
                             <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[8px] font-black rounded-md border border-blue-100/50 dark:border-blue-400/20 uppercase tracking-tighter shrink-0">
                               Impegno
+                            </span>
+                          )}
+                          {apt.notes && apt.notes.trim() !== '' && (
+                            <span title={apt.notes} className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[8px] font-black rounded-md border border-amber-100/50 dark:border-amber-400/20 uppercase tracking-tighter shrink-0 flex items-center gap-1">
+                              <StickyNote size={8} fill="currentColor" fillOpacity={0.2} /> NOTE
                             </span>
                           )}
                         </h3>

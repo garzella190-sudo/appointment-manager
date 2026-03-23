@@ -60,7 +60,9 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
           </p>
           <div className="flex items-center gap-1 shrink-0">
             {appointment.notes && appointment.notes.trim() !== '' && (
-              <StickyNote size={14} className="text-blue-500/70 dark:text-blue-400/70" />
+              <div className="flex items-center justify-center p-1 bg-amber-100 dark:bg-amber-900/40 rounded-lg text-amber-600 dark:text-amber-400 shadow-sm ring-1 ring-amber-500/20" title={appointment.notes}>
+                <StickyNote size={13} fill="currentColor" fillOpacity={0.2} />
+              </div>
             )}
             {isOverlapping && (
               <AlertTriangle size={14} className="text-red-600 dark:text-red-400 shrink-0" />

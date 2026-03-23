@@ -52,38 +52,38 @@ export const ConfirmBubble = ({
 
       {isOpen && (
         <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={(e) => {
             e.stopPropagation();
             setIsOpen(false);
             onCancel?.();
           }}
         >
-          {/* Backdrop blur */}
-          <div className="absolute inset-0 bg-black/5 backdrop-blur-[2px]" />
+          {/* Backdrop blur - more visible on mobile */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           
           <div 
             ref={bubbleRef}
             className={cn(
-              "relative w-full max-w-[280px] p-6 bg-white dark:bg-zinc-900 rounded-[32px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] border border-zinc-100 dark:border-zinc-800 animate-in zoom-in-95 duration-200",
+              "relative w-[90%] max-w-[320px] p-6 bg-white dark:bg-zinc-900 rounded-[32px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.3)] border border-zinc-100 dark:border-zinc-800 animate-in zoom-in-95 duration-200",
               className
             )}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="space-y-4">
               <div className="flex flex-col items-center text-center gap-3">
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-2xl text-red-500 shrink-0 mb-1">
-                  <AlertCircle size={24} />
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-red-500 shrink-0 mb-1">
+                  <AlertCircle size={32} />
                 </div>
                 <div>
-                  <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{title}</h4>
-                  <p className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed px-1">
+                  <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{title}</h4>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed px-1">
                     {message}
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 pt-2">
+              <div className="flex flex-col gap-3 pt-2">
                 <button
                   disabled={isLoading}
                   onClick={(e) => {
@@ -91,12 +91,12 @@ export const ConfirmBubble = ({
                     onConfirm();
                     setIsOpen(false);
                   }}
-                  className="w-full h-12 rounded-2xl text-xs font-black uppercase tracking-wider bg-red-600 text-white shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-wider bg-red-600 text-white shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <Trash2 size={14} />
+                    <Trash2 size={18} />
                   )}
                   {confirmLabel}
                 </button>
@@ -107,7 +107,7 @@ export const ConfirmBubble = ({
                     setIsOpen(false);
                     onCancel?.();
                   }}
-                  className="w-full h-12 rounded-2xl text-xs font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all border border-zinc-100 dark:border-zinc-800"
+                  className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-wider text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all border border-zinc-100 dark:border-zinc-800"
                 >
                   {cancelLabel}
                 </button>

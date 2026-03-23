@@ -612,6 +612,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                                if (res.success) {
                                  setForm(prev => ({ ...prev, note: '' }));
                                  showToast('Nota eliminata', 'success');
+                                onSuccess();
                                }
                              }}
                              trigger={
@@ -638,6 +639,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                               setForm(prev => ({ ...prev, note: noteRef.current?.value || '' }));
                               setIsEditingNote(false);
                               showToast('Nota salvata', 'success');
+                              onSuccess();
                             }
                           }}
                           className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
@@ -801,6 +803,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                             setForm(prev => ({ ...prev, note: noteRef.current?.value || '' }));
                             setIsEditingNote(false);
                             showToast('Nota salvata', 'success');
+                            onSuccess();
                           }
                         }}
                         className="p-1.5 bg-blue-600 text-white rounded-lg shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
