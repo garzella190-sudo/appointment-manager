@@ -8,24 +8,29 @@ export async function createUserAction(formData: {
   full_name: string;
   role: 'admin' | 'istruttore' | 'segreteria';
 }) {
-  const supabase = createAdminClient();
+  try {
+    const supabase = createAdminClient();
 
-  const { data, error } = await supabase.auth.admin.createUser({
-    email: formData.email,
-    password: formData.password,
-    email_confirm: true,
-    user_metadata: {
-      role: formData.role,
-      full_name: formData.full_name,
-    },
-  });
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: formData.email,
+      password: formData.password,
+      email_confirm: true,
+      user_metadata: {
+        role: formData.role,
+        full_name: formData.full_name,
+      },
+    });
 
-  if (error) {
-    console.error('Error creating user:', error.message);
-    return { error: error.message };
+    if (error) {
+      console.error('Error creating user:', error.message);
+      return { error: error.message };
+    }
+
+    return { success: true, user: data.user };
+  } catch (err: any) {
+    console.error('Fatal user creation error:', err);
+    return { error: err.message || "Errore imprevisto lato server." };
   }
-
-  return { success: true, user: data.user };
 }
 
 export async function listUsersAction() {

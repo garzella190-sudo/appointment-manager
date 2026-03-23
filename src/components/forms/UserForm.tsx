@@ -26,17 +26,22 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
     const full_name = formData.get('full_name') as string;
     const role = formData.get('role') as 'admin' | 'istruttore' | 'segreteria';
 
-    const result = await createUserAction({ email, password, full_name, role });
+    try {
+      const result = await createUserAction({ email, password, full_name, role });
 
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setSuccess(true);
-      setTimeout(() => {
-        onSuccess();
-      }, 1500);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSuccess(true);
+        setTimeout(() => {
+          onSuccess();
+        }, 1500);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Errore imprevisto durante la creazione dell'utente.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
