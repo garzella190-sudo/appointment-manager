@@ -1,0 +1,187 @@
+[
+  {
+    "id": "49aafd67-8b64-447b-9a12-458f9fcccecf",
+    "tipo": "B1",
+    "durata_default": 50,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente B1",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "397f1d4b-ccdc-4765-ab7e-2b355c5e56bb",
+    "tipo": "C1",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente C1",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "4f7fae7c-55f1-41c1-b7d3-82bc800344ff",
+    "tipo": "C",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente C",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "130e5a2b-d275-4305-b99a-5f01dda2b0f9",
+    "tipo": "C1E",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente C1E",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "fc98ef05-a237-42e0-b3c0-80ea966ab11f",
+    "tipo": "D1",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente D1",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "5caaef65-72aa-4ce5-b7f1-307d32cd7f93",
+    "tipo": "D1E",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente D1E",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "de0f8a99-aa35-4749-add9-e52a40bc376e",
+    "tipo": "CE",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente CE",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "80ab4304-fcf8-4e30-b2bc-dbe2804b582d",
+    "tipo": "DE",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente DE",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "0c3362bf-1b9d-432e-af25-53392804c4a3",
+    "tipo": "BE",
+    "durata_default": 60,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente BE",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "f40c4339-8a2a-48de-b5ce-a6ef59fbfe34",
+    "tipo": "D",
+    "durata_default": 90,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:24:33.810952+00:00",
+    "nome_visualizzato": "Patente D",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  },
+  {
+    "id": "6b4d1fc4-cd2d-42af-a878-7449d90f77ab",
+    "tipo": "B",
+    "durata_default": 30,
+    "veicoli_abilitati": [
+      "904e2d4c-0c6a-4d5d-beba-f65a0ceae106",
+      "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+      "d7a01817-9d7c-4a77-900a-5d992e9aed4f",
+      "f871fcfb-0179-4d4c-a481-a33dc65e3146"
+    ],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-16T22:52:17.170432+00:00",
+    "nome_visualizzato": "Patente B",
+    "cambio_ammesso": "manuale",
+    "nascosta": false
+  },
+  {
+    "id": "064e3afb-bee8-40f0-9d31-06f911dbe2c4",
+    "tipo": "AM",
+    "durata_default": 60,
+    "veicoli_abilitati": [
+      "a8d3b3af-55ff-46b2-b279-6f56757c33c1"
+    ],
+    "created_at": "2026-03-14T23:46:34.152159+00:00",
+    "updated_at": "2026-03-18T23:30:06.524274+00:00",
+    "nome_visualizzato": "Patente AM",
+    "cambio_ammesso": "entrambi",
+    "nascosta": false
+  },
+  {
+    "id": "f226a4f9-cfef-4a2d-bf7a-a19d36593bd9",
+    "tipo": "A",
+    "durata_default": 60,
+    "veicoli_abilitati": [
+      "cb7b83da-f2a3-4f4c-8d9b-f3c4d583a5e2"
+    ],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-18T23:30:25.605384+00:00",
+    "nome_visualizzato": "Patente A",
+    "cambio_ammesso": "entrambi",
+    "nascosta": false
+  },
+  {
+    "id": "991f3819-2a2f-42cb-967d-b00c8bae4bb2",
+    "tipo": "A2",
+    "durata_default": 60,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:35:02.155906+00:00",
+    "nome_visualizzato": "Patente A2",
+    "cambio_ammesso": "entrambi",
+    "nascosta": false
+  },
+  {
+    "id": "5a9093e0-9215-4b73-b3af-1598f84c8937",
+    "tipo": "A1",
+    "durata_default": 60,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-12T11:39:04.489991+00:00",
+    "updated_at": "2026-03-14T14:35:29.359261+00:00",
+    "nome_visualizzato": "Patente A1",
+    "cambio_ammesso": "entrambi",
+    "nascosta": false
+  },
+  {
+    "id": "71467eff-8003-45d5-8b30-df85feda23fa",
+    "tipo": "B96",
+    "durata_default": 60,
+    "veicoli_abilitati": [],
+    "created_at": "2026-03-14T14:35:36.561091+00:00",
+    "updated_at": "2026-03-14T14:35:36.561091+00:00",
+    "nome_visualizzato": "Patente B96",
+    "cambio_ammesso": "manuale",
+    "nascosta": true
+  }
+]

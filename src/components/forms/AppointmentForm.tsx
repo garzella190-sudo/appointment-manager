@@ -55,6 +55,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   // Form State
   const [isImpegno, setIsImpegno] = useState(defaultIsImpegno);
   const [nomeImpegno, setNomeImpegno] = useState('');
+  const [impegniNames, setImpegniNames] = useState<string[]>([]);
+  const [showImpegniDropdown, setShowImpegniDropdown] = useState(false);
 
   const [form, setForm] = useState({
     cliente_id: '',
@@ -85,12 +87,17 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     async function loadData() {
       setFetching(true);
       try {
-        const [cRes, iRes, vRes, pRes] = await Promise.all([
-          supabase.from('clienti').select('*').order('cognome'),
+        const [cRes, iRes, vRes, pRes, impRes] = await Promise.all([
+          supabase.from('clienti').select('*').neq('nome', 'UFFICIO').order('cognome'),
           supabase.from('istruttori').select('*').order('cognome'),
           supabase.from('veicoli').select('*').order('nome'),
           supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
+          supabase.from('clienti').select('cognome').eq('nome', 'UFFICIO'),
         ]);
+
+        // Extract unique impegno names
+        const uniqueNames = Array.from(new Set((impRes.data ?? []).map((c: {cognome: string}) => c.cognome))).filter(Boolean).sort() as string[];
+        setImpegniNames(uniqueNames);
 
         const sortedClienti = cRes.data ?? [];
         const sortedIstruttori = iRes.data ?? [];
@@ -134,6 +141,33 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             }
             setSelectedIstruttore(sortedIstruttori.find(i => i.id === apt.istruttore_id) || null);
             setSelectedVeicolo(sortedVeicoli.find(v => v.id === apt.veicolo_id) || null);
+          }
+        } else {
+          // New appointment: auto-fill from logged-in user's instructor association
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const linkedInstrId = user?.user_metadata?.istruttore_id;
+            if (linkedInstrId) {
+              const instr = sortedIstruttori.find(i => i.id === linkedInstrId);
+              if (instr) {
+                setSelectedIstruttore(instr);
+                // Auto-select instructor's default vehicle (for patente B)
+                const instrVehicleId = instr.veicolo_id;
+                if (instrVehicleId) {
+                  const veh = sortedVeicoli.find(v => v.id === instrVehicleId);
+                  if (veh) {
+                    setSelectedVeicolo(veh);
+                    setForm(prev => ({ ...prev, istruttore_id: linkedInstrId, veicolo_id: instrVehicleId }));
+                  } else {
+                    setForm(prev => ({ ...prev, istruttore_id: linkedInstrId }));
+                  }
+                } else {
+                  setForm(prev => ({ ...prev, istruttore_id: linkedInstrId }));
+                }
+              }
+            }
+          } catch {
+            // Session not available, skip auto-fill
           }
         }
       } catch {
@@ -306,10 +340,11 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
   }, [form.ora, form.durata]);
   
-  const suggestedImpegni = useMemo(() => {
-    const ufficioClients = clienti.filter(c => c.nome === 'UFFICIO');
-    return Array.from(new Set(ufficioClients.map(c => c.cognome))).filter(Boolean).sort();
-  }, [clienti]);
+  const filteredImpegniNames = useMemo(() => {
+    if (!nomeImpegno.trim()) return impegniNames;
+    const q = nomeImpegno.toLowerCase();
+    return impegniNames.filter(name => name.toLowerCase().includes(q));
+  }, [impegniNames, nomeImpegno]);
 
   const handleHoraFineChange = (newFine: string) => {
     try {
@@ -420,19 +455,32 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           </label>
           
           {isImpegno ? (
-            <div className="relative group">
+            <div className="relative">
               <input
-                list="suggested-impegni"
                 required
                 disabled={isView}
                 value={nomeImpegno}
-                onChange={(e) => setNomeImpegno(e.target.value)}
+                onChange={(e) => { setNomeImpegno(e.target.value); setShowImpegniDropdown(true); }}
+                onFocus={() => setShowImpegniDropdown(true)}
                 className={isView ? VIEW_BLOCK_CLS : INPUT_CLS}
                 placeholder="Es: Teoria B, Riunione, Ferie..."
               />
-              <datalist id="suggested-impegni">
-                {suggestedImpegni.map(name => <option key={name} value={name} />)}
-              </datalist>
+              {showImpegniDropdown && filteredImpegniNames.length > 0 && !isView && (
+                <div className="absolute z-50 w-full mt-2 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[20px] shadow-2xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="max-h-[200px] overflow-y-auto p-2">
+                    {filteredImpegniNames.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => { setNomeImpegno(name); setShowImpegniDropdown(false); }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             isView ? (

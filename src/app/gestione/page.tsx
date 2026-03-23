@@ -13,7 +13,7 @@ import { PatenteForm } from '@/components/forms/PatenteForm';
 import { InstallPWA } from '@/components/InstallPWA';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { listUsersAction } from '@/actions/auth';
+import { listUsersAction, updateUserAction } from '@/actions/auth';
 import { deleteVeicoloAction } from '@/actions/veicoli';
 import { deleteIstruttoreAction } from '@/actions/istruttori';
 import { deleteAppointmentAction } from '@/actions/appointment_actions';
@@ -512,19 +512,50 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
 const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AuthUser[]>([]);
+  const [istruttoriList, setIstruttoriList] = useState<{id: string; nome: string; cognome: string}[]>([]);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    const result = await listUsersAction();
+    const [result, { data: istData }] = await Promise.all([
+      listUsersAction(),
+      supabase.from('istruttori').select('id, nome, cognome').order('cognome'),
+    ]);
     if (result.users) {
       setUsers(result.users);
     }
+    setIstruttoriList(istData ?? []);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers, refreshKey]);
+
+  const handleAssociaIstruttore = async (userId: string, istruttoreId: string) => {
+    setSavingUserId(userId);
+    const result = await updateUserAction(userId, {
+      istruttore_id: istruttoreId || null,
+    });
+    if (result.error) {
+      alert('Errore: ' + result.error);
+    } else {
+      // Update local state
+      setUsers(prev => prev.map(u => {
+        if (u.id === userId) {
+          return {
+            ...u,
+            user_metadata: {
+              ...u.user_metadata,
+              istruttore_id: istruttoreId || null,
+            },
+          };
+        }
+        return u;
+      }));
+    }
+    setSavingUserId(null);
+  };
 
   return (
     <div className="relative">
@@ -542,6 +573,8 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
           {users.map((user) => {
             const role = user.user_metadata?.role || 'user';
             const fullName = user.user_metadata?.full_name || 'Utente';
+            const linkedIstruttoreId = user.user_metadata?.istruttore_id || '';
+            const linkedIstruttore = istruttoriList.find(i => i.id === linkedIstruttoreId);
             const initials = fullName
               .split(' ')
               .filter(Boolean)
@@ -551,33 +584,57 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
               .slice(0, 2);
 
             return (
-              <div key={user.id} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 font-bold text-xl",
-                    role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400" :
-                      role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" :
-                        "bg-zinc-100 text-zinc-600 dark:bg-zinc-900/20 dark:text-zinc-400"
-                  )}>
-                    {initials || <UserIcon size={24} />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-zinc-900 dark:text-white">{fullName}</h4>
-                      <span className={cn(
-                        "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide",
-                        role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" :
-                          role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
-                            "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      )}>
-                        {role === 'admin' ? 'Amministratore' : role}
-                      </span>
+              <div key={user.id} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex flex-col gap-4 group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 font-bold text-xl",
+                      role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400" :
+                        role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" :
+                          "bg-zinc-100 text-zinc-600 dark:bg-zinc-900/20 dark:text-zinc-400"
+                    )}>
+                      {initials || <UserIcon size={24} />}
                     </div>
-                    <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500">
-                      <span className="flex items-center gap-1"><Mail size={12} /> {user.email}</span>
-                      <span className="flex items-center gap-1"><Key size={12} /> ID: {user.id.slice(0, 8)}...</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-zinc-900 dark:text-white">{fullName}</h4>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide",
+                          role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" :
+                            role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
+                              "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                        )}>
+                          {role === 'admin' ? 'Amministratore' : role}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500">
+                        <span className="flex items-center gap-1"><Mail size={12} /> {user.email}</span>
+                        <span className="flex items-center gap-1"><Key size={12} /> ID: {user.id.slice(0, 8)}...</span>
+                      </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Associazione Istruttore */}
+                <div className="flex items-center gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide whitespace-nowrap shrink-0">
+                    Istruttore Associato
+                  </label>
+                  <select
+                    value={linkedIstruttoreId}
+                    onChange={(e) => handleAssociaIstruttore(user.id, e.target.value)}
+                    disabled={savingUserId === user.id}
+                    className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-50"
+                  >
+                    <option value="">Nessun istruttore</option>
+                    {istruttoriList.map(ist => (
+                      <option key={ist.id} value={ist.id}>{ist.cognome} {ist.nome}</option>
+                    ))}
+                  </select>
+                  {savingUserId === user.id && <Loader2 className="animate-spin text-blue-500 shrink-0" size={16} />}
+                  {linkedIstruttore && savingUserId !== user.id && (
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">✓ Collegato</span>
+                  )}
                 </div>
               </div>
             );

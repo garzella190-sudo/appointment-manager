@@ -40,3 +40,19 @@ export async function listUsersAction() {
 
   return { users: data.users };
 }
+
+export async function updateUserAction(userId: string, metadata: { istruttore_id?: string | null }) {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: metadata,
+  });
+
+  if (error) {
+    console.error('Error updating user:', error.message);
+    return { error: error.message };
+  }
+
+  return { success: true, user: data.user };
+}
+

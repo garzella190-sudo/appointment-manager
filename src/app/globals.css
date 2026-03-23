@@ -19,6 +19,16 @@
   --border: #e2e8f0;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #09090b;
+    --foreground: #fafafa;
+    --card: #18181b;
+    --card-foreground: #fafafa;
+    --border: #27272a;
+  }
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
@@ -34,6 +44,12 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+@media (prefers-color-scheme: dark) {
+  .glass {
+    background: rgba(24, 24, 27, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
 
 .glass-card {
   background: rgba(255, 255, 255, 0.7);
@@ -45,6 +61,13 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+@media (prefers-color-scheme: dark) {
+  .glass-card {
+    background: rgba(24, 24, 27, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  }
+}
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
@@ -60,6 +83,11 @@ body {
   border-radius: 10px;
 }
 
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+  }
+}
 
 /* Animations */
 @keyframes fadeIn {
@@ -119,9 +147,9 @@ body {
 }
 
 .premium-calendar .react-datepicker__day--selected {
-  background-color: transparent !important; /* Rimosso sfondo blu */
-  border: 2px solid #3b82f6 !important; /* Aggiunta bordatura blu */
-  color: #3b82f6 !important; /* Testo blu invece di bianco */
+  background-color: transparent !important;
+  border: 2px solid #3b82f6 !important;
+  color: #3b82f6 !important;
   font-weight: 700 !important;
   position: relative !important;
   z-index: 10 !important;

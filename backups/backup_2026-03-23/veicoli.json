@@ -1,0 +1,79 @@
+[
+  {
+    "id": "d7a01817-9d7c-4a77-900a-5d992e9aed4f",
+    "nome": "Polo 1 ",
+    "targa": "AA123BG",
+    "data_revisione": "2028-09-15",
+    "tipo_patente": "B",
+    "cambio_manuale": true,
+    "created_at": "2026-03-15T20:32:43.275845+00:00",
+    "updated_at": "2026-03-15T20:32:43.275845+00:00",
+    "colore": "#10B981"
+  },
+  {
+    "id": "f871fcfb-0179-4d4c-a481-a33dc65e3146",
+    "nome": "Polo 2",
+    "targa": "AA1243BG",
+    "data_revisione": "2028-11-15",
+    "tipo_patente": "B",
+    "cambio_manuale": true,
+    "created_at": "2026-03-15T20:33:25.419728+00:00",
+    "updated_at": "2026-03-15T20:33:25.419728+00:00",
+    "colore": "#b7a910"
+  },
+  {
+    "id": "01d81233-50a2-4feb-9883-54d470ffffb4",
+    "nome": "Yamaha ",
+    "targa": "AG123AG",
+    "data_revisione": "2027-04-07",
+    "tipo_patente": "A1",
+    "cambio_manuale": true,
+    "created_at": "2026-03-16T08:47:38.849178+00:00",
+    "updated_at": "2026-03-16T08:47:38.849178+00:00",
+    "colore": "#000000"
+  },
+  {
+    "id": "cb7b83da-f2a3-4f4c-8d9b-f3c4d583a5e2",
+    "nome": "Suzuki ",
+    "targa": "AG723AG",
+    "data_revisione": "2027-04-07",
+    "tipo_patente": "A",
+    "cambio_manuale": true,
+    "created_at": "2026-03-16T08:48:04.61958+00:00",
+    "updated_at": "2026-03-16T08:48:04.61958+00:00",
+    "colore": "#ffff00"
+  },
+  {
+    "id": "a8d3b3af-55ff-46b2-b279-6f56757c33c1",
+    "nome": "Buster",
+    "targa": "AA34QW",
+    "data_revisione": "2027-04-15",
+    "tipo_patente": "AM",
+    "cambio_manuale": false,
+    "created_at": "2026-03-16T22:25:57.929636+00:00",
+    "updated_at": "2026-03-16T22:25:57.929636+00:00",
+    "colore": "#d719f0"
+  },
+  {
+    "id": "6488fe4f-0f6c-449c-b661-b531a8e36119",
+    "nome": "Liberty",
+    "targa": "AD121AS",
+    "data_revisione": "2026-04-07",
+    "tipo_patente": "A1",
+    "cambio_manuale": false,
+    "created_at": "2026-03-17T22:08:32.523143+00:00",
+    "updated_at": "2026-03-17T22:08:32.523143+00:00",
+    "colore": "#5d23fb"
+  },
+  {
+    "id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "nome": "Fiat Panda 2007",
+    "targa": "DL718EG",
+    "data_revisione": "2027-12-31",
+    "tipo_patente": "B",
+    "cambio_manuale": true,
+    "created_at": "2026-03-15T20:32:05.849792+00:00",
+    "updated_at": "2026-03-20T08:40:06.018078+00:00",
+    "colore": "#cd580a"
+  }
+]

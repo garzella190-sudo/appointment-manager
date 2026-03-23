@@ -22,7 +22,7 @@ export default function ClientiPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [cRes, pRes] = await Promise.all([
-      supabase.from('clienti').select('*').order('cognome').order('nome'),
+      supabase.from('clienti').select('*').neq('nome', 'UFFICIO').order('cognome').order('nome'),
       supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
     ]);
     setClienti(cRes.data ?? []);
