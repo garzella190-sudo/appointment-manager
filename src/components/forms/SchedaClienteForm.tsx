@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Loader2, Phone, Mail, BadgeCheck, AlertCircle, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { Cliente, Patente, TipoPatente, TipoCambio } from '@/lib/database.types';
+import CustomSelect from './CustomSelect';
 import { 
   createClienteAction, 
   updateClienteAction, 
@@ -29,9 +30,9 @@ interface SchedaClienteFormProps {
 }
 
 const INPUT_CLS =
-  'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm';
+  'w-full bg-[#F4F4F4] dark:bg-zinc-900 border-transparent rounded-[16px] py-2.5 px-4 outline-none focus:ring-4 focus:ring-purple-500/5 focus:border-purple-500 transition-all text-sm font-semibold text-zinc-900 dark:text-zinc-100 h-12';
 
-const LABEL_CLS = 'text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide';
+const LABEL_CLS = 'text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest ml-1 mb-1.5 flex items-center gap-2';
 
 export const SchedaClienteForm = ({
   clienteId,
@@ -187,38 +188,29 @@ export const SchedaClienteForm = ({
         </div>
       </div>
 
-      {/* Patente richiesta & Preferenza Cambio */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Patente Richiesta</label>
-          <div className="flex items-center gap-2">
-            <BadgeCheck size={18} className="text-blue-500 shrink-0" />
-            <select
-              value={form.patente_richiesta_id}
-              title="Seleziona Patente"
-              onChange={set('patente_richiesta_id')}
-              className={INPUT_CLS}
-            >
-              {patenti.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.nome_visualizzato || p.tipo}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomSelect
+            options={patenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
+            value={form.patente_richiesta_id || ''}
+            onChange={(val) => setForm(prev => ({ ...prev, patente_richiesta_id: val }))}
+            icon={BadgeCheck}
+            placeholder="Seleziona Patente"
+          />
         </div>
 
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Tipo Cambio</label>
-          <select
-            value={form.preferenza_cambio}
-            title="Seleziona Preferenza Cambio"
-            onChange={set('preferenza_cambio')}
-            className={INPUT_CLS}
-          >
-            <option value="manuale">Manuale</option>
-            <option value="automatico">Automatico</option>
-          </select>
+          <CustomSelect
+            options={[
+              { id: 'manuale', label: 'Meccanico (Manuale)' },
+              { id: 'automatico', label: 'Automatico' }
+            ]}
+            value={form.preferenza_cambio || ''}
+            onChange={(val) => setForm(prev => ({ ...prev, preferenza_cambio: val }))}
+            placeholder="Seleziona Preferenza Cambio"
+          />
         </div>
       </div>
 

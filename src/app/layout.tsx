@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/hooks/useToast";
 import BottomNav from "@/components/BottomNav";
+import TopNav from "@/components/TopNav";
 import { Analytics } from "@vercel/analytics/next";
 import SWRegister from "@/components/SWRegister";
 
@@ -30,8 +31,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
-      <body className={`${inter.className} antialiased pb-32`}>
+      <body className={`${inter.className} antialiased pb-32 pt-16`}>
         <ToastProvider>
+          <TopNav />
           <main className="min-h-screen">
             {children}
           </main>

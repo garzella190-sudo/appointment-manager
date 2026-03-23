@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Calendar, Clock, User, Type, FileText, Trash2, AlertCircle, Plus } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 import { useToast } from '@/hooks/useToast';
 import { Istruttore, Impegno, TipoImpegno } from '@/lib/database.types';
 import { 
@@ -144,12 +145,18 @@ export const ImpegnoForm = ({
       {/* Istruttore */}
       <div className="space-y-1.5">
         <label className={LABEL_CLS}><User size={13} /> Istruttore</label>
-        <select required value={form.istruttore_id} onChange={set('istruttore_id')} className={INPUT_CLS}>
-          <option value="">Seleziona istruttore...</option>
-          {istruttori.map(i => (
-            <option key={i.id} value={i.id}>{i.cognome} {i.nome}</option>
-          ))}
-        </select>
+        <CustomSelect
+          options={istruttori.map(i => ({
+            id: i.id,
+            label: `${i.cognome} ${i.nome}`,
+            color: i.colore
+          }))}
+          value={form.istruttore_id}
+          onChange={(val) => setForm(prev => ({ ...prev, istruttore_id: val }))}
+          icon={User}
+          placeholder="Seleziona istruttore..."
+          searchable
+        />
       </div>
 
       {/* Tipo Impegno */}
@@ -157,17 +164,14 @@ export const ImpegnoForm = ({
         <label className={LABEL_CLS}><Type size={13} /> Tipo Impegno</label>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <select 
-              value={form.tipo} 
-              onChange={set('tipo')} 
-              className={INPUT_CLS}
-              disabled={showAddTipo}
-            >
-              {tipi.length === 0 && <option value="">Caricamento...</option>}
-              {tipi.map(t => (
-                <option key={t.id} value={t.nome}>{t.nome}</option>
-              ))}
-            </select>
+            <CustomSelect
+              options={tipi.map(t => ({ id: t.nome, label: t.nome }))}
+              value={form.tipo}
+              onChange={(val) => setForm(prev => ({ ...prev, tipo: val }))}
+              placeholder={tipi.length === 0 ? "Caricamento..." : "Seleziona tipo..."}
+              icon={Type}
+              className={showAddTipo ? "opacity-50 pointer-events-none" : ""}
+            />
           </div>
           <button
             type="button"

@@ -46,18 +46,35 @@ export async function listUsersAction() {
   return { users: data.users };
 }
 
-export async function updateUserAction(userId: string, metadata: { istruttore_id?: string | null }) {
+export async function updateUserAction(userId: string, data: { 
+  email?: string;
+  password?: string;
+  full_name?: string;
+  role?: string;
+  istruttore_id?: string | null;
+}) {
   const supabase = createAdminClient();
+  
+  const updatePayload: any = {};
+  if (data.email) updatePayload.email = data.email;
+  if (data.password) updatePayload.password = data.password;
 
-  const { data, error } = await supabase.auth.admin.updateUserById(userId, {
-    user_metadata: metadata,
-  });
+  // Metadata update logic
+  const { data: userRecord } = await supabase.auth.admin.getUserById(userId);
+  const existingMetadata = userRecord?.user?.user_metadata || {};
 
-  if (error) {
-    console.error('Error updating user:', error.message);
-    return { error: error.message };
+  updatePayload.user_metadata = {
+    ...existingMetadata,
+    ...(data.full_name && { full_name: data.full_name }),
+    ...(data.role && { role: data.role }),
+  };
+
+  if (data.istruttore_id !== undefined) {
+    updatePayload.user_metadata.istruttore_id = data.istruttore_id;
   }
 
-  return { success: true, user: data.user };
+  const { data: updated, error } = await supabase.auth.admin.updateUserById(userId, updatePayload);
+  if (error) return { error: error.message };
+  return { success: true, user: updated.user };
 }
 

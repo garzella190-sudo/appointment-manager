@@ -49,6 +49,23 @@ export async function cancelAppointmentAction(id: string) {
   return { success: true };
 }
 
+export async function updateAppointmentNoteAction(id: string, note: string | null) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('appuntamenti')
+    .update({ note })
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error updating appointment note:', error.message);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/calendar');
+  return { success: true };
+}
+
+
 /**
  * Sanity Check: Syncs all active appointments to time_slots table.
  * Deletes invalid slots and creates missing ones.

@@ -1,18 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { createUserAction } from '@/actions/auth';
+import { createUserAction, updateUserAction } from '@/actions/auth';
 import { Loader2, UserPlus, Shield, User, Mail, Lock } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 interface UserFormProps {
+  user?: any; // Se presente, siamo in modalità edit
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function UserForm({ onSuccess, onCancel }: UserFormProps) {
+export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [role, setRole] = useState<'admin' | 'istruttore' | 'segreteria'>(user?.user_metadata?.role || 'segreteria');
+
+  const isEdit = !!user;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,10 +29,19 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
     const full_name = formData.get('full_name') as string;
-    const role = formData.get('role') as 'admin' | 'istruttore' | 'segreteria';
 
     try {
-      const result = await createUserAction({ email, password, full_name, role });
+      let result;
+      if (isEdit) {
+        result = await updateUserAction(user.id, {
+          email,
+          full_name,
+          role,
+          ...(password && { password }) // Password opzionale in edit
+        });
+      } else {
+        result = await createUserAction({ email, password, full_name, role });
+      }
 
       if (result.error) {
         setError(result.error);
@@ -38,7 +52,7 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
         }, 1500);
       }
     } catch (err: any) {
-      setError(err?.message || "Errore imprevisto durante la creazione dell'utente.");
+      setError(err?.message || `Errore imprevisto durante la ${isEdit ? 'modifica' : 'creazione'} dell'utente.`);
     } finally {
       setLoading(false);
     }
@@ -55,6 +69,7 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
           type="text"
           required
           placeholder="es. Mario Rossi"
+          defaultValue={user?.user_metadata?.full_name || ''}
           className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
         />
       </div>
@@ -68,6 +83,7 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
           type="email"
           required
           placeholder="email@esempio.it"
+          defaultValue={user?.email || ''}
           className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
         />
       </div>
@@ -79,9 +95,9 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
         <input
           name="password"
           type="password"
-          required
+          required={!isEdit}
           minLength={6}
-          placeholder="••••••••"
+          placeholder={isEdit ? "Cambia password (lascia vuoto per non modificare)" : "••••••••"}
           className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
         />
       </div>
@@ -90,15 +106,17 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide ml-1 flex items-center gap-1.5">
           <Shield size={12} /> Ruolo
         </label>
-        <select
-          name="role"
-          required
-          className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-        >
-          <option value="segreteria">Segreteria</option>
-          <option value="istruttore">Istruttore</option>
-          <option value="admin">Amministratore</option>
-        </select>
+        <CustomSelect
+          options={[
+            { id: 'segreteria', label: 'Segreteria' },
+            { id: 'istruttore', label: 'Istruttore' },
+            { id: 'admin', label: 'Amministratore' }
+          ]}
+          value={role}
+          onChange={(val) => setRole(val as any)}
+          icon={Shield}
+          placeholder="Seleziona ruolo"
+        />
       </div>
 
       {error && (
@@ -109,7 +127,7 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
 
       {success && (
         <div className="p-3 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center">
-          Utente creato con successo!
+          Utente {isEdit ? 'aggiornato' : 'creato'} con successo!
         </div>
       )}
 
@@ -130,8 +148,8 @@ export function UserForm({ onSuccess, onCancel }: UserFormProps) {
             <Loader2 className="animate-spin" size={16} />
           ) : (
             <>
-              <UserPlus size={16} />
-              Crea Utente
+              {isEdit ? <Shield size={16} /> : <UserPlus size={16} />}
+              {isEdit ? 'Salva Modifiche' : 'Crea Utente'}
             </>
           )}
         </button>

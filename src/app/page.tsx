@@ -9,6 +9,7 @@ import { format, addDays, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
+import CustomSelect from '@/components/forms/CustomSelect';
 
 export default function Home() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -16,6 +17,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
+  const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
 
   // Popup state
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -27,7 +31,7 @@ export default function Home() {
     const endOfDayStr = new Date(`${dateStr}T23:59:59`).toISOString();
 
     try {
-      const [{ data: dbData, error: dbError }, { data: patentiData }] = await Promise.all([
+      const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
         supabase
           .from('appuntamenti')
           .select(`
@@ -39,10 +43,12 @@ export default function Home() {
           .gte('data', startOfDayStr)
           .lte('data', endOfDayStr)
           .order('data'),
-        supabase.from('patenti').select('id, tipo')
+        supabase.from('patenti').select('id, tipo'),
+        supabase.from('istruttori').select('id, nome, cognome').order('cognome')
       ]);
 
       if (dbError) throw dbError;
+      if (istruttoriData) setIstruttori(istruttoriData);
 
       const patentiMap = new Map<string, string>((patentiData || []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
 
@@ -96,16 +102,25 @@ export default function Home() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // Search logic
+  // Search and Filter logic
   const filteredAppointments = useMemo(() => {
-    if (!searchQuery) return appointments;
-    const q = searchQuery.toLowerCase();
-    return appointments.filter(a => 
-      (a.client_name?.toLowerCase().includes(q)) || 
-      (a.istruttore?.name?.toLowerCase().includes(q)) ||
-      (a.phone && a.phone.includes(q))
-    );
-  }, [appointments, searchQuery]);
+    let result = appointments;
+    
+    if (selectedInstructorId) {
+      result = result.filter(a => a.trainer_id === selectedInstructorId);
+    }
+    
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(a => 
+        (a.client_name?.toLowerCase().includes(q)) || 
+        (a.istruttore?.name?.toLowerCase().includes(q)) ||
+        (a.phone && a.phone.includes(q))
+      );
+    }
+    
+    return result;
+  }, [appointments, searchQuery, selectedInstructorId]);
 
   const handleSuccess = () => {
     setIsModalOpen(false);
@@ -162,16 +177,35 @@ export default function Home() {
         </button>
       </header>
 
-      {/* Search Bar */}
-      <div className="relative mb-8 group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors" size={20} />
-        <input
-          type="text"
-          placeholder="Cerca per cliente, istruttore o telefono..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm appearance-none shadow-sm"
-        />
+      {/* Search Bar & Filter */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
+        <div className="relative group flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors" size={20} />
+          <input
+            type="text"
+            placeholder="Cerca per cliente, istruttore o telefono..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm appearance-none shadow-sm"
+          />
+        </div>
+        <div className="min-w-[200px] shrink-0">
+          <CustomSelect
+            options={[
+              { id: '', label: 'Tutti gli istruttori' },
+              ...istruttori.map(i => ({ 
+                id: i.id, 
+                label: `${i.cognome} ${i.nome}`,
+                color: (i as any).colore 
+              }))
+            ]}
+            value={selectedInstructorId}
+            onChange={(val) => setSelectedInstructorId(val)}
+            icon={User}
+            placeholder="Filtra istruttore"
+            searchable
+          />
+        </div>
       </div>
 
       <section className="space-y-6">

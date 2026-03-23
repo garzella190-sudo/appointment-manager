@@ -6,6 +6,7 @@ import { it } from 'date-fns/locale/it';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import "react-datepicker/dist/react-datepicker.css";
+import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 
 registerLocale('it', it);
 
@@ -36,6 +37,12 @@ const CustomInput = forwardRef<HTMLInputElement, any>(({ value, onClick, placeho
 CustomInput.displayName = 'CustomInput';
 
 const DatePicker = ({ selected, onChange, className, placeholderText, required }: DatePickerProps) => {
+  // Funzione per identificare festività italiane
+  const getDayClass = (date: Date) => {
+    if (isItalianHoliday(date) || isWeekend(date)) return "is-holiday";
+    return "";
+  };
+
   return (
     <div className="relative group">
       <ReactDatePicker
@@ -48,7 +55,8 @@ const DatePicker = ({ selected, onChange, className, placeholderText, required }
         autoComplete="off"
         customInput={<CustomInput className={className} />}
         calendarClassName="premium-calendar"
-        popperPlacement="bottom-start"
+        dayClassName={getDayClass}
+        portalId="datepicker-portal"
       />
       <CalendarIcon 
         size={16} 

@@ -23,6 +23,7 @@ import {
   Clock, EyeOff, Eye, Copy,
   Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone
 } from 'lucide-react';
+import CustomSelect from '@/components/forms/CustomSelect';
 import { cn } from '@/lib/utils';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { PhoneActions } from '@/components/PhoneActions';
@@ -123,17 +124,13 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                 <div 
                   key={v.id}
                   onClick={() => openEdit(v)}
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all"
+                  className="glass-card p-5 flex items-center justify-between group cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-4">
                     <div 
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-bold text-lg"
-                      style={{ 
-                        backgroundColor: `${v.colore}15`, 
-                        color: v.colore 
-                      } as React.CSSProperties}
+                      className="w-14 h-14 rounded-3xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 flex items-center justify-center shrink-0 font-bold text-xl"
                     >
-                      {initials || <Car size={24} />}
+                      {initials || <Car size={26} />}
                     </div>
 
                     <div className="min-w-0">
@@ -180,11 +177,12 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? 'Modifica Veicolo' : 'Nuovo Veicolo'}
+        title={editing ? 'Dettagli Veicolo' : 'Nuovo Veicolo'}
       >
         <VeicoloForm
           key={editing?.id || 'new'}
           veicoloId={editing?.id}
+          initialMode={editing ? 'view' : 'edit'}
           defaultValues={editing ? {
             nome: editing.nome,
             targa: editing.targa,
@@ -254,11 +252,11 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
             return (
               <div 
                 key={i.id} 
-                className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all"
+                className="glass-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
                 onClick={() => openEdit(i)}
               >
                 <div className="flex items-center gap-4 flex-1">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold text-xl flex items-center justify-center shrink-0">
+                  <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg shadow-blue-500/20 font-bold text-2xl flex items-center justify-center shrink-0 tracking-tight">
                     {initials}
                   </div>
                   <div className="min-w-0">
@@ -317,11 +315,12 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? 'Modifica Istruttore' : 'Nuovo Istruttore'}
+        title={editing ? 'Dettagli Istruttore' : 'Nuovo Istruttore'}
       >
         <IstruttoreForm
           key={editing?.id || 'new'}
           istruttoreId={editing?.id}
+          initialMode={editing ? 'view' : 'edit'}
           defaultValues={editing ? {
             nome: editing.nome ?? '',
             cognome: editing.cognome ?? '',
@@ -367,13 +366,19 @@ const PatenteCard = ({
 
   return (
     <div className={cn(
-      "bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex items-center justify-between group transition-all hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer",
+      "glass-card p-5 flex items-center justify-between group transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer",
       pat.nascosta && "opacity-60 grayscale-[0.5]"
     )} onClick={() => onEdit(pat)}>
       <div className="flex items-center gap-4">
         <div className={cn(
-          "w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-xl shrink-0 transition-colors",
-          `bg-${c}-100 dark:bg-${c}-900/20 text-${c}-600 dark:text-${c}-400`
+          "w-14 h-14 rounded-3xl flex items-center justify-center font-bold text-xl shrink-0 transition-all shadow-md",
+          c === 'violet' ? "bg-gradient-to-br from-violet-400 to-violet-600 text-white shadow-violet-500/20" :
+          c === 'blue' ? "bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-blue-500/20" :
+          c === 'amber' ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-amber-500/20" :
+          c === 'orange' ? "bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-orange-500/20" :
+          c === 'emerald' ? "bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-emerald-500/20" :
+          c === 'rose' ? "bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-rose-500/20" :
+          "bg-gradient-to-br from-zinc-400 to-zinc-600 text-white shadow-zinc-500/20"
         )}>
           {pat.tipo}
         </div>
@@ -514,6 +519,7 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [istruttoriList, setIstruttoriList] = useState<{id: string; nome: string; cognome: string}[]>([]);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -557,6 +563,11 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
     setSavingUserId(null);
   };
 
+  const handleEditSuccess = () => {
+    setEditingUser(null);
+    fetchUsers();
+  };
+
   return (
     <div className="relative">
       {loading ? (
@@ -584,16 +595,20 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
               .slice(0, 2);
 
             return (
-              <div key={user.id} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex flex-col gap-4 group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+              <div 
+                key={user.id} 
+                onClick={() => setEditingUser(user)}
+                className="glass-card p-5 flex flex-col gap-4 group hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer relative focus-within:z-10"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className={cn(
-                      "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 font-bold text-xl",
-                      role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400" :
-                        role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" :
-                          "bg-zinc-100 text-zinc-600 dark:bg-zinc-900/20 dark:text-zinc-400"
+                      "w-16 h-16 rounded-3xl flex items-center justify-center shrink-0 font-bold text-2xl text-white shadow-lg",
+                      role === 'admin' ? "bg-gradient-to-br from-purple-400 to-purple-600 shadow-purple-500/20" :
+                        role === 'istruttore' ? "bg-gradient-to-br from-blue-400 to-blue-600 shadow-blue-500/20" :
+                          "bg-gradient-to-br from-zinc-400 to-zinc-600 shadow-zinc-500/20"
                     )}>
-                      {initials || <UserIcon size={24} />}
+                      {initials || <UserIcon size={28} />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -620,17 +635,20 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide whitespace-nowrap shrink-0">
                     Istruttore Associato
                   </label>
-                  <select
-                    value={linkedIstruttoreId}
-                    onChange={(e) => handleAssociaIstruttore(user.id, e.target.value)}
-                    disabled={savingUserId === user.id}
-                    className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all disabled:opacity-50"
-                  >
-                    <option value="">Nessun istruttore</option>
-                    {istruttoriList.map(ist => (
-                      <option key={ist.id} value={ist.id}>{ist.cognome} {ist.nome}</option>
-                    ))}
-                  </select>
+                  <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                    <CustomSelect
+                      options={[
+                        { id: '', label: 'Nessun istruttore' },
+                        ...istruttoriList.map(ist => ({
+                          id: ist.id,
+                          label: `${ist.cognome} ${ist.nome}`
+                        }))
+                      ]}
+                      value={linkedIstruttoreId}
+                      onChange={(val) => handleAssociaIstruttore(user.id, val)}
+                      placeholder="Seleziona..."
+                    />
+                  </div>
                   {savingUserId === user.id && <Loader2 className="animate-spin text-blue-500 shrink-0" size={16} />}
                   {linkedIstruttore && savingUserId !== user.id && (
                     <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">✓ Collegato</span>
@@ -641,6 +659,19 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
           })}
         </div>
       )}
+
+      {/* Modal Modifica Utente */}
+      <Modal
+        isOpen={!!editingUser}
+        onClose={() => setEditingUser(null)}
+        title="Modifica Utente"
+      >
+        <UserForm
+          user={editingUser}
+          onSuccess={handleEditSuccess}
+          onCancel={() => setEditingUser(null)}
+        />
+      </Modal>
     </div>
   );
 };
@@ -758,16 +789,23 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
           </button>
         </div>
 
-        <select 
-          value={selectedIstruttoreId}
-          onChange={(e) => setSelectedIstruttoreId(e.target.value)}
-          className="w-full sm:w-[200px] bg-zinc-50 dark:bg-zinc-800 border-none rounded-2xl py-2 px-4 text-xs font-semibold outline-none focus:ring-2 focus:ring-orange-500/20"
-        >
-          <option value="all">Tutti gli Istruttori</option>
-          {istruttori.map(ist => (
-            <option key={ist.id} value={ist.id}>{ist.cognome} {ist.nome}</option>
-          ))}
-        </select>
+        <div className="w-full sm:w-[240px]">
+          <CustomSelect
+            options={[
+              { id: 'all', label: 'Tutti gli Istruttori' },
+              ...istruttori.map(ist => ({
+                id: ist.id,
+                label: `${ist.cognome} ${ist.nome}`,
+                color: ist.colore
+              }))
+            ]}
+            value={selectedIstruttoreId}
+            onChange={(val) => setSelectedIstruttoreId(val)}
+            icon={UserIcon}
+            placeholder="Filtra Istruttore"
+            searchable
+          />
+        </div>
       </div>
 
       <div className="relative">
@@ -788,14 +826,13 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
             <div 
               key={i.id} 
               onClick={() => openEdit(i)}
-              className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:bg-zinc-50 transition-all font-semibold"
+              className="glass-card p-4 flex items-center justify-between group cursor-pointer hover:scale-[1.01] active:scale-[0.99] font-semibold"
             >
               <div className="flex items-center gap-4">
                 <div 
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-zinc-100"
-                  style={{ backgroundColor: `${i.istruttore?.colore || '#ccc'}15`, color: i.istruttore?.colore || '#ccc' }}
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm bg-gradient-to-br from-orange-400 to-orange-600 text-white"
                 >
-                  <Clock size={18} />
+                  <Clock size={20} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">

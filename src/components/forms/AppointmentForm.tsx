@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle } from 'lucide-react';
 import { format, addMinutes, parseISO, isAfter } from 'date-fns';
@@ -8,15 +8,17 @@ import { it } from 'date-fns/locale';
 import { Cliente, Istruttore, Veicolo, Patente, StatoAppuntamento } from '@/lib/database.types';
 import { cn } from '@/lib/utils';
 import { createAppointmentAction, updateAppointmentAction } from '@/actions/appointments';
-import { deleteAppointmentAction, cancelAppointmentAction } from '@/actions/appointment_actions';
+import { deleteAppointmentAction, cancelAppointmentAction, updateAppointmentNoteAction } from '@/actions/appointment_actions';
 import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
+import { createClient } from '@/utils/supabase/client';
 import { ClientAutocomplete } from './ClientAutocomplete';
 import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
 import { Modal } from '../Modal';
 import { SchedaClienteForm } from './SchedaClienteForm';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown, Check } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 interface FormProps {
   onSuccess: () => void;
@@ -82,6 +84,16 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     instructor_ids: [], 
     vehicle_ids: [] 
   });
+  const [isUpdatingNote, setIsUpdatingNote] = useState(false);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize notes
+  useEffect(() => {
+    if (noteRef.current) {
+      noteRef.current.style.height = 'auto';
+      noteRef.current.style.height = `${noteRef.current.scrollHeight}px`;
+    }
+  }, [form.note]);
 
   useEffect(() => {
     async function loadData() {
@@ -145,7 +157,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         } else {
           // New appointment: auto-fill from logged-in user's instructor association
           try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const browserSupabase = createClient();
+            const { data: { user } } = await browserSupabase.auth.getUser();
             const linkedInstrId = user?.user_metadata?.istruttore_id;
             if (linkedInstrId) {
               const instr = sortedIstruttori.find(i => i.id === linkedInstrId);
@@ -248,7 +261,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       const instrVeh = veicoli.find(v => v.id === instrDefaultId);
       if (instrVeh) {
         const isGearboxMatch = instrVeh.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
-        const isLicenseMatch = instrVeh.tipo_patente === currentPatenteTipo;
+        const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+        const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(instrVeh.tipo_patente) : instrVeh.tipo_patente === currentPatenteTipo;
         
         if (isGearboxMatch && isLicenseMatch) {
           setSelectedVeicolo(instrVeh);
@@ -261,7 +275,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     // PRIORITY 2: Best client match from all vehicles
     const compatibleVehicles = veicoli.filter(v => {
       const isGearboxMatch = v.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
-      const isLicenseMatch = v.tipo_patente === currentPatenteTipo;
+      const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+      const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) : v.tipo_patente === currentPatenteTipo;
       return isGearboxMatch && isLicenseMatch;
     });
 
@@ -289,7 +304,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         // Validation: Is it compatible with selected patente?
         const currentPatenteTipo = patenti.find(p => p.id === form.patente_id)?.tipo || 'B';
         const isGearboxMatch = veh.cambio_manuale ? (form.cambio === 'manuale') : (form.cambio === 'automatico');
-        const isLicenseMatch = veh.tipo_patente === currentPatenteTipo;
+        const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+        const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(veh.tipo_patente) : veh.tipo_patente === currentPatenteTipo;
         
         // Se c'è un match totale, lo selezioniamo
         if (isGearboxMatch && isLicenseMatch) {
@@ -314,7 +330,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     
     // Filter by Patente compatibility
     const currentPatenteTipo = patenti.find(p => p.id === form.patente_id)?.tipo || 'B';
-    const compatibleWithPatente = slotAvailable.filter(v => v.tipo_patente === currentPatenteTipo);
+    const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+    const compatibleWithPatente = slotAvailable.filter(v => isMoto ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) : v.tipo_patente === currentPatenteTipo);
 
     if (!selectedIstruttore) return compatibleWithPatente;
     
@@ -418,6 +435,23 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   if (fetching) return <div className="py-24 flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={40} /></div>;
 
   const isView = mode === 'view';
+
+  const handleNoteBlur = async (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    if (!appointmentId) return;
+    const newNote = e.target.value;
+    if (newNote === form.note) return;
+    
+    setIsUpdatingNote(true);
+    const result = await updateAppointmentNoteAction(appointmentId, newNote || null);
+    setIsUpdatingNote(false);
+    
+    if (result.success) {
+      setForm(prev => ({ ...prev, note: newNote }));
+      showToast('Nota aggiornata con successo!', 'success');
+    } else {
+      showToast(result.error || 'Errore salvataggio nota', 'error');
+    }
+  };
 
   return (
     <div className="animate-fade-in p-1">
@@ -535,6 +569,29 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               </div>
             )
           )}
+          
+          {/* NOTE (Auto-resizing) - Moved here if IS Impegno */}
+          {isImpegno && (
+            <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-top-2">
+              <label className={cn(LABEL_CLS, "flex justify-between items-center")}>
+                <span className="flex items-center gap-2">📝 NOTE</span>
+                {isUpdatingNote && <Loader2 className="animate-spin text-blue-500" size={12} />}
+              </label>
+              <textarea 
+                ref={noteRef}
+                rows={1} 
+                value={form.note} 
+                onChange={(e) => setForm(prev => ({ ...prev, note: e.target.value }))} 
+                onBlur={isView ? handleNoteBlur : undefined}
+                className={cn(
+                   isView ? "bg-zinc-50/50 border-zinc-100 hover:border-zinc-200 focus:bg-white" : INPUT_CLS,
+                   'resize-none py-4 leading-relaxed transition-all rounded-[16px] px-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 w-full min-h-[48px]',
+                   isView && "italic text-zinc-500"
+                )} 
+                placeholder="Note aggiuntive per l'impegno..." 
+              />
+            </div>
+          )}
         </div>
 
         {/* Modal Quick-Add Cliente */}
@@ -577,15 +634,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             {isView ? (
               <div className={VIEW_BLOCK_CLS}>{form.ora}</div>
             ) : (
-              <select 
-                required 
-                value={form.ora} 
-                onChange={(e) => setForm(prev => ({ ...prev, ora: e.target.value }))} 
-                className={cn(INPUT_CLS, 'text-center cursor-pointer')}
-              >
-                {!TIME_OPTIONS.includes(form.ora) && <option value={form.ora}>{form.ora}</option>}
-                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <CustomSelect
+                options={TIME_OPTIONS.map(t => ({ id: t, label: t }))}
+                value={form.ora}
+                onChange={(val) => setForm(prev => ({ ...prev, ora: val }))}
+                className="w-full"
+              />
             )}
           </div>
           <div className="space-y-2 flex-1 w-full">
@@ -595,84 +649,103 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 {oraFine}
               </div>
             ) : (
-              <select 
-                required 
-                value={oraFine} 
-                onChange={(e) => handleHoraFineChange(e.target.value)} 
-                className={cn(INPUT_CLS, 'text-center cursor-pointer text-blue-600 font-bold border-blue-50 bg-blue-50/20')}
-              >
-                {!TIME_OPTIONS.includes(oraFine) && <option value={oraFine}>{oraFine}</option>}
-                {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <CustomSelect
+                options={TIME_OPTIONS.map(t => ({ id: t, label: t }))}
+                value={oraFine}
+                onChange={handleHoraFineChange}
+                className="w-full text-blue-600 font-bold"
+              />
             )}
           </div>
         </div>
 
+        {/* NOTE (Auto-resizing) - Moved here if NOT Impegno, or moved up if IS Impegno */}
         {!isImpegno && (
           <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-            <label className={LABEL_CLS}><ShieldCheck size={13} /> PATENTE</label>
-            {isView ? (
-              <div className={VIEW_BLOCK_CLS}>{patenti.find(p => p.id === form.patente_id)?.tipo || 'B'}</div>
-            ) : (
-              <select value={form.patente_id} title="Seleziona Patente" onChange={(e) => setForm(prev => ({ ...prev, patente_id: e.target.value }))} className={INPUT_CLS}>
-                {patenti.map(p => <option key={p.id} value={p.id}>{p.tipo}</option>)}
-              </select>
-            )}
+            <label className={cn(LABEL_CLS, "flex justify-between items-center")}>
+              <span className="flex items-center gap-2">📝 NOTE</span>
+              {isUpdatingNote && <Loader2 className="animate-spin text-blue-500" size={12} />}
+            </label>
+            <textarea 
+              ref={noteRef}
+              rows={1} 
+              value={form.note} 
+              onChange={(e) => setForm(prev => ({ ...prev, note: e.target.value }))} 
+              onBlur={isView ? handleNoteBlur : undefined}
+              className={cn(
+                 isView ? "bg-zinc-50/50 border-zinc-100 hover:border-zinc-200 focus:bg-white" : INPUT_CLS,
+                 'resize-none py-4 leading-relaxed transition-all rounded-[16px] px-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 w-full min-h-[48px]',
+                 isView && "italic text-zinc-500"
+              )} 
+              placeholder="Note aggiuntive..." 
+            />
           </div>
         )}
 
-        {/* DURATA E CAMBIO */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-          <div className="space-y-2">
-            <label className={LABEL_CLS}><Clock size={13} /> DURATA (MIN)</label>
-            {isView ? (
-              <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
-            ) : durationMode !== 'custom' ? (
-              <select 
-                value={durationMode} 
-                title="Seleziona Durata" 
-                onChange={(e) => { 
-                  const val = e.target.value; 
-                  if (val === 'custom') {
-                    setDurationMode('custom');
-                  } else {
-                    const numVal = Number(val);
-                    setDurationMode(val as '30' | '60');
-                    setForm(prev => ({ ...prev, durata: numVal }));
-                  }
-                }} 
-                className={INPUT_CLS}
-              >
-                <option value="30">30 min</option>
-                <option value="60">60 min</option>
-                <option value="custom">Personalizzato...</option>
-              </select>
-            ) : (
-              <div className="flex gap-2">
-                <input 
-                  type="number" 
-                  title="Durata personalizzata" 
-                  aria-label="Durata personalizzata" 
-                  autoFocus 
-                  value={form.durata} 
-                  onChange={(e) => setForm(prev => ({ ...prev, durata: Number(e.target.value) }))} 
-                  className={INPUT_CLS} 
+        {/* DURATA, PATENTE E CAMBIO (Solo per Guida Cliente) */}
+        {!isImpegno && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+            <div className="space-y-2">
+              <label className={LABEL_CLS}><Clock size={13} /> DURATA (MIN)</label>
+              {isView ? (
+                <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
+              ) : durationMode !== 'custom' ? (
+                <CustomSelect
+                  options={[
+                    { id: '30', label: '30 min' },
+                    { id: '60', label: '60 min' },
+                    { id: 'custom', label: 'Personalizzato...' }
+                  ]}
+                  value={durationMode}
+                  onChange={(val) => {
+                    if (val === 'custom') {
+                      setDurationMode('custom');
+                    } else {
+                      const numVal = Number(val);
+                      setDurationMode(val as '30' | '60');
+                      setForm(prev => ({ ...prev, durata: numVal }));
+                    }
+                  }}
                 />
-                <button 
-                  type="button" 
-                  onClick={() => { 
-                    setDurationMode('60'); 
-                    setForm(prev => ({ ...prev, durata: 60 })); 
-                  }} 
-                  className="px-4 h-12 rounded-[16px] bg-zinc-100 text-zinc-500 font-bold text-[10px] uppercase tracking-wider shrink-0 hover:bg-zinc-200 transition-all"
-                >
-                  Annulla
-                </button>
-              </div>
-            )}
-          </div>
-          
-          {!isImpegno && (
+              ) : (
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    title="Durata personalizzata" 
+                    aria-label="Durata personalizzata" 
+                    autoFocus 
+                    value={form.durata} 
+                    onChange={(e) => setForm(prev => ({ ...prev, durata: Number(e.target.value) }))} 
+                    className={INPUT_CLS} 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      setDurationMode('60'); 
+                      setForm(prev => ({ ...prev, durata: 60 })); 
+                    }} 
+                    className="px-4 h-12 rounded-[16px] bg-zinc-100 text-zinc-500 font-bold text-[10px] uppercase tracking-wider shrink-0 hover:bg-zinc-200 transition-all"
+                  >
+                    Annulla
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+              <label className={LABEL_CLS}><ShieldCheck size={13} /> PATENTE</label>
+              {isView ? (
+                <div className={VIEW_BLOCK_CLS}>{patenti.find(p => p.id === form.patente_id)?.tipo || 'B'}</div>
+              ) : (
+                <CustomSelect
+                  options={patenti.map(p => ({ id: p.id, label: p.tipo }))}
+                  value={form.patente_id}
+                  onChange={(val) => setForm(prev => ({ ...prev, patente_id: val }))}
+                  placeholder="Seleziona Patente"
+                />
+              )}
+            </div>
+            
             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
               <label className={LABEL_CLS}>⚙️ TIPO CAMBIO</label>
               <div className="flex bg-zinc-100 border border-zinc-100 p-1 rounded-2xl h-12 items-center shadow-sm">
@@ -683,59 +756,151 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 ))}
               </div>
             </div>
-          )}
-        </div>
-
-        {/* ISTRUTTORE & VEICOLO */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className={LABEL_CLS}>👤 ISTRUTTORE</label>
-            {isView ? (
-               <div className={VIEW_BLOCK_CLS}>
-                <div className="w-2.5 h-2.5 rounded-full mr-3 shrink-0" style={{ backgroundColor: selectedIstruttore?.colore || '#3b82f6' }} />
-                <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
-              </div>
-            ) : (
-              <select required value={form.istruttore_id} title="Seleziona Istruttore" onChange={(e) => handleIstruttoreChange(e.target.value)} className={INPUT_CLS}>
-                <option value="">Seleziona istruttore...</option>
-                {istruttori.map(i => {
-                  const isBusy = !availableSlots.instructor_ids.includes(i.id);
-                  return (
-                    <option key={i.id} value={i.id} disabled={isBusy} className={isBusy ? 'text-zinc-300' : ''}>
-                      {i.cognome} {i.nome} {isBusy ? '(Occupato)' : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            )}
           </div>
-          {!isImpegno && (
+        )}
+
+        {/* ISTRUTTORE & VEICOLO (or ISTRUTTORE & DURATA if impegno) */}
+        {!isImpegno ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className={LABEL_CLS}>👤 ISTRUTTORE</label>
+              {isView ? (
+                 <div className={VIEW_BLOCK_CLS}>
+                  <div className="w-2.5 h-2.5 rounded-full mr-3 shrink-0" style={{ backgroundColor: selectedIstruttore?.colore || '#3b82f6' }} />
+                  <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
+                </div>
+              ) : (
+                <CustomSelect
+                  options={istruttori.map(i => {
+                    const isBusy = !availableSlots.instructor_ids.includes(i.id);
+                    return {
+                      id: i.id,
+                      nome: i.nome,
+                      cognome: i.cognome,
+                      info: isBusy ? '(Occupato)' : '',
+                      disabled: isBusy,
+                      color: i.colore
+                    };
+                  })}
+                  value={form.istruttore_id}
+                  onChange={handleIstruttoreChange}
+                  placeholder="Seleziona istruttore..."
+                  searchable
+                />
+              )}
+            </div>
+            
             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
               <label className={LABEL_CLS}><Car size={13} /> VEICOLO</label>
               {isView ? (
                 <div className={VIEW_BLOCK_CLS}>{selectedVeicolo?.nome || 'Senza veicolo'}</div>
               ) : (
-                <select value={form.veicolo_id} title="Seleziona Veicolo" onChange={(e) => { const veh = veicoli.find(v => v.id === e.target.value); setSelectedVeicolo(veh || null); setForm(prev => ({ ...prev, veicolo_id: e.target.value })); }} className={INPUT_CLS}>
-                  <option value="">Seleziona veicolo...</option>
-                  <option value="">Senza veicolo</option>
-                  {availableVeicoli.map(v => <option key={v.id} value={v.id}>{v.nome} ({v.targa})</option>)}
-                </select>
+              <CustomSelect
+                options={[
+                  { id: '', label: 'Senza veicolo' },
+                  ...availableVeicoli.map(v => {
+                    const isVeicoloMoto = ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente);
+                    return {
+                      id: v.id,
+                      label: isVeicoloMoto 
+                        ? `${v.nome} - Patente ${v.tipo_patente} [${v.cambio_manuale ? 'M' : 'A'}] (${v.targa})` 
+                        : `${v.nome} (${v.targa})`,
+                      color: v.colore
+                    };
+                  })
+                ]}
+                value={form.veicolo_id}
+                onChange={(val) => {
+                  const veh = veicoli.find(v => v.id === val);
+                  setSelectedVeicolo(veh || null);
+                  setForm(prev => ({ ...prev, veicolo_id: val }));
+                }}
+                placeholder="Seleziona veicolo..."
+                searchable
+              />
               )}
             </div>
-          )}
-        </div>
-
-        {/* NOTE */}
-        <div className="space-y-2">
-          <label className={LABEL_CLS}>📝 NOTE</label>
-          {isView ? (
-            <div className={cn(VIEW_BLOCK_CLS, "h-24 py-4 items-start leading-relaxed text-zinc-500 italic bg-zinc-50/30 overflow-y-auto whitespace-pre-wrap")}>
-              {form.note || "Nessuna nota."}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+             <div className="space-y-2">
+              <label className={LABEL_CLS}>👤 ISTRUTTORE</label>
+              {isView ? (
+                 <div className={VIEW_BLOCK_CLS}>
+                  <div className="w-2.5 h-2.5 rounded-full mr-3 shrink-0" style={{ backgroundColor: selectedIstruttore?.colore || '#3b82f6' }} />
+                  <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
+                </div>
+              ) : (
+                <CustomSelect
+                  options={istruttori.map(i => {
+                    const isBusy = !availableSlots.instructor_ids.includes(i.id);
+                    return {
+                      id: i.id,
+                      nome: i.nome,
+                      cognome: i.cognome,
+                      info: isBusy ? '(Occupato)' : '',
+                      disabled: isBusy,
+                      color: i.colore
+                    };
+                  })}
+                  value={form.istruttore_id}
+                  onChange={handleIstruttoreChange}
+                  placeholder="Seleziona istruttore..."
+                  searchable
+                />
+              )}
             </div>
-          ) : (
-            <textarea rows={3} value={form.note} onChange={(e) => setForm(prev => ({ ...prev, note: e.target.value }))} className={cn(INPUT_CLS, 'resize-none h-24 py-4 leading-relaxed')} placeholder="Note..." />
-          )}
-        </div>
+
+            <div className="space-y-2">
+              <label className={LABEL_CLS}><Clock size={13} /> DURATA (MIN)</label>
+              {isView ? (
+                <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
+              ) : durationMode !== 'custom' ? (
+                <CustomSelect
+                  options={[
+                    { id: '30', label: '30 min' },
+                    { id: '60', label: '60 min' },
+                    { id: 'custom', label: 'Personalizzato...' }
+                  ]}
+                  value={durationMode}
+                  onChange={(val) => {
+                    if (val === 'custom') {
+                      setDurationMode('custom');
+                    } else {
+                      const numVal = Number(val);
+                      setDurationMode(val as '30' | '60');
+                      setForm(prev => ({ ...prev, durata: numVal }));
+                    }
+                  }}
+                />
+              ) : (
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    title="Durata personalizzata" 
+                    aria-label="Durata personalizzata" 
+                    autoFocus 
+                    value={form.durata} 
+                    onChange={(e) => setForm(prev => ({ ...prev, durata: Number(e.target.value) }))} 
+                    className={INPUT_CLS} 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => { 
+                      setDurationMode('60'); 
+                      setForm(prev => ({ ...prev, durata: 60 })); 
+                    }} 
+                    className="px-4 h-12 rounded-[16px] bg-zinc-100 text-zinc-500 font-bold text-[10px] uppercase tracking-wider shrink-0 hover:bg-zinc-200 transition-all"
+                  >
+                    Annulla
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+
 
         {serverError && <p className="p-4 bg-red-50 text-red-600 text-[11px] font-black rounded-2xl border border-red-100 text-center uppercase tracking-wide">{serverError}</p>}
 

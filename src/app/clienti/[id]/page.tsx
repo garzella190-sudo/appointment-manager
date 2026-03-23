@@ -11,6 +11,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
+import CustomSelect from '@/components/forms/CustomSelect';
+
+const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] dark:bg-zinc-900/50 rounded-[16px] px-4 flex items-center h-12 text-sm font-semibold text-zinc-900 dark:text-zinc-100 transition-all cursor-default overflow-hidden';
+const LABEL_CLS = 'text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest ml-1 mb-1.5 flex items-center gap-2';
 
 // ── Tipi interni ─────────────────────────────────────────────
 type PageData = {
@@ -34,24 +38,24 @@ const InfoRow = ({
 }) => {
   if (!value) return null;
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
-        <Icon size={15} className="text-zinc-500 dark:text-zinc-400" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{label}</p>
+    <div className="space-y-1.5 mb-4">
+      <label className={LABEL_CLS}>
+        <Icon size={12} className="shrink-0" />
+        {label}
+      </label>
+      <div className={VIEW_BLOCK_CLS}>
         {href ? (
           <a 
             href={href} 
             className={cn(
-              "text-sm font-medium hover:underline truncate block",
+              "hover:underline truncate block",
               label.toLowerCase().includes('telefono') ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"
             )}
           >
             {value}
           </a>
         ) : (
-          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{value}</p>
+          <span className="truncate">{value}</span>
         )}
       </div>
     </div>
@@ -345,17 +349,25 @@ export default function SchedaClientePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="patente" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Patente Richiesta</label>
-                  <select id="patente" value={formState.patente_richiesta_id} title="Seleziona Patente" onChange={(e) => setFormState(p => ({ ...p, patente_richiesta_id: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
-                    {patenti.map(p => <option key={p.id} value={p.id}>{p.nome_visualizzato || p.tipo}</option>)}
-                  </select>
+                  <label htmlFor="patente" className={LABEL_CLS}>Patente Richiesta</label>
+                  <CustomSelect
+                    options={patenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
+                    value={formState.patente_richiesta_id}
+                    onChange={(val) => setFormState(p => ({ ...p, patente_richiesta_id: val }))}
+                    placeholder="Seleziona Patente"
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="cambio" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Tipo Cambio</label>
-                  <select id="cambio" value={formState.preferenza_cambio} title="Seleziona Tipo Cambio" onChange={(e) => setFormState(p => ({ ...p, preferenza_cambio: e.target.value }))} className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
-                    <option value="manuale">Manuale</option>
-                    <option value="automatico">Automatico</option>
-                  </select>
+                  <label htmlFor="cambio" className={LABEL_CLS}>Tipo Cambio</label>
+                  <CustomSelect
+                    options={[
+                      { id: 'manuale', label: 'Meccanico (Manuale)' },
+                      { id: 'automatico', label: 'Automatico' }
+                    ]}
+                    value={formState.preferenza_cambio}
+                    onChange={(val) => setFormState(p => ({ ...p, preferenza_cambio: val }))}
+                    placeholder="Seleziona Tipo Cambio"
+                  />
                 </div>
               </div>
 
@@ -394,25 +406,28 @@ export default function SchedaClientePage() {
               <InfoRow icon={Car}        label="Preferenza Cambio" value={cliente.preferenza_cambio ? (cliente.preferenza_cambio.charAt(0).toUpperCase() + cliente.preferenza_cambio.slice(1)) : 'Indifferente'} />
 
               {/* Istruttori abilitati */}
-              <div className="mt-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3 flex items-center gap-2">
-                  <School size={13} />
-                  Istruttori abilitati per questa patente ({istruttoriFiltrati.length})
+              <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+                <p className={LABEL_CLS}>
+                  <School size={13} strokeWidth={2.5} />
+                  Istruttori abilitati per {patente?.tipo || 'questa patente'} ({istruttoriFiltrati.length})
                 </p>
                 {istruttoriFiltrati.length === 0 ? (
-                  <p className="text-sm text-zinc-400 italic">Nessun istruttore abilitato per questa patente.</p>
+                  <div className={cn(VIEW_BLOCK_CLS, "italic text-zinc-400 justify-center")}>Nessun istruttore abilitato</div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                     {istruttoriFiltrati.map(i => (
-                      <span
+                      <div
                         key={i.id}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                        className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl shadow-sm group hover:border-blue-500/30 transition-all"
                       >
-                        <span className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center">
+                        <div 
+                          className="w-10 h-10 rounded-xl text-white font-bold text-xs flex items-center justify-center shadow-lg"
+                          style={{ backgroundColor: i.colore || '#3b82f6' }}
+                        >
                           {i.nome[0]}{i.cognome[0]}
-                        </span>
-                        {i.nome} {i.cognome}
-                      </span>
+                        </div>
+                        <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{i.nome} {i.cognome}</span>
+                      </div>
                     ))}
                   </div>
                 )}

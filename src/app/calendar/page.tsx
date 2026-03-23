@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, User, Calendar as CalendarIcon } from 'lucide-react';
+import CustomSelect from '@/components/forms/CustomSelect';
 import {
   DndContext,
   DragEndEvent,
@@ -24,6 +25,7 @@ import { Toast } from '@/components/Toast';
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import { Clock } from 'lucide-react';
+import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 
 const supabaseClient = createClient();
 
@@ -70,6 +72,10 @@ export default function CalendarPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [viewDays, setViewDays] = useState<1 | 3 | 5 | 7>(7);
+  
+  const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
+  const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
+  const [showWeekends, setShowWeekends] = useState(true);
 
   // Usa l'hook per gestire responsive in modo solido dopo l'idratazione
   const [mounted, setMounted] = useState(false);
@@ -98,8 +104,34 @@ export default function CalendarPage() {
   const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate.getTime()]);
   // Per evitare scatti in fase di caricamento dal server
   const effectiveViewDays = mounted ? viewDays : 7; 
-  const displayStart = useMemo(() => effectiveViewDays === 7 ? weekStart : currentDate, [effectiveViewDays, weekStart, currentDate.getTime()]);
-  const displayDays = useMemo(() => Array.from({ length: effectiveViewDays }, (_, i) => addDays(displayStart, i)), [displayStart.getTime(), effectiveViewDays]);
+  // Forza sempre la partenza dal Lunedì come richiesto
+  const displayStart = weekStart; 
+  const displayDays = useMemo(() => {
+    // Se la vista è a 7 giorni, mostriamo sempre l'intera settimana (Lun-Dom)
+    if (viewDays === 7) {
+      return Array.from({ length: 7 }, (_, i) => addDays(displayStart, i));
+    }
+    
+    // Per 1, 3, 5 giorni, partiamo dalla data corrente e saltiamo i weekend se disattivati
+    const days: Date[] = [];
+    let d = new Date(currentDate);
+    
+    // Se oggi è un weekend e showWeekends è off, spostiamoci al lunedì successivo per iniziare la vista?
+    // In realtà è meglio iniziare da oggi, ma se oggi è Sab/Dom e filtriamo, cerchiamo il primo giorno valido.
+    if (!showWeekends && [0, 6].includes(d.getDay())) {
+      // Se è domenica (0), aggiunge 1; se è sabato (6), aggiunge 2
+      const offset = d.getDay() === 0 ? 1 : 2;
+      d = addDays(d, offset);
+    }
+
+    while (days.length < viewDays) {
+      if (showWeekends || ![0, 6].includes(d.getDay())) {
+        days.push(new Date(d));
+      }
+      d = addDays(d, 1);
+    }
+    return days;
+  }, [displayStart, viewDays, showWeekends, currentDate.getTime()]);
 
   // Generate 15-minute intervals from 08:00 to 20:00
   const timeSlots = Array.from({ length: 12 * 4 + 1 }, (_, i) => {
@@ -114,7 +146,7 @@ export default function CalendarPage() {
     const fetchEndDate = addDays(displayStart, effectiveViewDays);
 
     try {
-      const [{ data: dbData, error: dbError }, { data: patentiData }] = await Promise.all([
+      const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
         supabase
           .from('appuntamenti')
           .select(`
@@ -125,10 +157,12 @@ export default function CalendarPage() {
           `)
           .gte('data', displayStart.toISOString())
           .lt('data', fetchEndDate.toISOString()),
-        supabase.from('patenti').select('id, tipo')
+        supabase.from('patenti').select('id, tipo'),
+        supabase.from('istruttori').select('id, nome, cognome').order('cognome')
       ]);
 
       if (dbError) throw dbError;
+      if (istruttoriData) setIstruttori(istruttoriData);
       
       const patentiMap = new Map<string, string>((patentiData || []).map((p: any) => [p.id, p.tipo]));
 
@@ -307,33 +341,74 @@ export default function CalendarPage() {
                   <ChevronRight size={20} />
                 </button>
               </div>
+
+              {viewDays !== 7 && (
+                <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl">
+                  <button
+                    onClick={() => setShowWeekends(!showWeekends)}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                      showWeekends 
+                        ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-500" 
+                        : "bg-white dark:bg-zinc-700 text-blue-600 shadow-sm"
+                    )}
+                  >
+                    Filtro Sab-Dom: {showWeekends ? 'Sì' : 'No'}
+                  </button>
+                </div>
+              )}
+
+              <div className="min-w-[180px]">
+                <CustomSelect
+                  options={[
+                    { id: '', label: 'Tutti gli istruttori' },
+                    ...istruttori.map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}` }))
+                  ]}
+                  value={selectedInstructorId}
+                  onChange={(val) => setSelectedInstructorId(val)}
+                  icon={User}
+                  placeholder="Istruttore"
+                  searchable
+                />
+              </div>
             </div>
           </header>
 
           <div className="bg-white dark:bg-zinc-900/80 rounded-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden">
             <div 
               className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30"
-              style={{ gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))` } as React.CSSProperties}
+              style={{ gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))` } as React.CSSProperties}
             >
               <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
                 <Clock size={16} className="text-zinc-400" />
               </div>
-              {displayDays.map((day: Date) => (
-                <div key={day.toString()} className={cn(
-                  "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
-                  isSameDay(day, new Date()) ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
-                )}>
-                  <span className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">
-                    {format(day, 'eee', { locale: it })}
-                  </span>
-                  <span className={cn(
-                    "text-lg font-black mt-1 inline-flex w-10 h-10 items-center justify-center rounded-full transition-all",
-                    isSameDay(day, new Date()) ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "text-zinc-900 dark:text-zinc-50"
+              {displayDays.map((day: Date) => {
+                const isHoliday = isItalianHoliday(day) || isWeekend(day);
+                const isToday = isSameDay(day, new Date());
+                return (
+                  <div key={day.toString()} className={cn(
+                    "p-4 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
+                    isToday ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
                   )}>
-                    {format(day, 'd')}
-                  </span>
-                </div>
-              ))}
+                    <span className={cn(
+                      "block text-[10px] uppercase font-bold tracking-wider font-mono",
+                      isHoliday ? "text-red-500" : "text-zinc-400"
+                    )}>
+                      {format(day, 'eee', { locale: it })}
+                    </span>
+                    <span className={cn(
+                      "text-lg font-black mt-1 inline-flex w-10 h-10 items-center justify-center rounded-full transition-all",
+                      isToday 
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" 
+                        : isHoliday
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-zinc-900 dark:text-zinc-50"
+                    )}>
+                      {format(day, 'd')}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="overflow-y-auto max-h-[700px] relative scrollbar-hide">
@@ -353,7 +428,7 @@ export default function CalendarPage() {
                       isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
                     )}
                     style={{ 
-                      gridTemplateColumns: `60px repeat(${viewDays}, minmax(0, 1fr))`,
+                      gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))`,
                       zIndex: timeSlots.length - timeSlots.indexOf(slot),
                       position: 'relative'
                     } as React.CSSProperties}
@@ -368,7 +443,9 @@ export default function CalendarPage() {
                       const dateStr = format(day, 'yyyy-MM-dd');
                       const cellId = `${dateStr}|${slot}`;
                       const cellAppointments = appointments.filter(a =>
-                        a.appointment_date === dateStr && a.appointment_time.slice(0, 5) === slot
+                        a.appointment_date === dateStr && 
+                        a.appointment_time.slice(0, 5) === slot &&
+                        (!selectedInstructorId || a.trainer_id === selectedInstructorId)
                       );
 
                       return (

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Loader2, BadgeCheck, Clock, Car, Eye, EyeOff } from 'lucide-react';
+import { Loader2, BadgeCheck, Clock, Car, Eye, EyeOff, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
+import CustomSelect from './CustomSelect';
 import { TipoPatente, CambioAmmesso, Veicolo } from '@/lib/database.types';
 
 interface PatenteFormProps {
@@ -146,17 +147,17 @@ export const PatenteForm = ({
         </div>
         <div className="space-y-1.5">
           <label htmlFor="cambio" className={LABEL_CLS}>Tipo Cambio Ammesso</label>
-          <select
-            id="cambio"
+          <CustomSelect
+            options={[
+              { id: 'manuale', label: 'Manuale' },
+              { id: 'automatico', label: 'Automatico' },
+              { id: 'entrambi', label: 'Entrambi (M / A)' }
+            ]}
             value={form.cambio}
-            title="Seleziona Tipo Cambio"
-            onChange={e => setForm(prev => ({ ...prev, cambio: e.target.value as CambioAmmesso }))}
-            className={INPUT_CLS}
-          >
-            <option value="manuale">Manuale</option>
-            <option value="automatico">Automatico</option>
-            <option value="entrambi">Entrambi (M / A)</option>
-          </select>
+            onChange={(val) => setForm(prev => ({ ...prev, cambio: val as CambioAmmesso }))}
+            icon={Settings}
+            placeholder="Seleziona Tipo Cambio"
+          />
         </div>
       </div>
 

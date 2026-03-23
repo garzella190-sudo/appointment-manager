@@ -107,6 +107,38 @@ body {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
   font-family: inherit !important;
   padding: 0.5rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+/* Centratore Globale per DatePicker Portal (Overlay Tutto Schermo) */
+#datepicker-portal {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none;
+  z-index: 999999 !important;
+}
+
+#datepicker-portal .react-datepicker-popper {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+  pointer-events: auto;
+  margin: 0 !important;
+}
+
+#datepicker-portal .react-datepicker__triangle {
+  display: none !important;
+}
+
+.react-datepicker-wrapper {
+  display: block !important;
+  width: 100% !important;
 }
 
 .premium-calendar .react-datepicker__header {
@@ -138,6 +170,15 @@ body {
   border-radius: 0.75rem !important;
   transition: none !important;
   margin: 0.1rem !important;
+}
+
+/* Sabato e Domenica e Festività in rosso */
+.premium-calendar .react-datepicker__day--0,
+.premium-calendar .react-datepicker__day--6,
+.premium-calendar .react-datepicker__day.is-holiday,
+.premium-calendar .react-datepicker__day-name:first-child, /* Dom */
+.premium-calendar .react-datepicker__day-name:last-child { /* Sab */
+  color: #ef4444 !important; /* red-500 */
 }
 
 .premium-calendar .react-datepicker__day:hover {
@@ -173,6 +214,4 @@ body {
   border-color: #64748b !important;
 }
 
-.premium-calendar .react-datepicker__triangle {
-  display: none !important;
-}
+/* Fine Overrides Premium */
