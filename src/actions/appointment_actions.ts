@@ -16,15 +16,8 @@ export async function deleteAppointmentAction(id: string) {
     return { success: false, error: error.message };
   }
 
-  // Release Slot
-  try {
-    await supabase
-      .from('time_slots')
-      .update({ is_available: true, appointment_id: null })
-      .eq('appointment_id', id);
-  } catch (e) {}
-
   revalidatePath('/calendar');
+  revalidatePath('/'); // Refresh Agenda
   return { success: true };
 }
 
@@ -40,15 +33,8 @@ export async function cancelAppointmentAction(id: string) {
     return { success: false, error: error.message };
   }
 
-  // Release Slot
-  try {
-    await supabase
-      .from('time_slots')
-      .update({ is_available: true, appointment_id: null })
-      .eq('appointment_id', id);
-  } catch (e) {}
-
   revalidatePath('/calendar');
+  revalidatePath('/'); // Refresh Agenda
   return { success: true };
 }
 
@@ -65,6 +51,7 @@ export async function updateAppointmentNoteAction(id: string, note: string | nul
   }
 
   revalidatePath('/calendar');
+  revalidatePath('/'); // Refresh Agenda
   return { success: true };
 }
 

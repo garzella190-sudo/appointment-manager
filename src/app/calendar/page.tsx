@@ -544,21 +544,22 @@ export default function CalendarPage() {
                               className="w-full flex flex-col gap-0 relative cursor-pointer min-h-[40px]"
                               onClick={() => handleCellClick(dateStr, slot)}
                             >
-                              {cellAppointments.map((apt, idx) => {
-                                const hasConflict = cellAppointments.length > 1; // Simplified for UI clearity in stacking
+                              {cellAppointments
+                                .filter(apt => apt.stato !== 'annullato')
+                                .map((apt, idx) => {
+                                const activeInCellCount = cellAppointments.filter(a => a.stato !== 'annullato').length;
+                                const hasConflict = activeInCellCount > 1; 
+                                
                                 return (
                                   <div
                                     key={apt.id}
-                                    className={cn(
-                                      "relative w-full",
-                                      apt.stato === 'annullato' && "opacity-70 grayscale [&>div]:!bg-red-500/10"
-                                    )}
+                                    className="relative w-full"
                                   >
                                     <DraggableAppointment
                                       appointment={apt}
                                       isOverlapping={hasConflict}
                                       onClick={setSelectedAppointment}
-                                      isStacked={cellAppointments.length > 1}
+                                      isStacked={cellAppointments.filter(a => a.stato !== 'annullato').length > 1}
                                       granularity={15}
                                       isFirst={idx === 0}
                                     />

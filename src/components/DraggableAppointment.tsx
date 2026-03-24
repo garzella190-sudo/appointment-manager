@@ -3,7 +3,7 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle, StickyNote } from 'lucide-react';
+import { AlertTriangle, StickyNote, Trash2 } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -69,13 +69,31 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 mt-1 sm:mt-1.5">
-          <span className="text-[10px] sm:text-xs font-bold uppercase py-0.5 px-1.5 bg-white dark:bg-black/20 rounded text-zinc-800 dark:text-zinc-200">
-            {appointment.license_type}
-          </span>
-          <span className="text-[10px] sm:text-xs font-semibold opacity-80 text-zinc-800 dark:text-zinc-300">
-            {appointment.appointment_time.slice(0, 5)}
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-1.5 mt-1 sm:mt-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] sm:text-xs font-bold uppercase py-0.5 px-1.5 bg-white dark:bg-black/20 rounded text-zinc-800 dark:text-zinc-200">
+              {appointment.license_type}
+            </span>
+            <span className="text-[10px] sm:text-xs font-semibold opacity-80 text-zinc-800 dark:text-zinc-300">
+              {appointment.appointment_time.slice(0, 5)}
+            </span>
+          </div>
+          
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Note: This only opens the DetailsModal which has the delete button,
+              // or we could add a direct ConfirmBubble here if needed.
+              // For now, let's keep it consistent with the user's request for a quick button.
+              // IF we want to trigger deletion directly from here, we'd need a callback.
+              if (onClick) onClick(appointment);
+            }}
+            className="p-1 rounded-lg text-red-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
+            title="Dettagli ed eliminazione"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
     </div>

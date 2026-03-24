@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote, Trash2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Appointment } from '@/types';
@@ -11,6 +11,7 @@ import { it } from 'date-fns/locale';
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import Select from '@/components/forms/Select';
+import { ConfirmBubble } from '@/components/ConfirmBubble';
 
 export default function Home() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -42,6 +43,7 @@ export default function Home() {
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
           `)
+          .is('eliminato_il', null)
           .gte('data', startOfDayStr)
           .lte('data', endOfDayStr)
           .order('data'),
@@ -326,6 +328,30 @@ export default function Home() {
                           <Phone size={18} />
                         </a>
                       )}
+                      
+                      <ConfirmBubble
+                        title="Elimina Appuntamento"
+                        message="Sei sicuro di voler eliminare questa guida? L'azione è irreversibile."
+                        confirmLabel="Elimina"
+                        onConfirm={async () => {
+                          const { deleteAppointmentAction } = await import('@/actions/appointment_actions');
+                          const res = await deleteAppointmentAction(apt.id);
+                          if (res.success) {
+                            fetchAppointments();
+                          } else {
+                            alert(res.error || "Errore durante l'eliminazione");
+                          }
+                        }}
+                        trigger={
+                          <button
+                            className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                            title="Elimina appuntamento"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        }
+                      />
+
                       <ChevronRight size={20} className="text-zinc-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>

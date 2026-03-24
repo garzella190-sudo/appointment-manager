@@ -28,7 +28,7 @@ export const Toast = ({ message, type = 'success', duration = 3000, onClose }: T
 
   return (
     <div className={cn(
-      "fixed bottom-40 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 transform",
+      "fixed bottom-28 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 transform",
       isVisible ? "translate-y-0 opacity-100 scale-100" : "translate-y-4 opacity-0 scale-95"
     )}>
       <div className={cn(

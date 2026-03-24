@@ -88,3 +88,20 @@ export async function signOutAction() {
   await supabaseServer.auth.signOut();
   return { success: true };
 }
+
+export async function deleteUserAction(userId: string) {
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    
+    if (error) {
+      console.error('Error deleting user:', error.message);
+      return { error: error.message };
+    }
+    
+    return { success: true };
+  } catch (err: any) {
+    console.error('Fatal user deletion error:', err);
+    return { error: err.message || "Errore imprevisto lato server." };
+  }
+}

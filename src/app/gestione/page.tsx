@@ -163,8 +163,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                       }}
                       trigger={
                         <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-2 rounded-xl text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                          className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
                           title="Elimina veicolo"
                         >
                           <Trash2 size={18} />
@@ -312,9 +311,8 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                         }}
                         trigger={
                           <button
-                            onClick={(e) => e.stopPropagation()}
                             title="Elimina istruttore"
-                            className="p-2 rounded-xl text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-all shadow-sm"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -653,28 +651,59 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
                   </div>
 
                   {/* Associazione Istruttore */}
-                  <div className="flex items-center gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap shrink-0">
-                      Istruttore
-                    </label>
-                    <div className="flex-1" onClick={(e) => e.stopPropagation()}>
-                      <Select
-                        options={[
-                          { id: '', label: 'Nessun istruttore' },
-                          ...istruttoriList.map(ist => ({
-                            id: ist.id,
-                            label: `${ist.cognome} ${ist.nome}`
-                          }))
-                        ]}
-                        value={linkedIstruttoreId}
-                        onChange={(val) => handleAssociaIstruttore(user.id, val)}
-                        placeholder="Seleziona..."
+                  <div className="flex flex-col gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                    <div className="flex items-center gap-3">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap shrink-0">
+                        Istruttore
+                      </label>
+                      <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          options={[
+                            { id: '', label: 'Nessun istruttore' },
+                            ...istruttoriList.map(ist => ({
+                              id: ist.id,
+                              label: `${ist.cognome} ${ist.nome}`
+                            }))
+                          ]}
+                          value={linkedIstruttoreId}
+                          onChange={(val) => handleAssociaIstruttore(user.id, val)}
+                          placeholder="Seleziona..."
+                        />
+                      </div>
+                      {savingUserId === user.id && <Loader2 className="animate-spin text-blue-500 shrink-0" size={16} />}
+                      {linkedIstruttore && savingUserId !== user.id && (
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap uppercase tracking-tighter">✓ Collegato</span>
+                      )}
+                    </div>
+
+                    {/* Quick Delete User */}
+                    <div className="flex justify-end pt-1">
+                      <ConfirmBubble
+                        title="Elimina Utente"
+                        message={`Sei sicuro di voler eliminare l'utente ${fullName}? L'accesso verrà immediatamente revocato.`}
+                        confirmLabel="Elimina Utente"
+                        onConfirm={async () => {
+                          setSavingUserId(user.id);
+                          const { deleteUserAction } = await import('@/actions/auth');
+                          const res = await deleteUserAction(user.id);
+                          if (res.success) {
+                            fetchUsers();
+                          } else {
+                            alert(res.error || "Errore eliminazione utente");
+                          }
+                          setSavingUserId(null);
+                        }}
+                        trigger={
+                          <button
+                            type="button"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all"
+                          >
+                            <Trash2 size={12} /> Elimina Utente
+                          </button>
+                        }
                       />
                     </div>
-                    {savingUserId === user.id && <Loader2 className="animate-spin text-blue-500 shrink-0" size={16} />}
-                    {linkedIstruttore && savingUserId !== user.id && (
-                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap uppercase tracking-tighter">✓ Collegato</span>
-                    )}
                   </div>
                 </div>
               );
@@ -894,9 +923,8 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
                   }}
                   trigger={
                     <button 
-                      onClick={(e) => e.stopPropagation()} 
                       title="Elimina"
-                      className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
                     >
                       <Trash2 size={16} />
                     </button>

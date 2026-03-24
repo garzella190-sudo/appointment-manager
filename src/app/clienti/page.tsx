@@ -169,8 +169,7 @@ export default function ClientiPage() {
                         }}
                         trigger={
                           <button
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-2 rounded-xl text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
                             title="Elimina cliente"
                           >
                             <Trash2 size={18} />

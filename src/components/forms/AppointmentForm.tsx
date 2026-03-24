@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
-import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil } from 'lucide-react';
+import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil, X, Plus, ChevronDown, Check } from 'lucide-react';
 import { format, addMinutes, parseISO, isAfter } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Cliente, Istruttore, Veicolo, Patente, StatoAppuntamento } from '@/lib/database.types';
@@ -17,7 +17,7 @@ import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
 import { Modal } from '../Modal';
 import { SchedaClienteForm } from './SchedaClienteForm';
-import { Plus, ChevronDown, Check } from 'lucide-react';
+
 import Select from './Select';
 import { ConfirmBubble } from '../ConfirmBubble';
 
@@ -124,7 +124,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         setPatenti(sortedPatenti);
 
         if (appointmentId) {
-          const { data, error } = await supabase.from('appuntamenti').select('*').eq('id', appointmentId).single();
+          const { data, error } = await supabase.from('appuntamenti').select('*').is('eliminato_il', null).eq('id', appointmentId).single();
           const apt = data as (Record<string, any> & { inizio: string; durata: number; stato: string; cambio: string; cliente_id: string; istruttore_id: string; veicolo_id: string; note: string; patente_id: string });
           if (apt && !error) {
             const dateObj = new Date(apt.inizio);
@@ -579,7 +579,72 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               </div>
             )
           )}
-          
+          {/* QUICK ACTIONS BAR (View mode only) */}
+          {isView && appointmentId && (
+            <div className="flex bg-zinc-50 dark:bg-zinc-900/50 p-1.5 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 items-center justify-between gap-1 shadow-sm mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+              {/* MODIFICA */}
+              <button
+                type="button"
+                onClick={() => setMode('edit')}
+                className="flex-1 h-10 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-100 transition-all active:scale-95"
+              >
+                <Edit3 size={14} /> Modifica
+              </button>
+
+              {/* ANNULLA */}
+              <ConfirmBubble
+                title="Annulla appuntamento"
+                message="Vuoi annullare questa guida? L'azione è reversibile solo manualmente."
+                confirmLabel="Annulla Guida"
+                onConfirm={async () => {
+                  setLoading(true); 
+                  const result = await cancelAppointmentAction(appointmentId!); 
+                  if (result.success) {
+                    showToast('Appuntamento annullato', 'info');
+                    onSuccess(); 
+                  } else {
+                    showToast(result.error || 'Errore durante l\'annullamento', 'error');
+                    setLoading(false);
+                  }
+                }}
+                trigger={
+                  <button 
+                    type="button" 
+                    disabled={form.stato === 'annullato'}  
+                    className="flex-1 h-10 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-orange-100 transition-all active:scale-95 disabled:opacity-30"
+                  >
+                    <X size={14} /> Annulla
+                  </button>
+                }
+              />
+
+              {/* ELIMINA */}
+              <ConfirmBubble
+                title="Elimina definitivamente"
+                message="Sei sicuro di voler eliminare questo record? Non potrai tornare indietro."
+                confirmLabel="Elimina"
+                onConfirm={async () => {
+                  setLoading(true); 
+                  const result = await deleteAppointmentAction(appointmentId!); 
+                  if (result.success) {
+                    showToast('Appuntamento eliminato definitivamente', 'info');
+                    onSuccess(); 
+                  } else {
+                    showToast(result.error || 'Errore durante l\'eliminazione', 'error');
+                    setLoading(false);
+                  }
+                }}
+                trigger={
+                  <div
+                    className="flex-1 h-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-100 transition-all cursor-pointer active:scale-95 px-2"
+                  >
+                    <Trash2 size={14} /> Elimina
+                  </div>
+                }
+              />
+            </div>
+          )}
+
           {/* NOTE (Auto-resizing) - Moved here if IS Impegno */}
           {isImpegno && (
             <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-top-2 group">
@@ -1069,68 +1134,6 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         <div className="pt-6">
           {isView ? (
             <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  type="button" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setMode('edit');
-                  }} 
-                  className="h-14 bg-blue-50 text-blue-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-blue-100/50 flex items-center justify-center gap-2"
-                >
-                  <Edit3 size={16} /> MODIFICA
-                </button>
-                <ConfirmBubble
-                  title="Annulla appuntamento"
-                  message="Vuoi annullare questa guida? L'azione è reversibile solo manualmente."
-                  confirmLabel="Annulla Guida"
-                  onConfirm={async () => {
-                    setLoading(true); 
-                    const result = await cancelAppointmentAction(appointmentId!); 
-                    if (result.success) {
-                      showToast('Appuntamento annullato', 'info');
-                      onSuccess(); 
-                    } else {
-                      showToast(result.error || 'Errore durante l\'annullamento', 'error');
-                      setLoading(false);
-                    }
-                  }}
-                  trigger={
-                    <button 
-                      type="button" 
-                      disabled={form.stato === 'annullato'}  
-                      className="h-14 bg-orange-50 text-orange-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-orange-100/50 disabled:opacity-30"
-                    >
-                      ANNULLA
-                    </button>
-                  }
-                />
-              </div>
-              <ConfirmBubble
-                title="Elimina definitivamente"
-                message="Sei sicuro di voler eliminare questo record? Non potrai tornare indietro."
-                confirmLabel="Elimina"
-                onConfirm={async () => {
-                  setLoading(true); 
-                  const result = await deleteAppointmentAction(appointmentId!); 
-                  if (result.success) {
-                    showToast('Appuntamento eliminato definitivamente', 'info');
-                    onSuccess(); 
-                  } else {
-                    showToast(result.error || 'Errore durante l\'eliminazione', 'error');
-                    setLoading(false);
-                  }
-                }}
-                trigger={
-                  <button 
-                    type="button" 
-                    className="w-full h-14 bg-red-50 text-red-600 font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-red-100/50 flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={16} /> ELIMINA
-                  </button>
-                }
-              />
               <button 
                 type="button" 
                 onClick={(e) => {

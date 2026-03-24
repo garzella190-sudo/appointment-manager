@@ -96,18 +96,20 @@ export async function createAppointmentAction(payload: {
     return { success: false, error: "Istruttore già impegnato in questa fascia oraria." };
   }
 
-  // 2. Client Check
-  const { data: clientBusy } = await supabase
-    .from('appuntamenti')
-    .select('id')
-    .is('eliminato_il', null)
-    .neq('stato', 'annullato')
-    .eq('cliente_id', finalClienteId)
-    .lt('inizio', endISO)
-    .gt('fine', startISO);
+  // 2. Client Check (skip for Impegni: they share the UFFICIO client ID)
+  if (!payload.is_impegno) {
+    const { data: clientBusy } = await supabase
+      .from('appuntamenti')
+      .select('id')
+      .is('eliminato_il', null)
+      .neq('stato', 'annullato')
+      .eq('cliente_id', finalClienteId)
+      .lt('inizio', endISO)
+      .gt('fine', startISO);
 
-  if (clientBusy && clientBusy.length > 0) {
-    return { success: false, error: "Il cliente ha già un'altra guida in questo orario." };
+    if (clientBusy && clientBusy.length > 0) {
+      return { success: false, error: "Il cliente ha già un'altra guida in questo orario." };
+    }
   }
 
   // 3. Vehicle Check (if applicable)
@@ -289,19 +291,21 @@ export async function updateAppointmentAction(id: string, payload: any) {
     return { success: false, error: "Istruttore già impegnato in questa fascia oraria." };
   }
 
-  // 2. Client Check
-  const { data: clientBusy } = await supabase
-    .from('appuntamenti')
-    .select('id')
-    .is('eliminato_il', null)
-    .neq('id', id)
-    .neq('stato', 'annullato')
-    .eq('cliente_id', finalClienteId)
-    .lt('inizio', endISO)
-    .gt('fine', startISO);
+  // 2. Client Check (skip for Impegni: they share the UFFICIO client ID)
+  if (!payload.is_impegno) {
+    const { data: clientBusy } = await supabase
+      .from('appuntamenti')
+      .select('id')
+      .is('eliminato_il', null)
+      .neq('id', id)
+      .neq('stato', 'annullato')
+      .eq('cliente_id', finalClienteId)
+      .lt('inizio', endISO)
+      .gt('fine', startISO);
 
-  if (clientBusy && clientBusy.length > 0) {
-    return { success: false, error: "Il cliente ha già un'altra guida in questo orario." };
+    if (clientBusy && clientBusy.length > 0) {
+      return { success: false, error: "Il cliente ha già un'altra guida in questo orario." };
+    }
   }
 
   // 3. Vehicle Check
