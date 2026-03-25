@@ -9,15 +9,36 @@ export default function SWRegister() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
 
   useEffect(() => {
+    let updateInterval: NodeJS.Timeout;
+    let registration: ServiceWorkerRegistration;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && registration) {
+        registration.update();
+      }
+    };
+
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
-        .then((registration) => {
-          // Check for update on registration
+        .then((reg) => {
+          registration = reg;
+          
+          // 1. Check for update immediately on registration (initial opening)
+          registration.update();
+
           if (registration.waiting) {
             setWaitingWorker(registration.waiting);
             setShowUpdatePrompt(true);
           }
+
+          // 2. Poll for updates every 30 minutes
+          updateInterval = setInterval(() => {
+            registration.update();
+          }, 30 * 60 * 1000);
+
+          // 3. Check for update when the app comes to foreground
+          document.addEventListener('visibilitychange', handleVisibilityChange);
 
           // Listen for new updates
           registration.addEventListener('updatefound', () => {
@@ -38,12 +59,19 @@ export default function SWRegister() {
 
       // Reload page when the new service worker takes over
       let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
+      const handleControllerChange = () => {
         if (!refreshing) {
           refreshing = true;
           window.location.reload();
         }
-      });
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+      return () => {
+        if (updateInterval) clearInterval(updateInterval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      };
     }
   }, []);
 
