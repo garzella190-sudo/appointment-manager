@@ -75,10 +75,8 @@ export const SchedaClienteForm = ({
     if (payloadTelefono) predicates.push(`telefono.eq."${payloadTelefono}"`);
     if (payloadEmail)    predicates.push(`email.eq."${payloadEmail}"`);
     
-    const { data: duplicates } = await supabase
-      .from('clienti')
+    const { data: duplicates } = await supabase.from('clienti')
       .select('id')
-      .is('eliminato_il', null)
       .or(predicates.join(','))
       .filter('id', 'neq', clienteId || '00000000-0000-0000-0000-000000000000')
       .limit(1);
@@ -118,7 +116,7 @@ export const SchedaClienteForm = ({
 
   const handleDelete = async () => {
     if (!clienteId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo cliente? I dati rimarranno nel database ma non saranno più visibili nell'applicazione.")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo cliente? L'azione è definitiva.")) return;
 
     setLoading(true);
     const result = await deleteClienteAction(clienteId);
@@ -264,7 +262,7 @@ export const SchedaClienteForm = ({
       {clienteId && (
         <ConfirmBubble
           title="Elimina Cliente"
-          message="Sei sicuro di voler eliminare questo cliente? I dati rimarranno nel database ma non saranno più visibili."
+          message="Sei sicuro di voler eliminare questo cliente? L'azione è definitiva."
           confirmLabel="Elimina"
           onConfirm={async () => {
             setLoading(true);

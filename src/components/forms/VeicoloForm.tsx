@@ -79,7 +79,7 @@ export const VeicoloForm = ({
   
   useEffect(() => {
     async function fetchPatenti() {
-      const { data } = await supabase.from('patenti').select('*').is('eliminato_il', null).eq('nascosta', false).order('tipo');
+      const { data } = await supabase.from('patenti').select('*').eq('nascosta', false).order('tipo');
       if (data) setPatenti(data);
     }
     fetchPatenti();
@@ -122,7 +122,7 @@ export const VeicoloForm = ({
 
   const handleDelete = async () => {
     if (!veicoloId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo veicolo? I dati rimarranno nel database ma non saranno più visibili nell'applicazione.")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo veicolo? L'azione è definitiva.")) return;
 
     setLoading(true);
     const result = await deleteVeicoloAction(veicoloId);
@@ -344,7 +344,7 @@ export const VeicoloForm = ({
             </button>
             <ConfirmBubble
               title="Elimina Veicolo"
-              message="Sei sicuro di voler eliminare questo veicolo? I dati rimarranno nel database ma non saranno più visibili."
+              message="Sei sicuro di voler eliminare questo veicolo? L'azione è definitiva."
               confirmLabel="Elimina"
               onConfirm={async () => {
                 setLoading(true);

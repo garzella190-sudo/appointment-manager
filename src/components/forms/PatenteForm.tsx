@@ -56,7 +56,7 @@ export const PatenteForm = ({
 
   useEffect(() => {
     const fetchVehicles = async () => {
-      const { data } = await supabase.from('veicoli').select('*').is('eliminato_il', null).order('nome');
+      const { data } = await supabase.from('veicoli').select('*').order('nome');
       setVehicles(data || []);
     };
     fetchVehicles();

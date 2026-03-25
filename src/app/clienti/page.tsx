@@ -25,8 +25,8 @@ export default function ClientiPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [cRes, pRes] = await Promise.all([
-      supabase.from('clienti').select('*').is('eliminato_il', null).neq('nome', 'UFFICIO').order('cognome').order('nome'),
-      supabase.from('patenti').select('*').is('eliminato_il', null).eq('nascosta', false).order('tipo'),
+      supabase.from('clienti').select('*').neq('nome', 'UFFICIO').order('cognome').order('nome'),
+      supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
     ]);
     setClienti(cRes.data ?? []);
     setPatenti(pRes.data ?? []);
@@ -161,7 +161,7 @@ export default function ClientiPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       <ConfirmBubble
                         title="Elimina Cliente"
-                        message="Sei sicuro di voler eliminare questo cliente? I dati rimarranno nel database ma non saranno più visibili."
+                        message="Sei sicuro di voler eliminare questo cliente? L'azione è definitiva."
                         confirmLabel="Elimina"
                         onConfirm={async () => {
                           const result = await deleteClienteAction(cliente.id);

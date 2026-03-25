@@ -86,7 +86,6 @@ export async function createAppointmentAction(payload: {
   const { data: instructorBusy } = await supabase
     .from('appuntamenti')
     .select('id')
-    .is('eliminato_il', null)
     .neq('stato', 'annullato')
     .eq('istruttore_id', payload.istruttore_id)
     .lt('inizio', endISO)
@@ -101,8 +100,7 @@ export async function createAppointmentAction(payload: {
     const { data: clientBusy } = await supabase
       .from('appuntamenti')
       .select('id')
-      .is('eliminato_il', null)
-      .neq('stato', 'annullato')
+        .neq('stato', 'annullato')
       .eq('cliente_id', finalClienteId)
       .lt('inizio', endISO)
       .gt('fine', startISO);
@@ -117,8 +115,7 @@ export async function createAppointmentAction(payload: {
     const { data: vehicleBusy } = await supabase
       .from('appuntamenti')
       .select('id')
-      .is('eliminato_il', null)
-      .neq('stato', 'annullato')
+        .neq('stato', 'annullato')
       .eq('veicolo_id', payload.veicolo_id)
       .lt('inizio', endISO)
       .gt('fine', startISO);
@@ -283,7 +280,6 @@ export async function updateAppointmentAction(id: string, payload: any) {
   const { data: instructorBusy } = await supabase
     .from('appuntamenti')
     .select('id')
-    .is('eliminato_il', null)
     .neq('id', id)
     .neq('stato', 'annullato')
     .eq('istruttore_id', payload.istruttore_id)
@@ -299,8 +295,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
     const { data: clientBusy } = await supabase
       .from('appuntamenti')
       .select('id')
-      .is('eliminato_il', null)
-      .neq('id', id)
+        .neq('id', id)
       .neq('stato', 'annullato')
       .eq('cliente_id', finalClienteId)
       .lt('inizio', endISO)
@@ -316,8 +311,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
     const { data: vehicleBusy } = await supabase
       .from('appuntamenti')
       .select('id')
-      .is('eliminato_il', null)
-      .neq('id', id)
+        .neq('id', id)
       .neq('stato', 'annullato')
       .eq('veicolo_id', payload.veicolo_id)
       .lt('inizio', endISO)

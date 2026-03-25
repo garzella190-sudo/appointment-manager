@@ -42,7 +42,6 @@ export default function Home() {
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
           `)
-          .is('eliminato_il', null)
           .eq('data_solo', dateStr)
           .order('data'),
         supabase.from('patenti').select('id, tipo'),

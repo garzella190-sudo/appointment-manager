@@ -195,11 +195,10 @@ export default function CalendarPage() {
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
           `)
-          .is('eliminato_il', null)
           .gte('data_solo', format(fetchStartDate, 'yyyy-MM-dd'))
           .lt('data_solo', format(fetchEndDate, 'yyyy-MM-dd')),
-        supabase.from('patenti').select('id, tipo').is('eliminato_il', null),
-        supabase.from('istruttori').select('id, nome, cognome').is('eliminato_il', null).order('cognome')
+        supabase.from('patenti').select('id, tipo'),
+        supabase.from('istruttori').select('id, nome, cognome').order('cognome')
       ]);
 
       if (dbError) throw dbError;

@@ -63,7 +63,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
 
   const fetchVeicoli = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('veicoli').select('*').is('eliminato_il', null).order('nome');
+    const { data } = await supabase.from('veicoli').select('*').order('nome');
     setVeicoli(data ?? []);
     setLoading(false);
   }, []);
@@ -152,7 +152,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                   <div className="flex items-center gap-2">
                     <ConfirmBubble
                       title="Elimina Veicolo"
-                      message="Sei sicuro di voler eliminare questo veicolo? I dati rimarranno nel database ma non saranno più visibili."
+                      message="Sei sicuro di voler eliminare questo veicolo? L'azione è definitiva."
                       confirmLabel="Elimina"
                       onConfirm={async () => {
                         const result = await deleteVeicoloAction(v.id);
@@ -219,8 +219,8 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
   const fetch = useCallback(async () => {
     setLoading(true);
     const [{ data: iData }, { data: vData }] = await Promise.all([
-      supabase.from('istruttori').select('*').is('eliminato_il', null).order('cognome'),
-      supabase.from('veicoli').select('*').is('eliminato_il', null).order('nome')
+      supabase.from('istruttori').select('*').order('cognome'),
+      supabase.from('veicoli').select('*').order('nome')
     ]);
     setIstruttori(iData ?? []);
     setVehicles(vData ?? []);
@@ -300,7 +300,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                     <div className="flex items-center gap-2 transition-all ml-auto sm:ml-0">
                       <ConfirmBubble
                         title="Elimina Istruttore"
-                        message="Sei sicuro di voler eliminare questo istruttore? I dati rimarranno nel database ma non saranno più visibili."
+                        message="Sei sicuro di voler eliminare questo istruttore? L'azione è definitiva."
                         confirmLabel="Elimina"
                         onConfirm={async () => {
                           const result = await deleteIstruttoreAction(i.id);
@@ -437,7 +437,7 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('patenti').select('*').is('eliminato_il', null).order('tipo');
+    const { data } = await supabase.from('patenti').select('*').order('tipo');
     setPatenti(data ?? []);
     setLoading(false);
   }, []);
@@ -545,7 +545,7 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
     setLoading(true);
     const [result, { data: istData }] = await Promise.all([
       listUsersAction(),
-      supabase.from('istruttori').select('id, nome, cognome').is('eliminato_il', null).order('cognome'),
+      supabase.from('istruttori').select('id, nome, cognome').order('cognome'),
     ]);
     if (result.users) {
       setUsers(result.users);
@@ -746,14 +746,12 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
         .from('appuntamenti')
         .select(`
           id, data, durata, stato, note, istruttore_id, 
-          clienti!inner(id, nome, cognome, eliminato_il),
+          clienti!inner(id, nome, cognome),
           istruttori(id, nome, cognome, colore)
         `)
-        .is('eliminato_il', null)
         .eq('clienti.nome', 'UFFICIO')
-        .is('clienti.eliminato_il', null)
         .order('data', { ascending: false }),
-      supabase.from('istruttori').select('id, nome, cognome').is('eliminato_il', null).order('cognome')
+      supabase.from('istruttori').select('id, nome, cognome').order('cognome')
     ]);
     
     setIstruttori(istData ?? []);

@@ -57,22 +57,21 @@ export async function updateVeicoloAction(id: string, payload: {
 
 export async function deleteVeicoloAction(id: string) {
   const supabase = await createClient();
-  const now = new Date().toISOString();
 
-  // Soft delete associated appointments
+  // Hard delete associated appointments
   await supabase
     .from('appuntamenti')
-    .update({ eliminato_il: now })
+    .delete()
     .eq('veicolo_id', id);
 
-  // Soft delete the vehicle
+  // Hard delete the vehicle
   const { error } = await supabase
     .from('veicoli')
-    .update({ eliminato_il: now })
+    .delete()
     .eq('id', id);
 
   if (error) {
-    console.error('Error soft-deleting vehicle:', error.message);
+    console.error('Error deleting vehicle:', error.message);
     return { success: false, error: error.message };
   }
 

@@ -91,22 +91,21 @@ export async function updateIstruttoreAction(id: string, payload: {
 
 export async function deleteIstruttoreAction(id: string) {
   const supabase = await createClient();
-  const now = new Date().toISOString();
 
-  // Soft delete associated appointments
+  // Hard delete associated appointments first (because of RESTRICT constraint)
   await supabase
     .from('appuntamenti')
-    .update({ eliminato_il: now })
+    .delete()
     .eq('istruttore_id', id);
 
-  // Soft delete the instructor
+  // Hard delete the instructor
   const { error } = await supabase
     .from('istruttori')
-    .update({ eliminato_il: now })
+    .delete()
     .eq('id', id);
 
   if (error) {
-    console.error('Error soft-deleting instructor:', error.message);
+    console.error('Error deleting instructor:', error.message);
     return { success: false, error: error.message };
   }
 

@@ -70,8 +70,8 @@ export const IstruttoreForm = ({
   useEffect(() => {
     async function fetchData() {
       const [vRes, pRes] = await Promise.all([
-        supabase.from('veicoli').select('id, nome, targa').is('eliminato_il', null).order('nome'),
-        supabase.from('patenti').select('*').is('eliminato_il', null).eq('nascosta', false).order('tipo')
+        supabase.from('veicoli').select('id, nome, targa').order('nome'),
+        supabase.from('patenti').select('*').eq('nascosta', false).order('tipo')
       ]);
       if (vRes.data) setVehicles(vRes.data);
       if (pRes.data) setPatenti(pRes.data);
@@ -139,7 +139,7 @@ export const IstruttoreForm = ({
 
   const handleDelete = async () => {
     if (!istruttoreId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? I dati rimarranno nel database ma non saranno più visibili nell'applicazione.")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? L'azione è definitiva.")) return;
 
     setLoading(true);
     const result = await deleteIstruttoreAction(istruttoreId);
@@ -375,7 +375,7 @@ export const IstruttoreForm = ({
             </button>
             <ConfirmBubble
               title="Elimina Istruttore"
-              message="Sei sicuro di voler eliminare questo istruttore? I dati rimarranno nel database ma non saranno più visibili."
+              message="Sei sicuro di voler eliminare questo istruttore? L'azione è definitiva."
               confirmLabel="Elimina"
               onConfirm={async () => {
                 setLoading(true);

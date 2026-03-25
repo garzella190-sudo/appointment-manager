@@ -8,7 +8,7 @@ export async function deleteAppointmentAction(id: string) {
   const supabase = await createClient();
   const { error } = await supabase
     .from('appuntamenti')
-    .update({ eliminato_il: new Date().toISOString() })
+    .delete()
     .eq('id', id);
   
   if (error) {

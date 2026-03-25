@@ -58,7 +58,7 @@ export const ImpegnoForm = ({
   useEffect(() => {
     async function fetchData() {
       const [iRes, tRes] = await Promise.all([
-        supabase.from('istruttori').select('*').is('eliminato_il', null).order('cognome'),
+        supabase.from('istruttori').select('*').order('cognome'),
         getTipiImpegnoAction()
       ]);
       if (iRes.data) setIstruttori(iRes.data);
@@ -121,7 +121,7 @@ export const ImpegnoForm = ({
 
   const handleDelete = async () => {
     if (!impegnoId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo impegno? I dati rimarranno nel database ma non saranno più visibili nell'applicazione.")) return;
+    if (!window.confirm("Sei sicuro di voler eliminare questo impegno? L'azione è definitiva.")) return;
 
     setLoading(true);
     const result = await deleteImpegnoAction(impegnoId);
@@ -304,7 +304,7 @@ export const ImpegnoForm = ({
       {impegnoId && (
         <ConfirmBubble
           title="Elimina Impegno"
-          message="Sei sicuro di voler eliminare questo impegno? I dati rimarranno nel database ma non saranno più visibili."
+          message="Sei sicuro di voler eliminare questo impegno? L'azione è definitiva."
           confirmLabel="Elimina"
           onConfirm={async () => {
             setLoading(true);

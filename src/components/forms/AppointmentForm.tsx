@@ -103,11 +103,11 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       setFetching(true);
       try {
         const [cRes, iRes, vRes, pRes, impRes] = await Promise.all([
-          supabase.from('clienti').select('*').is('eliminato_il', null).neq('nome', 'UFFICIO').order('cognome'),
-          supabase.from('istruttori').select('*').is('eliminato_il', null).order('cognome'),
-          supabase.from('veicoli').select('*').is('eliminato_il', null).order('nome'),
-          supabase.from('patenti').select('*').is('eliminato_il', null).eq('nascosta', false).order('tipo'),
-          supabase.from('clienti').select('cognome').is('eliminato_il', null).eq('nome', 'UFFICIO'),
+          supabase.from('clienti').select('*').neq('nome', 'UFFICIO').order('cognome'),
+          supabase.from('istruttori').select('*').order('cognome'),
+          supabase.from('veicoli').select('*').order('nome'),
+          supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
+          supabase.from('clienti').select('cognome').eq('nome', 'UFFICIO'),
         ]);
 
         // Extract unique impegno names
@@ -125,7 +125,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         setPatenti(sortedPatenti);
 
         if (appointmentId) {
-          const { data, error } = await supabase.from('appuntamenti').select('*').is('eliminato_il', null).eq('id', appointmentId).single();
+          const { data, error } = await supabase.from('appuntamenti').select('*').eq('id', appointmentId).single();
           const apt = data as (Record<string, any> & { inizio: string; durata: number; stato: string; cambio: string; cliente_id: string; istruttore_id: string; veicolo_id: string; note: string; patente_id: string });
           if (apt && !error) {
             const dateObj = new Date(apt.inizio);
@@ -209,7 +209,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         const { data: overlapping } = await supabase
           .from('appuntamenti')
           .select('istruttore_id, veicolo_id, cliente_id')
-          .is('eliminato_il', null)
+          
           .neq('id', appointmentId || '00000000-0000-0000-0000-000000000000')
           .neq('stato', 'annullato')
           .lt('inizio', endISO)
@@ -774,7 +774,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             onCancel={() => setAddingCliente(false)}
             onSuccess={async (newId) => {
               // Refresh client list
-              const { data } = await supabase.from('clienti').select('*').is('eliminato_il', null).order('cognome');
+              const { data } = await supabase.from('clienti').select('*').order('cognome');
               const sorted = data ?? [];
               setClienti(sorted);
               

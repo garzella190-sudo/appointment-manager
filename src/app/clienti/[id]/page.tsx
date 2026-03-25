@@ -127,7 +127,6 @@ export default function SchedaClientePage() {
       .from('appuntamenti')
       .select('id, data, durata, stato, importo, note, istruttori(id, nome, cognome), veicoli(id, nome, targa)')
       .eq('cliente_id', id)
-      .is('eliminato_il', null)
       .order('data', { ascending: false });
 
     // Normalizza il risultato Supabase (il join torna come oggetto, non array)
