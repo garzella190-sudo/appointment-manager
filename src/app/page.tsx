@@ -102,7 +102,11 @@ export default function Home() {
   useEffect(() => {
     console.log("Agenda V7 - Initialized");
     if (typeof window !== 'undefined' && !window.location.search.includes('no-alert')) {
-      alert("Agenda V7 Caricata - Se vedi questo, il codice è quello nuovo.");
+      const alerted = localStorage.getItem('v7_alert_shown');
+      if (!alerted) {
+        alert("Agenda V7 Caricata - Se vedi questo, il codice è quello nuovo.");
+        localStorage.setItem('v7_alert_shown', 'true');
+      }
     }
     fetchAppointments();
   }, [fetchAppointments]);
@@ -173,20 +177,10 @@ export default function Home() {
               <span className="text-[10px] font-black bg-sky-100 dark:bg-sky-900 text-sky-600 px-1.5 py-0.5 rounded-md tracking-tighter">V7</span>
               <RefreshButton onRefresh={fetchAppointments} className="h-8 w-8 p-0" />
             </div>
-            <div className="flex items-center gap-2 mt-0">
+            <div className="flex items-center gap-3 mt-0">
               <p className="text-zinc-500 dark:text-zinc-400 capitalize text-sm font-semibold">
                 {format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}
               </p>
-              <button 
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.location.href = window.location.pathname + '?v=' + new Date().getTime();
-                  }
-                }}
-                className="px-2 py-0.5 bg-red-500 text-white text-[8px] font-black rounded uppercase tracking-tighter"
-              >
-                Forza Refresh
-              </button>
               <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
                 <button
                   onClick={(e) => { e.preventDefault(); navigateDay(-1); }}

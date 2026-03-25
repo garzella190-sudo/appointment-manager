@@ -1002,6 +1002,16 @@ export default function GestionePage() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display leading-none">Gestione</h1>
           <RefreshButton onRefresh={() => setRefreshKey(prev => prev + 1)} className="h-8 w-8 p-0" />
+          <button 
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = window.location.pathname + '?v=' + new Date().getTime();
+              }
+            }}
+            className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-[9px] font-black rounded-lg uppercase tracking-tighter border border-red-200 dark:border-red-900/30 transition-all"
+          >
+            Forza Refresh PWA
+          </button>
         </div>
         <p className="text-zinc-500 dark:text-zinc-400 mt-0 text-xs font-semibold">Configura le risorse della scuola guida</p>
       </header>
