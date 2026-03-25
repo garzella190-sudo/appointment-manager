@@ -553,10 +553,9 @@ export default function CalendarPage() {
                               onClick={() => handleCellClick(dateStr, slot)}
                             >
                               {cellAppointments
-                                .filter(apt => apt.stato !== 'annullato')
                                 .map((apt, idx) => {
                                 const activeInCellCount = cellAppointments.filter(a => a.stato !== 'annullato').length;
-                                const hasConflict = activeInCellCount > 1; 
+                                const hasConflict = apt.stato !== 'annullato' && activeInCellCount > 1; 
                                 
                                 return (
                                   <div
@@ -567,7 +566,7 @@ export default function CalendarPage() {
                                       appointment={apt}
                                       isOverlapping={hasConflict}
                                       onClick={setSelectedAppointment}
-                                      isStacked={cellAppointments.filter(a => a.stato !== 'annullato').length > 1}
+                                      isStacked={cellAppointments.length > 1}
                                       granularity={15}
                                       isFirst={idx === 0}
                                     />

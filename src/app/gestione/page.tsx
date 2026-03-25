@@ -17,12 +17,12 @@ import { it } from 'date-fns/locale';
 import { listUsersAction, updateUserAction } from '@/actions/auth';
 import { deleteVeicoloAction } from '@/actions/veicoli';
 import { deleteIstruttoreAction } from '@/actions/istruttori';
-import { deleteAppointmentAction } from '@/actions/appointment_actions';
+import { deleteAppointmentAction, cancelAppointmentAction } from '@/actions/appointment_actions';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
   AlertTriangle, CheckCircle2, Phone, Mail, Search,
   Clock, EyeOff, Eye, Copy,
-  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone
+  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone, X
 } from 'lucide-react';
 import Select from '@/components/forms/Select';
 import { cn } from '@/lib/utils';
@@ -767,6 +767,7 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
         data: a.data,
         durata: a.durata,
         note: a.note,
+        stato: a.stato,
         istruttore: a.istruttori,
         istruttore_id: a.istruttore_id,
         ora_inizio: format(new Date(a.data), 'HH:mm'),
@@ -875,7 +876,10 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
             <div 
               key={i.id} 
               onClick={() => openEdit(i)}
-              className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/5 transition-all"
+              className={cn(
+                "bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer transition-all",
+                i.stato === 'annullato' ? "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950" : "hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/5"
+              )}
             >
               <div className="flex items-center gap-4">
                 <div 
@@ -885,7 +889,10 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-tight">
+                    <span className={cn(
+                      "text-sm font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-tight",
+                      i.stato === 'annullato' && "line-through text-zinc-500"
+                    )}>
                       {i.tipo}
                     </span>
                     <span className="text-[10px] px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-zinc-500 font-bold uppercase tracking-widest">
@@ -909,6 +916,29 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
                 >
                   <Copy size={16} />
                 </button>
+                {i.stato !== 'annullato' && (
+                  <ConfirmBubble
+                    title="Annulla Impegno"
+                    message="Vuoi annullare questo impegno? Resterà visibile nello storico."
+                    confirmLabel="Annulla"
+                    onConfirm={async () => {
+                      const result = await cancelAppointmentAction(i.id);
+                      if (result.success) {
+                        fetch();
+                      } else {
+                        alert(result.error || "Errore durante l'annullamento.");
+                      }
+                    }}
+                    trigger={
+                      <button 
+                        title="Annulla"
+                        className="p-2 text-zinc-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-xl transition-all"
+                      >
+                        <X size={16} />
+                      </button>
+                    }
+                  />
+                )}
                 <ConfirmBubble
                   title="Elimina Impegno"
                   message="Sei sicuro di voler eliminare questo impegno?"

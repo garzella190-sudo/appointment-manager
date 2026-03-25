@@ -41,7 +41,8 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
         "relative w-full p-1.5 mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] shadow-sm flex flex-col justify-between border-l-4",
         isDragging ? "invisible" : "hover:scale-[1.02] hover:shadow-lg hover:z-[30]",
         appointment.is_unavailability ? "bg-zinc-200 dark:bg-zinc-700/50" : "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md",
-        isOverlapping && "ring-2 ring-red-500 animate-pulse bg-red-500/10 dark:bg-red-500/20"
+        isOverlapping && "ring-2 ring-red-500 animate-pulse bg-red-500/10 dark:bg-red-500/20",
+        appointment.stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950 border-zinc-300 dark:border-zinc-700"
       )}
       style={{ 
         ...style,
@@ -55,7 +56,10 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
     >
       <div>
         <div className="flex items-start justify-between gap-1">
-          <p className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight truncate">
+          <p className={cn(
+            "text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight truncate",
+            appointment.stato === 'annullato' && "line-through text-zinc-500 dark:text-zinc-400"
+          )}>
             {appointment.client_name}
           </p>
           <div className="flex items-center gap-1 shrink-0">
