@@ -1,0 +1,310 @@
+[
+  {
+    "id": "c685de7a-b8fe-4897-bb98-1b2ec4a4376b",
+    "cliente_id": "267f19e1-9960-455a-842a-5717c84108e3",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T13:00:00+00:00",
+    "durata": 60,
+    "stato": "programmato",
+    "importo": null,
+    "note": null,
+    "created_at": "2026-03-20T14:31:02.619815+00:00",
+    "updated_at": "2026-03-20T14:31:02.619815+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T13:00:00+00:00",
+    "fine": "2026-03-23T14:00:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Francesca",
+      "cognome": "Rofi"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "714e17c7-f3f4-4136-8e5d-35ad551b822e",
+    "cliente_id": "a69b7a2a-91c9-44d0-8c0e-33a6ae05e235",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T16:00:00+00:00",
+    "durata": 60,
+    "stato": "programmato",
+    "importo": null,
+    "note": null,
+    "created_at": "2026-03-18T13:59:40.572013+00:00",
+    "updated_at": "2026-03-18T13:59:40.572013+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T16:00:00+00:00",
+    "fine": "2026-03-23T17:00:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Filippo",
+      "cognome": "Daddi"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "43662e44-230b-4ddf-ac83-ac93019d93ed",
+    "cliente_id": "0cf9d6ae-1ef1-4a4b-9614-66344e892401",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T09:30:00+00:00",
+    "durata": 30,
+    "stato": "programmato",
+    "importo": null,
+    "note": "",
+    "created_at": "2026-03-22T22:35:04.962954+00:00",
+    "updated_at": "2026-03-23T22:34:07.321333+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T09:30:00+00:00",
+    "fine": "2026-03-23T10:00:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Marta",
+      "cognome": "Savi"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "b1885def-62c8-4c8d-a396-c470e2cf5b1e",
+    "cliente_id": "878a095d-307f-4295-8f4b-0354d408d49e",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T10:00:00+00:00",
+    "durata": 30,
+    "stato": "programmato",
+    "importo": null,
+    "note": null,
+    "created_at": "2026-03-22T22:35:29.896146+00:00",
+    "updated_at": "2026-03-22T22:35:29.896146+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T10:00:00+00:00",
+    "fine": "2026-03-23T10:30:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Mirko",
+      "cognome": "Bruschi"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "d1fe49f0-af02-4775-90cb-f45edbda5edd",
+    "cliente_id": "c6560b36-a9d0-4db8-a44c-4404e07c532c",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T14:00:00+00:00",
+    "durata": 30,
+    "stato": "programmato",
+    "importo": null,
+    "note": null,
+    "created_at": "2026-03-22T22:39:55.033438+00:00",
+    "updated_at": "2026-03-22T22:39:55.033438+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T14:00:00+00:00",
+    "fine": "2026-03-23T14:30:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Alice",
+      "cognome": "Grassi"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "37512ed2-f9b0-4329-8844-becc233d8e10",
+    "cliente_id": "345a9477-ccfb-492d-9618-a2ad9e8f8b7e",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T15:30:00+00:00",
+    "durata": 30,
+    "stato": "annullato",
+    "importo": null,
+    "note": "Dice di essere registrata a domani..",
+    "created_at": "2026-03-22T22:42:05.101059+00:00",
+    "updated_at": "2026-03-23T15:57:42.721057+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T15:30:00+00:00",
+    "fine": "2026-03-23T16:00:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Federica",
+      "cognome": "Dessì"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "00a1fbd6-d538-45b2-a367-17640fe4ed88",
+    "cliente_id": "687a6eb3-68a2-49cc-94c2-7782688fd543",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T07:00:00+00:00",
+    "durata": 30,
+    "stato": "programmato",
+    "importo": null,
+    "note": null,
+    "created_at": "2026-03-23T22:00:15.222185+00:00",
+    "updated_at": "2026-03-23T22:57:01.521946+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T07:00:00+00:00",
+    "fine": "2026-03-23T07:30:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": "2026-03-23T22:57:01.212+00:00",
+    "clienti": {
+      "nome": "Sofia",
+      "cognome": "Amato"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "c45b2d3e-2697-4499-a128-4f17b8d09e41",
+    "cliente_id": "14ccc8c2-397f-44df-83f8-fc8aa5486612",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T14:30:00+00:00",
+    "durata": 60,
+    "stato": "programmato",
+    "importo": null,
+    "note": null,
+    "created_at": "2026-03-22T22:40:45.995684+00:00",
+    "updated_at": "2026-03-23T22:26:14.408786+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T14:30:00+00:00",
+    "fine": "2026-03-23T15:30:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Giovanni",
+      "cognome": "Sirressi"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "a0004dff-e029-46fa-b4e0-dc3f28845bfc",
+    "cliente_id": "687a6eb3-68a2-49cc-94c2-7782688fd543",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": "f11c96f2-9c8c-4025-a1c7-9250c9b269bb",
+    "data": "2026-03-23T10:30:00+00:00",
+    "durata": 30,
+    "stato": "annullato",
+    "importo": null,
+    "note": "Scrive domenica di non poter venire",
+    "created_at": "2026-03-22T22:39:19.269276+00:00",
+    "updated_at": "2026-03-23T22:56:07.953634+00:00",
+    "send_email": true,
+    "send_whatsapp": true,
+    "inizio": "2026-03-23T10:30:00+00:00",
+    "fine": "2026-03-23T11:00:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": null,
+    "clienti": {
+      "nome": "Sofia",
+      "cognome": "Amato"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": {
+      "nome": "Fiat Panda 2007"
+    }
+  },
+  {
+    "id": "b74d1915-6414-437e-b075-5839c87bcadb",
+    "cliente_id": "c344d73f-febf-4350-af56-ba229dbacc38",
+    "istruttore_id": "2782e356-3e74-46ba-a507-014e3fdb6b68",
+    "veicolo_id": null,
+    "data": "2026-03-23T08:00:00+00:00",
+    "durata": 60,
+    "stato": "programmato",
+    "importo": null,
+    "note": "Nota test impegno con icona sticky note",
+    "created_at": "2026-03-23T22:58:03.756536+00:00",
+    "updated_at": "2026-03-23T23:05:13.433442+00:00",
+    "send_email": false,
+    "send_whatsapp": false,
+    "inizio": "2026-03-23T08:00:00+00:00",
+    "fine": "2026-03-23T09:00:00+00:00",
+    "data_solo": "2026-03-23",
+    "patente_id": null,
+    "eliminato_il": "2026-03-23T23:05:13.167+00:00",
+    "clienti": {
+      "nome": "UFFICIO",
+      "cognome": "TEST IMPEGNO"
+    },
+    "istruttori": {
+      "nome": "Manuele",
+      "cognome": "Garzella"
+    },
+    "veicoli": null
+  }
+]

@@ -81,9 +81,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   const [durationMode, setDurationMode] = useState<'30' | '60' | 'custom'>('60');
   const [serverError, setServerError] = useState<string | null>(null);
   const [addingCliente, setAddingCliente] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState<{ instructor_ids: string[], vehicle_ids: string[] }>({ 
+  const [availableSlots, setAvailableSlots] = useState<{ instructor_ids: string[], vehicle_ids: string[], busy_client_ids: string[] }>({ 
     instructor_ids: [], 
-    vehicle_ids: [] 
+    vehicle_ids: [],
+    busy_client_ids: []
   });
   const [isUpdatingNote, setIsUpdatingNote] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -207,7 +208,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         // Query appuntamenti directly for overlaps
         const { data: overlapping } = await supabase
           .from('appuntamenti')
-          .select('istruttore_id, veicolo_id')
+          .select('istruttore_id, veicolo_id, cliente_id')
           .is('eliminato_il', null)
           .neq('id', appointmentId || '00000000-0000-0000-0000-000000000000')
           .neq('stato', 'annullato')
@@ -216,7 +217,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
         const busyInstructors = overlapping?.map((a: any) => a.istruttore_id).filter(Boolean) as string[] || [];
         const busyVehicles = overlapping?.map((a: any) => a.veicolo_id).filter(Boolean) as string[] || [];
+        const busyClients = overlapping?.map((a: any) => a.cliente_id).filter(Boolean) as string[] || [];
 
+        // If a client is busy, they shouldn't be selectable, but we handle that at validation time.
+        // For instructors and vehicles:
         const nextInstructorIds = istruttori.map(i => i.id).filter(id => !busyInstructors.includes(id));
         const nextVehicleIds = veicoli.map(v => v.id).filter(id => !busyVehicles.includes(id));
 
@@ -225,9 +229,11 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                           prev.instructor_ids.every((id, idx) => id === nextInstructorIds[idx]);
           const isSameV = prev.vehicle_ids.length === nextVehicleIds.length && 
                           prev.vehicle_ids.every((id, idx) => id === nextVehicleIds[idx]);
+          const isSameC = prev.busy_client_ids?.length === busyClients.length &&
+                          prev.busy_client_ids.every((id: string, idx: number) => id === busyClients[idx]);
           
-          if (isSameI && isSameV) return prev;
-          return { instructor_ids: nextInstructorIds, vehicle_ids: nextVehicleIds };
+          if (isSameI && isSameV && isSameC) return prev;
+          return { instructor_ids: nextInstructorIds, vehicle_ids: nextVehicleIds, busy_client_ids: busyClients };
         });
       } catch (err) {
         console.error('Error checking availability:', err);
@@ -412,6 +418,17 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     if (!isImpegno && !form.cliente_id) return alert('Seleziona un cliente');
     if (isImpegno && !nomeImpegno.trim()) return alert('Inserisci il nome dell\'impegno');
     if (!form.istruttore_id) return alert('Seleziona un istruttore');
+    
+    // Strict overlap validation before submitting
+    if (!availableSlots.instructor_ids.includes(form.istruttore_id)) {
+      return alert("L'istruttore è già impegnato in questo orario.");
+    }
+    if (!isImpegno && form.veicolo_id && !availableSlots.vehicle_ids.includes(form.veicolo_id)) {
+      return alert("Il veicolo è già in uso in questo orario.");
+    }
+    if (!isImpegno && form.cliente_id && availableSlots.busy_client_ids.includes(form.cliente_id)) {
+      return alert("Il cliente ha già un'altra guida in questo orario.");
+    }
     
     setLoading(true);
     const startDateTime = new Date(`${form.data}T${form.ora}`).toISOString();
