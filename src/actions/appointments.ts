@@ -14,7 +14,8 @@ export async function createAppointmentAction(payload: {
   nome_impegno?: string;
   istruttore_id: string;
   veicolo_id: string | null;
-  data: string; // ISO string
+  data: string; // "YYYY-MM-DDTHH:mm" locally or ISO
+  data_solo?: string; // "YYYY-MM-DD"
   durata: number;
   stato: string;
   note: string | null;
@@ -68,9 +69,8 @@ export async function createAppointmentAction(payload: {
   const startISO = startTime.toISOString();
   const endISO = endTime.toISOString();
   
-  // Robust date_solo: extract YYYY-MM-DD from the local date/time provided, or from the ISO
-  // Since payload.data is expected to be "YYYY-MM-DDTHH:mm", we can split by T.
-  const dateOnly = payload.data.includes('T') ? payload.data.split('T')[0] : payload.data;
+  // Use explicit data_solo if provided, otherwise extract from input string
+  const dateOnly = payload.data_solo || payload.data.split('T')[0];
 
   console.log('DEBUG: Creating appointment', {
     dateOnly,
@@ -223,6 +223,7 @@ export async function createAppointmentAction(payload: {
 
   revalidatePath('/calendar');
   revalidatePath('/gestione');
+  revalidatePath('/');
 
   return { success: true, appointment };
 }
@@ -265,7 +266,9 @@ export async function updateAppointmentAction(id: string, payload: any) {
   
   const startISO = startTime.toISOString();
   const endISO = endTime.toISOString();
-  const dateOnly = payload.data.split('T')[0];
+  
+  // Use explicit data_solo if provided, otherwise extract from input string
+  const dateOnly = payload.data_solo || payload.data.split('T')[0];
 
   console.log('DEBUG: Creating appointment', {
     localData: payload.data,
@@ -357,6 +360,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
 
   revalidatePath('/calendar');
   revalidatePath('/gestione');
+  revalidatePath('/');
 
   return { success: true, appointment: data };
 }

@@ -30,8 +30,6 @@ export default function Home() {
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     const dateStr = format(currentDate, 'yyyy-MM-dd');
-    const startOfDayStr = new Date(`${dateStr}T00:00:00`).toISOString();
-    const endOfDayStr = new Date(`${dateStr}T23:59:59`).toISOString();
 
     try {
       const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
@@ -44,8 +42,7 @@ export default function Home() {
             veicoli ( id, targa, nome, colore )
           `)
           .is('eliminato_il', null)
-          .gte('data', startOfDayStr)
-          .lte('data', endOfDayStr)
+          .eq('data_solo', dateStr)
           .order('data'),
         supabase.from('patenti').select('id, tipo'),
         supabase.from('istruttori').select('id, nome, cognome').order('cognome')

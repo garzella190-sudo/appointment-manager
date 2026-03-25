@@ -26,6 +26,7 @@ import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import { Clock } from 'lucide-react';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
+import { updateAppointmentAction } from '@/actions/appointments';
 
 const supabaseClient = createClient();
 
@@ -89,10 +90,12 @@ export default function CalendarPage() {
     const savedViewDays = localStorage.getItem('calendar_viewDays');
     const savedShowWeekends = localStorage.getItem('calendar_showWeekends');
     const savedDate = localStorage.getItem('calendar_currentDate');
+    const savedGranularity = localStorage.getItem('calendar_granularity');
 
     if (savedInstructorId !== null) setSelectedInstructorId(savedInstructorId);
     if (savedViewDays !== null) setViewDays(parseInt(savedViewDays) as any);
     if (savedShowWeekends !== null) setShowWeekends(savedShowWeekends === 'true');
+    if (savedGranularity !== null) setGranularity(parseInt(savedGranularity) as any);
     if (savedDate !== null) {
       try {
         setCurrentDate(new Date(savedDate));
@@ -125,7 +128,8 @@ export default function CalendarPage() {
     localStorage.setItem('calendar_viewDays', viewDays.toString());
     localStorage.setItem('calendar_showWeekends', showWeekends.toString());
     localStorage.setItem('calendar_currentDate', currentDate.toISOString());
-  }, [selectedInstructorId, viewDays, showWeekends, currentDate, mounted]);
+    localStorage.setItem('calendar_granularity', granularity.toString());
+  }, [selectedInstructorId, viewDays, showWeekends, currentDate, granularity, mounted]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -177,7 +181,8 @@ export default function CalendarPage() {
 
   const fetchWeekAppointments = useCallback(async () => {
     setLoading(true);
-    const fetchEndDate = addDays(displayStart, effectiveViewDays);
+    const fetchStartDate = displayDays[0];
+    const fetchEndDate = addDays(displayDays[displayDays.length - 1], 1);
 
     try {
       const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
@@ -190,8 +195,8 @@ export default function CalendarPage() {
             veicoli ( id, targa, nome, colore )
           `)
           .is('eliminato_il', null)
-          .gte('data', displayStart.toISOString())
-          .lt('data', fetchEndDate.toISOString()),
+          .gte('data_solo', format(fetchStartDate, 'yyyy-MM-dd'))
+          .lt('data_solo', format(fetchEndDate, 'yyyy-MM-dd')),
         supabase.from('patenti').select('id, tipo').is('eliminato_il', null),
         supabase.from('istruttori').select('id, nome, cognome').is('eliminato_il', null).order('cognome')
       ]);
@@ -237,7 +242,7 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, displayStart.getTime(), effectiveViewDays]);
+  }, [supabaseClient, displayDays]);
 
   useEffect(() => {
     if (mounted) fetchWeekAppointments();
@@ -318,18 +323,21 @@ export default function CalendarPage() {
       const startISO = startDateTime.toISOString();
       const endISO = endDateTime.toISOString();
 
-      const { error } = await supabase
-        .from('appuntamenti')
-        .update({ 
-          data: startISO,
-          inizio: startISO,
-          fine: endISO,
-          data_solo: dateStr
-        })
-        .eq('id', active.id);
+      // Call server action for robust validation and revalidation
+      const result = await updateAppointmentAction(active.id as string, { 
+        ...targetApt,
+        data: startISO,
+        inizio: startISO,
+        fine: endISO,
+        data_solo: dateStr,
+        cliente_id: targetApt.cliente_id
+      });
 
-      if (error) {
-        console.error('Error updating appointment position:', error);
+      if (result && !result.success) {
+        setToast({
+          message: result.error || 'Errore durante lo spostamento',
+          type: 'error'
+        });
         if (mounted) fetchWeekAppointments(); 
       }
     }

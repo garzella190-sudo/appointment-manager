@@ -17,6 +17,7 @@ export async function deleteAppointmentAction(id: string) {
   }
 
   revalidatePath('/calendar');
+  revalidatePath('/gestione');
   revalidatePath('/'); // Refresh Agenda
   return { success: true };
 }
@@ -34,6 +35,7 @@ export async function cancelAppointmentAction(id: string) {
   }
 
   revalidatePath('/calendar');
+  revalidatePath('/gestione');
   revalidatePath('/'); // Refresh Agenda
   return { success: true };
 }
@@ -51,6 +53,7 @@ export async function updateAppointmentNoteAction(id: string, note: string | nul
   }
 
   revalidatePath('/calendar');
+  revalidatePath('/gestione');
   revalidatePath('/'); // Refresh Agenda
   return { success: true };
 }
