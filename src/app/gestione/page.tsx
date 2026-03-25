@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { User as AuthUser } from '@supabase/supabase-js';
 import { PhoneActions } from '@/components/PhoneActions';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
+import { RefreshButton } from '@/components/RefreshButton';
 
 // ── Helper per badge scadenza revisione ───────────────────────
 const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
@@ -1019,7 +1020,10 @@ export default function GestionePage() {
     <div className="flex flex-col h-full animate-fade-in overflow-hidden">
       {/* Page Header - Fixed */}
       <header className="pt-2 px-4 md:px-6 pb-4 flex-shrink-0 max-w-4xl mx-auto w-full">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display leading-none">Gestione</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display leading-none">Gestione</h1>
+          <RefreshButton onRefresh={() => setRefreshKey(prev => prev + 1)} className="h-8 w-8 p-0" />
+        </div>
         <p className="text-zinc-500 dark:text-zinc-400 mt-0 text-xs font-semibold">Configura le risorse della scuola guida</p>
       </header>
 

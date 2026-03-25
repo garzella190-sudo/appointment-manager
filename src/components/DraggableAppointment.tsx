@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { AlertTriangle, StickyNote, Trash2 } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
+import { isSameDay, parseISO } from 'date-fns';
 
 interface DraggableAppointmentProps {
   appointment: Appointment;
@@ -21,6 +22,14 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
     id: appointment.id,
     data: appointment
   });
+
+  const now = new Date();
+  const isToday = isSameDay(parseISO(appointment.appointment_date), now);
+  const [h, m] = appointment.appointment_time.split(':').map(Number);
+  const startTime = new Date(now);
+  startTime.setHours(h, m, 0, 0);
+  const endTime = new Date(startTime.getTime() + appointment.duration * 60000);
+  const isInProgress = isToday && now >= startTime && now < endTime && appointment.stato !== 'annullato';
 
   const style = isDragging ? {
     opacity: 0,
@@ -42,7 +51,8 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
         isDragging ? "invisible" : "hover:scale-[1.02] hover:shadow-lg hover:z-[30]",
         appointment.is_unavailability ? "bg-zinc-200 dark:bg-zinc-700/50" : "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md",
         isOverlapping && "ring-2 ring-red-500 animate-pulse bg-red-500/10 dark:bg-red-500/20",
-        appointment.stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950 border-zinc-300 dark:border-zinc-700"
+        appointment.stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950 border-zinc-300 dark:border-zinc-700",
+        isInProgress && "ring-[3px] ring-blue-600/40 border-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(37,99,235,0.1)] animate-pulse-subtle"
       )}
       style={{ 
         ...style,

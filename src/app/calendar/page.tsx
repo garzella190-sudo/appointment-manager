@@ -20,6 +20,7 @@ import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
 import { DroppableCell } from '@/components/DroppableCell';
 import { DraggableAppointment } from '@/components/DraggableAppointment';
+import { RefreshButton } from '@/components/RefreshButton';
 import { cn } from '@/lib/utils';
 import { Toast } from '@/components/Toast';
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
@@ -371,7 +372,10 @@ export default function CalendarPage() {
         <div className="flex flex-col h-full w-full overflow-hidden">
           <header className="px-2 sm:px-4 md:px-6 py-2 pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0">
             <div>
+            <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
+              <RefreshButton onRefresh={fetchWeekAppointments} className="h-8 w-8 p-0" />
+            </div>
               <p className="text-zinc-500 dark:text-zinc-400 mt-0.5 capitalize text-xs font-medium">
                 {format(weekStart, 'MMMM yyyy', { locale: it })}
               </p>

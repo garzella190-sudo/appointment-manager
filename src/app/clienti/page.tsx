@@ -12,6 +12,7 @@ import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2, Trash2 }
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
+import { RefreshButton } from '@/components/RefreshButton';
 
 export default function ClientiPage() {
   const router = useRouter();
@@ -55,7 +56,10 @@ export default function ClientiPage() {
       <div className="pt-2 px-4 md:px-6 pb-1 max-w-4xl mx-auto w-full flex-shrink-0">
         <header className="mb-2 flex items-end justify-between">
           <div>
+          <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Clienti</h1>
+            <RefreshButton onRefresh={fetchData} className="h-8 w-8 p-0" />
+          </div>
             <p className="text-zinc-500 dark:text-zinc-400 mt-0 text-xs font-semibold">
               {loading ? 'Caricamento...' : `${clienti.length} clienti registrati`}
             </p>

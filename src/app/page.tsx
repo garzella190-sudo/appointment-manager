@@ -12,6 +12,7 @@ import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import Select from '@/components/forms/Select';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
+import { RefreshButton } from '@/components/RefreshButton';
 
 export default function Home() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -164,7 +165,10 @@ export default function Home() {
       <div className="pt-2 px-4 md:px-6 pb-1 max-w-4xl mx-auto w-full flex-shrink-0">
         <header className="mb-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-3">
           <div>
+          <div className="flex items-center gap-3">
             <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-none">Agenda</h1>
+            <RefreshButton onRefresh={fetchAppointments} className="h-8 w-8 p-0" />
+          </div>
             <div className="flex items-center gap-3 mt-0">
               <p className="text-zinc-500 dark:text-zinc-400 capitalize text-sm font-semibold">
                 {format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}
@@ -252,16 +256,25 @@ export default function Home() {
             </div>
           ) : filteredAppointments.length > 0 ? (
             <div className="grid gap-3">
-              {filteredAppointments.map((apt) => (
-                <div
-                  key={apt.id}
-                  id={`apt-${apt.id}`}
-                  onClick={() => setSelectedAppointment(apt)}
-                  className={cn(
-                    "group relative p-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all",
-                    apt.stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950"
-                  )}
-                >
+              {filteredAppointments.map((apt) => {
+                const now = new Date();
+                const [h, m] = apt.appointment_time.split(':').map(Number);
+                const startTime = new Date(now);
+                startTime.setHours(h, m, 0, 0);
+                const endTime = new Date(startTime.getTime() + apt.duration * 60000);
+                const isInProgress = isSameDay(currentDate, now) && now >= startTime && now < endTime && apt.stato !== 'annullato';
+
+                return (
+                  <div
+                    key={apt.id}
+                    id={`apt-${apt.id}`}
+                    onClick={() => setSelectedAppointment(apt)}
+                    className={cn(
+                      "group relative p-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all text-left",
+                      apt.stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950",
+                      isInProgress && "ring-[3px] ring-blue-600/40 border-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(37,99,235,0.1)] animate-pulse-subtle"
+                    )}
+                  >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
                       <div 
@@ -353,8 +366,9 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
           ) : (
             <div className="p-12 text-center bg-zinc-50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-3">
               <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
