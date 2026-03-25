@@ -64,7 +64,7 @@ export default function LoginPage() {
               value={email} 
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@autoscuola.it"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-base text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
             />
           </div>
           
@@ -76,7 +76,7 @@ export default function LoginPage() {
               value={password} 
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-base text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
             />
           </div>
 

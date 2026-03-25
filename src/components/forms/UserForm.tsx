@@ -70,7 +70,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
           required
           placeholder="es. Mario Rossi"
           defaultValue={user?.user_metadata?.full_name || ''}
-          className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+          className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-base outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
         />
       </div>
 
@@ -84,7 +84,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
           required
           placeholder="email@esempio.it"
           defaultValue={user?.email || ''}
-          className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+          className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-base outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
         />
       </div>
 
@@ -98,7 +98,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
           required={!isEdit}
           minLength={6}
           placeholder={isEdit ? "Cambia password (lascia vuoto per non modificare)" : "••••••••"}
-          className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+          className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-base outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
         />
       </div>
 

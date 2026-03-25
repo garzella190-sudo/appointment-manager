@@ -44,7 +44,7 @@ const BottomNav = ({ user }: BottomNavProps) => {
 
   return (
     <>
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[98%] max-w-2xl z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <nav className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[95%] max-w-2xl z-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2 px-3 sm:px-6 rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-200/50 dark:border-zinc-800/50">
           
           {/* User Profile - Left */}

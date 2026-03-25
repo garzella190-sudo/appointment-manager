@@ -20,7 +20,7 @@ interface PatenteFormProps {
   onCancel: () => void;
 }
 
-const INPUT_CLS = 'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm';
+const INPUT_CLS = 'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-base';
 const LABEL_CLS = 'text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-1.5';
 
 export const PatenteForm = ({

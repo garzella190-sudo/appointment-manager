@@ -95,7 +95,7 @@ const Select = ({
                 <input
                   autoFocus
                   type="text"
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-xl pl-9 pr-4 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500/10"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-xl pl-9 pr-4 py-2 text-base font-semibold outline-none focus:ring-2 focus:ring-blue-500/10"
                   placeholder="Cerca..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}

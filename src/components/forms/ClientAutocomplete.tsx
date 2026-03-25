@@ -72,7 +72,7 @@ export const ClientAutocomplete = ({
         </div>
         <input
           type="text"
-          className="w-full bg-[#F4F4F4] border-transparent rounded-[16px] pl-12 pr-10 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all text-sm h-12 font-semibold text-zinc-900"
+          className="w-full bg-[#F4F4F4] border-transparent rounded-[16px] pl-12 pr-10 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all text-base h-12 font-semibold text-zinc-900"
           placeholder={placeholder}
           value={query}
           onChange={(e) => {

@@ -28,9 +28,9 @@ interface VeicoloFormProps {
   onCancel: () => void;
 }
 
-const INPUT_CLS = 'w-full bg-[#F4F4F4] dark:bg-zinc-900 border-transparent rounded-[16px] py-3 px-4 outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 transition-all text-sm font-semibold text-zinc-900 dark:text-zinc-100 h-12';
+const INPUT_CLS = 'w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 px-4 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-base font-semibold text-zinc-900 dark:text-zinc-100 h-12';
 const LABEL_CLS = 'text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest ml-1 mb-1.5 flex items-center gap-2';
-const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] dark:bg-zinc-900/50 rounded-[16px] px-4 flex items-center h-12 text-sm font-semibold text-zinc-900 dark:text-zinc-100 transition-all cursor-default overflow-hidden';
+const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] dark:bg-zinc-900/50 rounded-[16px] px-4 flex items-center h-12 text-base font-semibold text-zinc-900 dark:text-zinc-100 transition-all cursor-default overflow-hidden';
 
 export const VeicoloForm = ({
   veicoloId,

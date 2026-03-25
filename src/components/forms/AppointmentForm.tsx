@@ -32,9 +32,9 @@ interface FormProps {
 }
 
 // Fixed Premium Light Aesthetic Tokens
-const INPUT_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 transition-all text-sm h-12 font-semibold text-zinc-900';
+const INPUT_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 transition-all text-base h-12 font-semibold text-zinc-900';
 const LABEL_CLS = 'text-[11px] font-bold text-zinc-400 uppercase tracking-[0.1em] flex items-center gap-2 ml-1 mb-2';
-const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 flex items-center h-12 text-sm font-semibold text-zinc-900 transition-all cursor-default overflow-hidden';
+const VIEW_BLOCK_CLS = 'w-full bg-[#F4F4F4] border-transparent rounded-[16px] px-4 flex items-center h-12 text-base font-semibold text-zinc-900 transition-all cursor-default overflow-hidden';
 
 const TIME_OPTIONS = Array.from({ length: (22 - 8) * 4 + 1 }, (_, i) => {
   const totalMinutes = i * 15;
