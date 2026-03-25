@@ -218,8 +218,8 @@
 
 /* Premium DatePicker Overrides */
 .premium-calendar {
-  background-color: var(--card) !important;
-  border: 1px solid var(--border) !important;
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
   border-radius: 1.25rem !important; /* rounded-2xl */
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
   font-family: inherit !important;
@@ -259,15 +259,15 @@
 }
 
 .premium-calendar .react-datepicker__header {
-  background-color: var(--card) !important;
-  border-bottom: 1px solid var(--border) !important;
+  background-color: hsl(var(--card)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
   border-top-left-radius: 1rem !important;
   border-top-right-radius: 1rem !important;
   padding-top: 0.75rem !important;
 }
 
 .premium-calendar .react-datepicker__current-month {
-  color: var(--foreground) !important;
+  color: hsl(var(--foreground)) !important;
   font-weight: 700 !important;
   font-size: 0.875rem !important;
   margin-bottom: 0.5rem !important;
@@ -281,7 +281,7 @@
 }
 
 .premium-calendar .react-datepicker__day {
-  color: var(--foreground) !important;
+  color: hsl(var(--foreground)) !important;
   width: 2.25rem !important;
   line-height: 2.25rem !important;
   border-radius: 0.75rem !important;
