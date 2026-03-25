@@ -69,10 +69,10 @@ export default function SWRegister() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={handleUpdate}
-            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-blue-500/25"
+            className="h-10 bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-blue-500/25 flex items-center justify-center"
           >
             Aggiorna
           </button>

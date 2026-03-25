@@ -119,7 +119,8 @@ export default function Home() {
           const element = document.getElementById(`apt-${targetApt.id}`);
           const container = scrollContainerRef.current;
           if (element && container) {
-            const scrollPos = element.offsetTop - (container.clientHeight / 2) + (element.clientHeight / 2);
+            // Align to top with a small offset (12px) for breathing room
+            const scrollPos = element.offsetTop - 12;
             container.scrollTo({ top: scrollPos, behavior: 'smooth' });
           }
         }
