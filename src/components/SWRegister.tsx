@@ -19,8 +19,9 @@ export default function SWRegister() {
     };
 
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      // Force physical file rename to bypass iOS cache
       navigator.serviceWorker
-        .register('/sw.js')
+        .register('/sw-v4.js')
         .then((reg) => {
           registration = reg;
           

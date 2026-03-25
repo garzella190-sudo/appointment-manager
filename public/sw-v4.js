@@ -1,56 +1,45 @@
-const CACHE_NAME = 'appointment-manager-v2'; // Increment version
+const CACHE_NAME = 'appointment-manager-v4'; // Increment version v4
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
   '/app_icon_512.png'
 ];
 
-// Install: Cache core assets
+// Install: Cache core assets and skip waiting
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('SW: Pre-caching core assets');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
 });
 
-// Activate: Clean up old caches
+// Activate: Clean up ALL old caches and claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.filter((cacheName) => {
-          return cacheName !== CACHE_NAME;
-        }).map((cacheName) => {
-          console.log('SW: Removing old cache', cacheName);
-          return caches.delete(cacheName);
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('SW: Removing old cache', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
     }).then(() => self.clients.claim())
   );
 });
 
-// Fetch strategy
+// Fetch strategy: NETWORK FIRST for everything to solve iOS caching issues
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
-  // For Navigations (HTML), try network first, then cache
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match('/'))
-    );
-    return;
-  }
-
-  // For other requests, use Stale-While-Revalidate
+  // Global Network-First strategy
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchedResponse = fetch(event.request).then((networkResponse) => {
-        // Only cache valid responses
+    fetch(event.request)
+      .then((networkResponse) => {
+        // Cache successful responses
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -58,10 +47,18 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => null);
-
-      return cachedResponse || fetchedResponse;
-    })
+      })
+      .catch(() => {
+        // Fallback to cache if network fails
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          
+          // Absolute fallback for navigation
+          if (event.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+        });
+      })
   );
 });
 

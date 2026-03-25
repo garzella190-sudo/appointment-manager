@@ -54,7 +54,7 @@ const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
 };
 
 // ── Tab: Veicoli ──────────────────────────────────────────────
-const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
+const TabVeicoli = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
   const [loading, setLoading] = useState(true);
   const [veicoli, setVeicoli] = useState<Veicolo[]>([]);
   const [search, setSearch] = useState('');
@@ -85,15 +85,21 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
       <div className="pb-4 flex-shrink-0">
         <div className="relative group">
           <Search
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-emerald-500 transition-colors"
+            className={cn(
+              "absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors",
+              sectionColor === 'emerald' ? "group-focus-within:text-emerald-500" : "group-focus-within:text-sky-500"
+            )}
             size={20}
           />
           <input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Cerca per nome o targa…"
-            className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm text-sm"
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca per nome o targa..."
+            className={cn(
+              "w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none transition-all shadow-sm text-sm",
+              sectionColor === 'emerald' ? "focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500" : "focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500"
+            )}
           />
         </div>
       </div>
@@ -101,8 +107,8 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
       <div className="flex-1 overflow-y-auto scroll-container pb-8">
         {loading ? (
           <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
-            <Loader2 className="animate-spin text-emerald-500" size={40} />
-            <p className="text-sm font-medium">Caricamento veicoli…</p>
+            <Loader2 className={cn("animate-spin", sectionColor === 'emerald' ? "text-emerald-500" : "text-sky-500")} size={40} />
+            <p className="text-sm font-medium">Caricamento...</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-[32px] p-16 text-center shadow-sm">
@@ -119,11 +125,11 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                 <div 
                   key={v.id}
                   onClick={() => openEdit(v)}
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/5 transition-all"
+                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/5 transition-all"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-1 w-full sm:w-auto">
                     <div 
-                      className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 flex items-center justify-center shrink-0 font-bold text-xl"
+                      className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 font-bold text-xl shadow-inner border border-emerald-200/50 dark:border-emerald-500/10"
                     >
                       {initials || <Car size={20} />}
                     </div>
@@ -138,7 +144,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                         </span>
                       </div>
                       <div className="flex items-center flex-wrap gap-2 mt-1.5">
-                        <span className="px-2 py-1 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                        <span className="px-2 py-1 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider">
                           Pat. {v.tipo_patente}
                         </span>
                         <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider">
@@ -149,32 +155,32 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <ConfirmBubble
-                      title="Elimina Veicolo"
-                      message="Sei sicuro di voler eliminare questo veicolo? L'azione è definitiva."
-                      confirmLabel="Elimina"
-                      onConfirm={async () => {
-                        const result = await deleteVeicoloAction(v.id);
-                        if (result.success) {
-                          fetchVeicoli();
-                        } else {
-                          alert(result.error || "Errore durante l'eliminazione.");
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/50">
+                    <div className="flex items-center gap-2">
+                      <ConfirmBubble
+                        title="Elimina Veicolo"
+                        message="Sei sicuro di voler eliminare questo veicolo? L'azione è definitiva."
+                        confirmLabel="Elimina"
+                        onConfirm={async () => {
+                          const result = await deleteVeicoloAction(v.id);
+                          if (result.success) {
+                            fetchVeicoli();
+                          } else {
+                            alert(result.error || "Errore durante l'eliminazione.");
+                          }
+                        }}
+                        trigger={
+                          <button
+                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
+                            title="Elimina veicolo"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Trash2 size={18} />
+                          </button>
                         }
-                      }}
-                      trigger={
-                        <button
-                          className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
-                          title="Elimina veicolo"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      }
-                    />
-                    <Pencil
-                      size={18}
-                      className="text-zinc-300 group-hover:text-emerald-500 transition-colors shrink-0"
-                    />
+                      />
+                    </div>
+                    <ChevronRight size={20} className="text-zinc-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 </div>
               );
@@ -209,7 +215,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
 };
 
 // ── Tab: Istruttori ───────────────────────────────────────────
-const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
+const TabIstruttori = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
   const [loading, setLoading] = useState(true);
   const [istruttori, setIstruttori] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<Veicolo[]>([]);
@@ -243,15 +249,21 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
       <div className="pb-4 flex-shrink-0">
         <div className="relative group">
           <Search
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors"
+            className={cn(
+              "absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 transition-colors",
+              sectionColor === 'emerald' ? "group-focus-within:text-emerald-500" : "group-focus-within:text-sky-500"
+            )}
             size={20}
           />
           <input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Cerca istruttore per nome…"
-            className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm text-sm"
+            className={cn(
+              "w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none transition-all shadow-sm text-sm",
+              sectionColor === 'emerald' ? "focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500" : "focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500"
+            )}
           />
         </div>
       </div>
@@ -259,7 +271,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
       <div className="flex-1 overflow-y-auto scroll-container pb-8">
         {loading ? (
           <div className="py-20 flex items-center justify-center">
-            <Loader2 className="animate-spin text-blue-500" size={36} />
+            <Loader2 className={cn("animate-spin", sectionColor === 'emerald' ? "text-emerald-500" : "text-sky-500")} size={36} />
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-[32px] p-16 text-center shadow-sm">
@@ -273,16 +285,16 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
               return (
                 <div 
                   key={i.id} 
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all"
+                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all"
                   onClick={() => openEdit(i)}
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg shadow-blue-500/20 font-bold text-lg flex items-center justify-center shrink-0 tracking-tight font-display">
+                  <div className="flex items-center gap-4 min-w-0 flex-1 w-full sm:w-auto">
+                    <div className="w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 font-bold text-lg flex items-center justify-center shrink-0 shadow-inner border border-sky-200/50 dark:border-sky-500/10">
                       {initials}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <h4 className="font-bold text-zinc-900 dark:text-white truncate">{i.cognome} {i.nome}</h4>
-                      <div className="flex flex-wrap gap-1.5 mt-1.5 min-w-0">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-1.5 min-w-0">
                         {i.telefono ? (
                           <PhoneActions phone={i.telefono} secondary />
                         ) : (
@@ -291,14 +303,14 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                           </span>
                         )}
                         {i.email && (
-                          <a href={`mailto:${i.email}`} className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:text-blue-600 rounded-lg text-[10px] font-bold transition-colors truncate font-mono" onClick={e => e.stopPropagation()}>
+                          <a href={`mailto:${i.email}`} className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:text-sky-600 rounded-lg text-[10px] font-bold transition-colors truncate font-mono" onClick={e => e.stopPropagation()}>
                             <Mail size={11} /> {i.email}
                           </a>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {((i.patenti_abilitate as TipoPatente[]) || []).map(p => (
-                          <span key={p} className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded text-[10px] font-black tracking-widest uppercase">
+                          <span key={p} className="px-1.5 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded text-[10px] font-black tracking-widest uppercase">
                             {p}
                           </span>
                         ))}
@@ -306,17 +318,17 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    {i.veicolo_id && (
-                      <div className="hidden lg:flex flex-col gap-0.5 text-right mr-2">
-                        <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Default</label>
-                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-tighter">
-                          {vehicles.find(v => v.id === i.veicolo_id)?.nome || 'Veicolo'}
-                        </span>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/50">
+                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                      {i.veicolo_id && (
+                        <div className="hidden lg:flex flex-col gap-0.5 text-right mr-2">
+                          <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Default</label>
+                          <span className="text-[10px] font-black text-sky-500 uppercase tracking-tighter">
+                            {vehicles.find(v => v.id === i.veicolo_id)?.nome || 'Veicolo'}
+                          </span>
+                        </div>
+                      )}
 
-                    <div className="flex items-center gap-2 transition-all ml-auto sm:ml-0">
                       <ConfirmBubble
                         title="Elimina Istruttore"
                         message="Sei sicuro di voler eliminare questo istruttore? L'azione è definitiva."
@@ -332,14 +344,15 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
                         trigger={
                           <button
                             title="Elimina istruttore"
-                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-all shadow-sm"
+                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-all font-bold text-xs uppercase"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                           </button>
                         }
                       />
-                      <Pencil size={18} className="text-zinc-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all" />
                     </div>
+                    <ChevronRight size={20} className="text-zinc-300 group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 </div>
               );
@@ -447,7 +460,7 @@ const PatenteCard = ({
 };
 
 // ── Tab: Patenti ──────────────────────────────────────────────
-const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
+const TabPatenti = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
   const [loading, setLoading] = useState(true);
   const [patenti, setPatenti] = useState<Patente[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -476,7 +489,7 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
   if (loading) {
     return (
       <div className="py-20 flex items-center justify-center">
-        <Loader2 className="animate-spin text-purple-500" size={36} />
+        <Loader2 className="animate-spin text-sky-500" size={36} />
       </div>
     );
   }
@@ -553,7 +566,7 @@ const TabPatenti = ({ refreshKey }: { refreshKey: number }) => {
 };
 
 // ── Tab: Utenti ───────────────────────────────────────────────
-const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
+const TabUtenti = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [istruttoriList, setIstruttoriList] = useState<{id: string; nome: string; cognome: string}[]>([]);
@@ -612,7 +625,7 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
       <div className="flex-1 overflow-y-auto scroll-container pb-8 -mx-1 px-1">
         {loading ? (
           <div className="py-20 flex items-center justify-center">
-            <Loader2 className="animate-spin text-blue-500" size={36} />
+            <Loader2 className="animate-spin text-emerald-500" size={36} />
           </div>
         ) : users.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-[32px] p-16 text-center shadow-sm">
@@ -689,7 +702,7 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
 };
 
 // ── Tab: Impegni (Altri Impegni) ─────────────────────────────
-const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
+const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
   const [loading, setLoading] = useState(true);
   const [impegni, setImpegni] = useState<any[]>([]);
   const [istruttori, setIstruttori] = useState<any[]>([]);
@@ -818,7 +831,7 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
       <div className="flex-1 overflow-y-auto scroll-container pb-8">
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center font-bold text-zinc-400 gap-3">
-            <Loader2 className="animate-spin text-orange-500" size={32} /> 
+            <Loader2 className="animate-spin text-sky-500" size={32} /> 
             <span className="text-sm font-medium uppercase tracking-widest">Caricamento impegni...</span>
           </div>
         ) : filtered.length === 0 ? (
@@ -962,6 +975,15 @@ export default function GestionePage() {
     setRefreshKey(prev => prev + 1);
   };
 
+  const getSectionColor = () => {
+    if (active === 'veicoli' || active === 'utenti') return 'emerald';
+    if (active === 'patenti') return 'sky';
+    if (active === 'istruttori') return 'sky';
+    return 'blue';
+  };
+
+  const sectionColor = getSectionColor();
+
   const getAddTitle = () => {
     switch (active) {
       case 'veicoli': return 'Nuovo Veicolo';
@@ -1016,7 +1038,10 @@ export default function GestionePage() {
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl font-black text-[11px] uppercase tracking-wider hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/20 active:scale-95 shrink-0"
+            className={cn(
+              "flex items-center justify-center gap-2 px-4 py-2 text-white rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-lg active:scale-95 shrink-0",
+              sectionColor === 'emerald' ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" : "bg-sky-500 hover:bg-sky-600 shadow-sky-500/20"
+            )}
           >
             <Plus size={16} />
             {getAddTitle()}
@@ -1028,11 +1053,11 @@ export default function GestionePage() {
       <div className="flex-1 overflow-hidden px-4 md:px-6 pb-32">
         <div className="max-w-4xl mx-auto h-full flex flex-col">
           <div className="flex-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} />}
-            {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} />}
-            {active === 'impegni' && <TabImpegni refreshKey={refreshKey} />}
-            {active === 'patenti' && <TabPatenti refreshKey={refreshKey} />}
-            {active === 'utenti' && <TabUtenti refreshKey={refreshKey} />}
+            {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} sectionColor={sectionColor} />}
+            {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} sectionColor={sectionColor} />}
+            {active === 'impegni' && <TabImpegni refreshKey={refreshKey} sectionColor={sectionColor} />}
+            {active === 'patenti' && <TabPatenti refreshKey={refreshKey} sectionColor={sectionColor} />}
+            {active === 'utenti' && <TabUtenti refreshKey={refreshKey} sectionColor={sectionColor} />}
             {active === 'mobile' && <InstallPWA />}
           </div>
         </div>
