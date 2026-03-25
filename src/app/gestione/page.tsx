@@ -133,15 +133,15 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                         <h4 className="font-bold text-zinc-900 dark:text-white truncate">
                           {v.nome}
                         </h4>
-                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded tracking-widest leading-none border border-zinc-200/50 dark:border-zinc-700">
+                        <span className="font-mono text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded tracking-widest leading-none border border-zinc-200/50 dark:border-zinc-700">
                           {v.targa}
                         </span>
                       </div>
                       <div className="flex items-center flex-wrap gap-2 mt-1.5">
-                        <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                        <span className="px-2 py-1 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md text-[10px] font-black uppercase tracking-wider">
                           Pat. {v.tipo_patente}
                         </span>
-                        <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-bold">
+                        <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider">
                           {v.cambio_manuale ? 'Manuale' : 'Automatico'}
                         </span>
                         <RevisionBadge dataRevisione={v.data_revisione} />
@@ -1016,7 +1016,7 @@ export default function GestionePage() {
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl font-black text-[11px] uppercase tracking-wider hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/20 active:scale-95 shrink-0"
           >
             <Plus size={16} />
             {getAddTitle()}

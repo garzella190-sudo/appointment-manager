@@ -388,9 +388,9 @@ export default function CalendarPage() {
                     key={days}
                     onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
                     className={cn(
-                      "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap",
+                      "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black transition-all whitespace-nowrap uppercase tracking-wider",
                       viewDays === days 
-                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" 
+                        ? "bg-purple-600 text-white shadow-md shadow-purple-500/20" 
                         : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
                     )}
                   >
@@ -399,7 +399,7 @@ export default function CalendarPage() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner">
+              <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
                 <button
                   onClick={() => navigateWeek(-1)}
                   title="Settimana precedente"
@@ -427,14 +427,14 @@ export default function CalendarPage() {
 
 
               {viewDays !== 7 && (
-                <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl">
+                <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
                   <button
                     onClick={() => setShowWeekends(!showWeekends)}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
+                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
                       showWeekends 
                         ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-500" 
-                        : "bg-white dark:bg-zinc-700 text-blue-600 shadow-sm"
+                        : "bg-white dark:bg-zinc-700 text-purple-600 shadow-sm"
                     )}
                   >
                     Sab-Dom: {showWeekends ? 'Sì' : 'No'}

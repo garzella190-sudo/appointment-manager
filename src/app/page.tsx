@@ -200,7 +200,7 @@ export default function Home() {
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 px-4 h-9 rounded-xl text-white font-bold shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 appearance-none text-sm"
+            className="bg-purple-600 px-4 h-9 rounded-xl text-white font-black shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 appearance-none text-[11px] uppercase tracking-wider"
           >
             <Plus size={16} />
             <span>Nuovo</span>
@@ -286,8 +286,11 @@ export default function Home() {
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
                         <div 
-                          className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-white shadow-inner font-bold text-lg"
-                          style={{ backgroundColor: apt.istruttore?.color || '#3b82f6' } as React.CSSProperties}
+                          className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center shadow-inner font-bold text-lg"
+                          style={{ 
+                            backgroundColor: `${apt.istruttore?.color}20` || '#f3e8ff',
+                            color: apt.istruttore?.color || '#9333ea'
+                          }}
                         >
                           {initials}
                         </div>
@@ -309,27 +312,28 @@ export default function Home() {
                             )}
                         </h3>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1.5">
-                          <span className="text-xs font-black text-blue-600 dark:text-blue-400">{apt.appointment_time.slice(0, 5)}</span>
-                          <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
+                          <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">{apt.appointment_time.slice(0, 5)}</span>
+                          
+                          <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-tight">
                             <User size={12} className="text-zinc-400" />
                             <span className="truncate">{apt.istruttore?.name}</span>
                           </div>
                           
-                          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                          <div className="flex items-center gap-1 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-[10px] font-black uppercase tracking-wider">
                             <Clock size={10} className="shrink-0" />
                             <span>{apt.duration} min</span>
                           </div>
                           
                           {!apt.is_impegno && (
-                            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-[10px] font-bold uppercase tracking-wider min-w-0">
+                            <div className="flex items-center gap-1 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-md text-[10px] font-black uppercase tracking-wider min-w-0">
                               <Car size={10} className="shrink-0" />
                               <span className="truncate max-w-[120px]">{apt.vehicle_id}</span>
                             </div>
                           )}
 
                           {!apt.is_impegno && (
-                            <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-black uppercase tracking-wider">
-                              {apt.license_type}
+                            <span className="px-2 py-1 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                              Pat. {apt.license_type}
                             </span>
                           )}
                         </div>
