@@ -22,7 +22,7 @@ import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
   AlertTriangle, CheckCircle2, Phone, Mail, Search,
   Clock, EyeOff, Eye, Copy,
-  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone, X
+  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone, X, ChevronRight
 } from 'lucide-react';
 import Select from '@/components/forms/Select';
 import { cn } from '@/lib/utils';
@@ -93,7 +93,7 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Cerca per nome o targa…"
-            className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl py-2 pl-12 pr-4 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm text-sm"
+            className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all shadow-sm text-sm"
           />
         </div>
       </div>
@@ -123,9 +123,9 @@ const TabVeicoli = ({ refreshKey }: { refreshKey: number }) => {
                 >
                   <div className="flex items-center gap-4">
                     <div 
-                      className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 flex items-center justify-center shrink-0 font-bold text-xl"
+                      className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/20 flex items-center justify-center shrink-0 font-bold text-xl"
                     >
-                      {initials || <Car size={26} />}
+                      {initials || <Car size={20} />}
                     </div>
 
                     <div className="min-w-0">
@@ -213,6 +213,7 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
   const [loading, setLoading] = useState(true);
   const [istruttori, setIstruttori] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<Veicolo[]>([]);
+  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
 
@@ -230,31 +231,49 @@ const TabIstruttori = ({ refreshKey }: { refreshKey: number }) => {
 
   // handleDelete removed, logic moved to ConfirmBubble onConfirm
 
-  useEffect(() => { fetch(); }, [fetch, refreshKey]);
+  const filtered = istruttori.filter(i => 
+    `${i.cognome ?? ''} ${i.nome ?? ''}`.toLowerCase().includes(search.toLowerCase())
+  );
 
   const openEdit = (i: any) => { setEditing(i); setModalOpen(true); };
   const onSuccess = () => { setModalOpen(false); fetch(); };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto scroll-container pb-8 -mx-1 px-1">
+      <div className="pb-4 flex-shrink-0">
+        <div className="relative group">
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors"
+            size={20}
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Cerca istruttore per nome…"
+            className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scroll-container pb-8">
         {loading ? (
           <div className="py-20 flex items-center justify-center">
             <Loader2 className="animate-spin text-blue-500" size={36} />
           </div>
-        ) : istruttori.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-[32px] p-16 text-center shadow-sm">
             <Users size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
             <p className="text-zinc-500 font-medium font-display">Nessun istruttore registrato.</p>
           </div>
         ) : (
           <div className="grid gap-3">
-            {istruttori.map(i => {
+            {filtered.map(i => {
               const initials = `${i.cognome?.[0] || ''}${i.nome?.[0] || ''}`.toUpperCase();
               return (
                 <div 
                   key={i.id} 
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all"
+                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5 transition-all"
                   onClick={() => openEdit(i)}
                 >
                   <div className="flex items-center gap-4 flex-1">
@@ -384,12 +403,12 @@ const PatenteCard = ({
 
   return (
     <div className={cn(
-      "glass-card p-5 flex items-center justify-between group transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer",
+      "bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group transition-all hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/5 cursor-pointer",
       pat.nascosta && "opacity-60 grayscale-[0.5]"
     )} onClick={() => onEdit(pat)}>
       <div className="flex items-center gap-4">
         <div className={cn(
-          "w-14 h-14 rounded-3xl flex items-center justify-center font-bold text-xl shrink-0 transition-all shadow-md",
+          "w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0 transition-all shadow-md",
           c === 'violet' ? "bg-gradient-to-br from-violet-400 to-violet-600 text-white shadow-violet-500/20" :
           c === 'blue' ? "bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-blue-500/20" :
           c === 'amber' ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-amber-500/20" :
@@ -615,97 +634,37 @@ const TabUtenti = ({ refreshKey }: { refreshKey: number }) => {
                 .toUpperCase()
                 .slice(0, 2);
 
-              return (
+                return (
                 <div 
                   key={user.id} 
                   onClick={() => setEditingUser(user)}
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-5 flex flex-col gap-4 group hover:border-indigo-500/50 hover:shadow-xl hover:shadow-indigo-500/5 transition-all cursor-pointer relative focus-within:z-10"
+                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:border-indigo-500/50 hover:shadow-xl hover:shadow-indigo-500/5 transition-all"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 font-bold text-lg text-white shadow-lg font-display",
-                        role === 'admin' ? "bg-gradient-to-br from-purple-400 to-purple-600 shadow-purple-500/20" :
-                          role === 'istruttore' ? "bg-gradient-to-br from-blue-400 to-blue-600 shadow-blue-500/20" :
-                            "bg-gradient-to-br from-zinc-400 to-zinc-600 shadow-zinc-500/20"
-                      )}>
-                        {initials || <UserIcon size={24} />}
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 font-bold text-lg text-white shadow-lg font-display",
+                      role === 'admin' ? "bg-gradient-to-br from-purple-400 to-purple-600 shadow-purple-500/20" :
+                        role === 'istruttore' ? "bg-gradient-to-br from-blue-400 to-blue-600 shadow-blue-500/20" :
+                          "bg-gradient-to-br from-zinc-400 to-zinc-600 shadow-zinc-500/20"
+                    )}>
+                      {initials || <UserIcon size={20} />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-zinc-900 dark:text-white truncate">{fullName}</h4>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
+                          role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" :
+                            role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
+                              "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                        )}>
+                          {role === 'admin' ? 'Admin' : role}
+                        </span>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-zinc-900 dark:text-white">{fullName}</h4>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
-                            role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" :
-                              role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
-                                "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                          )}>
-                            {role === 'admin' ? 'Admin' : role}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-400 font-bold font-mono">
-                          <span className="flex items-center gap-1 lowercase"><Mail size={12} className="opacity-70" /> {user.email}</span>
-                          <span className="flex items-center gap-1 uppercase tracking-tighter opacity-70"><Key size={12} className="opacity-70" /> {user.id.slice(0, 8)}</span>
-                        </div>
-                      </div>
+                      <p className="text-[11px] text-zinc-400 truncate font-mono mt-0.5">{user.email}</p>
                     </div>
                   </div>
-
-                  {/* Associazione Istruttore */}
-                  <div className="flex flex-col gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="flex items-center gap-3">
-                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest whitespace-nowrap shrink-0">
-                        Istruttore
-                      </label>
-                      <div className="flex-1" onClick={(e) => e.stopPropagation()}>
-                        <Select
-                          options={[
-                            { id: '', label: 'Nessun istruttore' },
-                            ...istruttoriList.map(ist => ({
-                              id: ist.id,
-                              label: `${ist.cognome} ${ist.nome}`
-                            }))
-                          ]}
-                          value={linkedIstruttoreId}
-                          onChange={(val) => handleAssociaIstruttore(user.id, val)}
-                          placeholder="Seleziona..."
-                        />
-                      </div>
-                      {savingUserId === user.id && <Loader2 className="animate-spin text-blue-500 shrink-0" size={16} />}
-                      {linkedIstruttore && savingUserId !== user.id && (
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap uppercase tracking-tighter">✓ Collegato</span>
-                      )}
-                    </div>
-
-                    {/* Quick Delete User */}
-                    <div className="flex justify-end pt-1">
-                      <ConfirmBubble
-                        title="Elimina Utente"
-                        message={`Sei sicuro di voler eliminare l'utente ${fullName}? L'accesso verrà immediatamente revocato.`}
-                        confirmLabel="Elimina Utente"
-                        onConfirm={async () => {
-                          setSavingUserId(user.id);
-                          const { deleteUserAction } = await import('@/actions/auth');
-                          const res = await deleteUserAction(user.id);
-                          if (res.success) {
-                            fetchUsers();
-                          } else {
-                            alert(res.error || "Errore eliminazione utente");
-                          }
-                          setSavingUserId(null);
-                        }}
-                        trigger={
-                          <button
-                            type="button"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all"
-                          >
-                            <Trash2 size={12} /> Elimina Utente
-                          </button>
-                        }
-                      />
-                    </div>
-                  </div>
+                  <ChevronRight size={20} className="text-zinc-300 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
               );
             })}
@@ -959,7 +918,7 @@ const TabImpegni = ({ refreshKey }: { refreshKey: number }) => {
                     </button>
                   }
                 />
-                <Pencil size={18} className="text-zinc-300 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={20} className="text-zinc-300 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all shrink-0" />
               </div>
             </div>
             ))}

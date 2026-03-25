@@ -216,7 +216,7 @@ export default function Home() {
               placeholder="Cerca per cliente, istruttore o telefono..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm appearance-none shadow-sm"
+              className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm appearance-none shadow-sm"
             />
           </div>
           <div className="min-w-[200px] shrink-0">
@@ -281,7 +281,7 @@ export default function Home() {
                         className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-white shadow-inner"
                         style={{ backgroundColor: apt.istruttore?.color || '#3b82f6' } as React.CSSProperties}
                       >
-                        <Clock size={22} className="stroke-[2.5]" />
+                        <Clock size={20} className="stroke-[2.5]" />
                       </div>
                       <div className="min-w-0">
                         <h3 className={cn(
