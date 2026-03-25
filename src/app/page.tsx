@@ -264,6 +264,14 @@ export default function Home() {
                 const endTime = new Date(startTime.getTime() + apt.duration * 60000);
                 const isInProgress = isSameDay(currentDate, now) && now >= startTime && now < endTime && apt.stato !== 'annullato';
 
+                    const initials = apt.client_name
+                      .split(' ')
+                      .filter(Boolean)
+                      .map(n => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2);
+
                 return (
                   <div
                     key={apt.id}
@@ -277,12 +285,12 @@ export default function Home() {
                   >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
-                      <div 
-                        className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-white shadow-inner"
-                        style={{ backgroundColor: apt.istruttore?.color || '#3b82f6' } as React.CSSProperties}
-                      >
-                        <Clock size={20} className="stroke-[2.5]" />
-                      </div>
+                        <div 
+                          className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-white shadow-inner font-bold text-lg"
+                          style={{ backgroundColor: apt.istruttore?.color || '#3b82f6' } as React.CSSProperties}
+                        >
+                          {initials}
+                        </div>
                       <div className="min-w-0">
                         <h3 className={cn(
                           "font-bold text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-2",
@@ -294,11 +302,11 @@ export default function Home() {
                               Impegno
                             </span>
                           )}
-                          {apt.notes && apt.notes.trim() !== '' && (
-                            <span title={apt.notes} className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[8px] font-black rounded-md border border-amber-100/50 dark:border-amber-400/20 uppercase tracking-tighter shrink-0 flex items-center gap-1">
-                              <StickyNote size={8} fill="currentColor" fillOpacity={0.2} /> NOTE
-                            </span>
-                          )}
+                            {apt.notes && apt.notes.trim() !== '' && (
+                              <span title={apt.notes} className="text-amber-500 dark:text-amber-400 shrink-0 flex items-center" aria-label="Ha Note">
+                                <StickyNote size={14} fill="currentColor" fillOpacity={0.2} />
+                              </span>
+                            )}
                         </h3>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1.5">
                           <span className="text-xs font-black text-blue-600 dark:text-blue-400">{apt.appointment_time.slice(0, 5)}</span>
