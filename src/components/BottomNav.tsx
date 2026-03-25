@@ -82,10 +82,6 @@ const BottomNav = ({ user }: BottomNavProps) => {
                   key={item.name}
                   href={item.href}
                   title={item.name}
-                  onClick={() => {
-                    // Force refresh on every navigation click for "security/freshness" on mobile
-                    router.refresh();
-                  }}
                   className={cn(
                     "flex flex-col items-center gap-0.5 transition-all duration-300 hover:scale-110 active:scale-95 px-1 sm:px-2",
                     isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
