@@ -20,6 +20,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showHeader, setShowHeader] = useState(true);
+  const lastScrollY = useRef(0);
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
@@ -165,6 +167,18 @@ export default function Home() {
   };
 
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const currentY = e.currentTarget.scrollTop;
+    if (currentY < 10) {
+      setShowHeader(true);
+    } else if (currentY > lastScrollY.current && currentY > 50) {
+      setShowHeader(false);
+    } else if (currentY < lastScrollY.current) {
+      setShowHeader(true);
+    }
+    lastScrollY.current = currentY;
+  };
+
   const titleText = isSameDay(currentDate, new Date()) ? "Oggi" : format(currentDate, 'EEEE d MMMM', { locale: it });
 
   return (
@@ -215,38 +229,44 @@ export default function Home() {
           </button>
         </header>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative group flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-sky-500 transition-colors" size={20} />
-            <input
-              type="text"
-              placeholder="Cerca..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all text-sm shadow-sm appearance-none"
-            />
-          </div>
-          <div className="min-w-[180px] shrink-0">
-            <Select
-              options={[
-                { id: '', label: 'Tutti' },
-                ...istruttori.map(i => ({ 
-                  id: i.id, 
-                  label: `${i.cognome} ${i.nome}`
-                }))
-              ]}
-              value={selectedInstructorId}
-              onChange={(val) => setSelectedInstructorId(val)}
-              icon={User}
-              placeholder="Istruttore"
-              searchable
-            />
+        <div className={cn(
+          "transition-all duration-500 ease-in-out origin-top overflow-hidden",
+          showHeader ? "max-h-[200px] opacity-100 mb-3 translate-y-0" : "max-h-0 opacity-0 mb-0 -translate-y-4"
+        )}>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative group flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-sky-500 transition-colors" size={20} />
+              <input
+                type="text"
+                placeholder="Cerca..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all text-sm shadow-sm appearance-none"
+              />
+            </div>
+            <div className="min-w-[180px] shrink-0">
+              <Select
+                options={[
+                  { id: '', label: 'Tutti' },
+                  ...istruttori.map(i => ({ 
+                    id: i.id, 
+                    label: `${i.cognome} ${i.nome}`
+                  }))
+                ]}
+                value={selectedInstructorId}
+                onChange={(val) => setSelectedInstructorId(val)}
+                icon={User}
+                placeholder="Istruttore"
+                searchable
+              />
+            </div>
           </div>
         </div>
       </div>
 
       <section 
         ref={scrollContainerRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto scroll-container px-4 md:px-6 pb-32"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
