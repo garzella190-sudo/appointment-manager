@@ -125,7 +125,7 @@ export default function ClientiPage() {
                 <div 
                   key={cliente.id}
                   onClick={() => router.push(`/clienti/${cliente.id}`)}
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/5 transition-all"
+                  className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/5 transition-all text-left pr-14"
                 >
                   <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
                     <div className="w-12 h-12 rounded-xl bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 font-bold text-lg flex items-center justify-center shrink-0 shadow-inner">
@@ -158,33 +158,28 @@ export default function ClientiPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/50">
-                    <div className="flex items-center gap-2">
-                      <ConfirmBubble
-                        title="Elimina Cliente"
-                        message="Sei sicuro di voler eliminare questo cliente? L'azione è definitiva."
-                        confirmLabel="Elimina"
-                        onConfirm={async () => {
-                          const result = await deleteClienteAction(cliente.id);
-                          if (result.success) {
-                            await fetchData();
-                          } else {
-                            alert(result.error || "Errore durante l'eliminazione.");
-                          }
-                        }}
-                        trigger={
-                          <button
-                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
-                            title="Elimina cliente"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                  <div className="absolute top-3 right-3 z-10 flex gap-2">
+                    <ConfirmBubble
+                      title="Elimina Cliente"
+                      message="Sei sicuro di voler eliminare questo cliente? L'azione è definitiva."
+                      confirmLabel="Elimina"
+                      onConfirm={async () => {
+                        const result = await deleteClienteAction(cliente.id);
+                        if (result.success) {
+                          await fetchData();
+                        } else {
+                          alert(result.error || "Errore durante l'eliminazione.");
                         }
-                      />
-                    </div>
-                    <ChevronRight
-                      size={20}
-                      className="text-zinc-300 group-hover:text-pink-500 group-hover:translate-x-0.5 transition-all shrink-0"
+                      }}
+                      trigger={
+                        <button
+                          className="p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50"
+                          title="Elimina cliente"
+                          onClick={(e) => { e.stopPropagation(); }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      }
                     />
                   </div>
                 </div>

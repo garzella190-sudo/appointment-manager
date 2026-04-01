@@ -241,17 +241,20 @@ export default function SchedaClientePage() {
         </div>
 
         {/* Edit toggle */}
-        <button
-          onClick={() => setEditMode(v => !v)}
-          className={cn(
-            'shrink-0 p-2.5 rounded-xl transition-all font-medium text-sm flex items-center gap-2',
-            editMode
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/30'
-              : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-          )}
-        >
-          {editMode ? <CheckCheck size={18} /> : <Pencil size={18} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setEditMode(v => !v)}
+            className={cn(
+              'w-12 h-12 rounded-2xl transition-all flex items-center justify-center shadow-sm border border-purple-100/50 dark:border-purple-900/30 active:scale-95',
+              editMode
+                ? 'bg-purple-600 text-white shadow-xl shadow-purple-500/30'
+                : 'bg-white dark:bg-zinc-800 text-purple-600 hover:bg-purple-50'
+            )}
+            title={editMode ? "Valida" : "Modifica"}
+          >
+            {editMode ? <CheckCheck size={20} /> : <Pencil size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* ── Tabs ─────────────────────────────────────────────── */}

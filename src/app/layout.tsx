@@ -49,10 +49,11 @@ export default async function RootLayout({
             <main className="flex-1 overflow-hidden relative pt-0">
               {children}
             </main>
-            <BottomNav user={userData} />
+            <BottomNav />
           </div>
           <Analytics />
           <SWRegister />
+          <div id="datepicker-portal" />
         </ToastProvider>
       </body>
     </html>

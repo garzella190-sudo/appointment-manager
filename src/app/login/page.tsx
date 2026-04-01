@@ -42,8 +42,7 @@ export default function LoginPage() {
       }
 
       // Se è tutto ok, ti spedisce al calendario!
-      router.push('/');
-      router.refresh();
+      window.location.href = '/';
     }
   };
 

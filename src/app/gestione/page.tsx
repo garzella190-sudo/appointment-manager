@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Veicolo, Patente, TipoPatente, ImpegnoDettagliato } from '@/lib/database.types';
@@ -12,7 +12,7 @@ import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { UserForm } from '@/components/forms/UserForm';
 import { PatenteForm } from '@/components/forms/PatenteForm';
 import { InstallPWA } from '@/components/InstallPWA';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { listUsersAction, updateUserAction } from '@/actions/auth';
 import { deleteVeicoloAction } from '@/actions/veicoli';
@@ -22,7 +22,7 @@ import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import {
   AlertTriangle, CheckCircle2, Phone, Mail, Search,
   Clock, EyeOff, Eye, Copy,
-  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone, X, ChevronRight
+  Car, BadgeCheck, Users, Plus, Pencil, Loader2, ShieldCheck, Key, User as UserIcon, Trash2, Smartphone, X, ChevronRight, Wrench
 } from 'lucide-react';
 import Select from '@/components/forms/Select';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,24 @@ import { User as AuthUser } from '@supabase/supabase-js';
 import { PhoneActions } from '@/components/PhoneActions';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
+import { useAuth } from '@/hooks/useAuth';
+import { FileText, Printer, ChevronDown } from 'lucide-react';
+
+// ── Stili per la stampa ────────────────────────────────────────
+const PrintStyles = () => (
+  <style jsx global>{`
+    @media print {
+      body { background: white !important; }
+      .print-hidden { display: none !important; }
+      .print-only { display: block !important; }
+      .scroll-container { overflow: visible !important; height: auto !important; }
+      .no-shadow { shadow: none !important; box-shadow: none !important; }
+      .no-border { border: none !important; }
+      @page { margin: 1.5cm; }
+    }
+    .print-only { display: none; }
+  `}</style>
+);
 
 // ── Helper per badge scadenza revisione ───────────────────────
 const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
@@ -54,7 +72,7 @@ const RevisionBadge = ({ dataRevisione }: { dataRevisione: string }) => {
 };
 
 // ── Tab: Veicoli ──────────────────────────────────────────────
-const TabVeicoli = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
+const TabVeicoli = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, sectionColor: string, isAdmin: boolean }) => {
   const [loading, setLoading] = useState(true);
   const [veicoli, setVeicoli] = useState<Veicolo[]>([]);
   const [search, setSearch] = useState('');
@@ -125,7 +143,7 @@ const TabVeicoli = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
                 <div 
                   key={v.id}
                   onClick={() => openEdit(v)}
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/5 transition-all"
+                  className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/5 transition-all pr-12"
                 >
                   <div className="flex items-center gap-4 min-w-0 flex-1 w-full sm:w-auto">
                     <div 
@@ -143,11 +161,11 @@ const TabVeicoli = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
                           {v.targa}
                         </span>
                       </div>
-                      <div className="flex items-center flex-wrap gap-2 mt-1.5">
-                        <span className="px-2 py-1 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                      <div className="flex items-center flex-wrap gap-2 mt-1.5 overflow-hidden">
+                        <span className="px-1.5 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
                           Pat. {v.tipo_patente}
                         </span>
-                        <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider">
+                        <span className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
                           {v.cambio_manuale ? 'Manuale' : 'Automatico'}
                         </span>
                         <RevisionBadge dataRevisione={v.data_revisione} />
@@ -155,8 +173,7 @@ const TabVeicoli = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/50">
-                    <div className="flex items-center gap-2">
+                  <div className="absolute top-3 right-3 z-10 flex gap-2">
                       <ConfirmBubble
                         title="Elimina Veicolo"
                         message="Sei sicuro di voler eliminare questo veicolo? L'azione è definitiva."
@@ -171,16 +188,17 @@ const TabVeicoli = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
                         }}
                         trigger={
                           <button
-                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
+                            className={cn(
+                              "p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50",
+                              !isAdmin && "hidden"
+                            )}
                             title="Elimina veicolo"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </button>
                         }
                       />
-                    </div>
-                    <ChevronRight size={20} className="text-zinc-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 </div>
               );
@@ -215,7 +233,7 @@ const TabVeicoli = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
 };
 
 // ── Tab: Istruttori ───────────────────────────────────────────
-const TabIstruttori = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
+const TabIstruttori = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, sectionColor: string, isAdmin: boolean }) => {
   const [loading, setLoading] = useState(true);
   const [istruttori, setIstruttori] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<Veicolo[]>([]);
@@ -234,8 +252,9 @@ const TabIstruttori = ({ refreshKey, sectionColor }: { refreshKey: number, secti
     setLoading(false);
   }, []);
 
-
-  // handleDelete removed, logic moved to ConfirmBubble onConfirm
+  useEffect(() => {
+    fetch();
+  }, [fetch, refreshKey]);
 
   const filtered = istruttori.filter(i => 
     `${i.cognome ?? ''} ${i.nome ?? ''}`.toLowerCase().includes(search.toLowerCase())
@@ -285,7 +304,7 @@ const TabIstruttori = ({ refreshKey, sectionColor }: { refreshKey: number, secti
               return (
                 <div 
                   key={i.id} 
-                  className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all"
+                  className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all pr-12"
                   onClick={() => openEdit(i)}
                 >
                   <div className="flex items-center gap-4 min-w-0 flex-1 w-full sm:w-auto">
@@ -314,21 +333,16 @@ const TabIstruttori = ({ refreshKey, sectionColor }: { refreshKey: number, secti
                             {p}
                           </span>
                         ))}
+                        {i.veicolo_id && (
+                          <span className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded text-[10px] font-black tracking-widest uppercase flex items-center gap-1">
+                            <Car size={10} /> {vehicles.find(v => v.id === i.veicolo_id)?.nome || 'Veicolo'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/50">
-                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                      {i.veicolo_id && (
-                        <div className="hidden lg:flex flex-col gap-0.5 text-right mr-2">
-                          <label className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Default</label>
-                          <span className="text-[10px] font-black text-sky-500 uppercase tracking-tighter">
-                            {vehicles.find(v => v.id === i.veicolo_id)?.nome || 'Veicolo'}
-                          </span>
-                        </div>
-                      )}
-
+                  <div className="absolute top-3 right-3 z-10 flex gap-2">
                       <ConfirmBubble
                         title="Elimina Istruttore"
                         message="Sei sicuro di voler eliminare questo istruttore? L'azione è definitiva."
@@ -344,15 +358,16 @@ const TabIstruttori = ({ refreshKey, sectionColor }: { refreshKey: number, secti
                         trigger={
                           <button
                             title="Elimina istruttore"
-                            className="p-2 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-all font-bold text-xs uppercase"
+                            className={cn(
+                              "p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50",
+                              !isAdmin && "hidden"
+                            )}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </button>
                         }
                       />
-                    </div>
-                    <ChevronRight size={20} className="text-zinc-300 group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 </div>
               );
@@ -765,6 +780,20 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
 
   useEffect(() => { fetch(); }, [fetch, refreshKey]);
 
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+
+  // Generate last 24 months for selector
+  const monthOptions = useMemo(() => {
+    return Array.from({ length: 24 }, (_, i) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      return {
+        value: format(date, 'yyyy-MM'),
+        label: format(date, 'MMMM yyyy', { locale: it })
+      };
+    });
+  }, []);
+
   const filtered = impegni.filter(i => {
     if (selectedIstruttoreId !== 'all' && i.istruttore_id !== selectedIstruttoreId) return false;
     
@@ -773,7 +802,8 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
     today.setHours(0, 0, 0, 0);
     
     if (showStorico) {
-      return impegnoDate < today;
+      if (!selectedMonth) return impegnoDate < today;
+      return format(impegnoDate, 'yyyy-MM') === selectedMonth && impegnoDate < today;
     } else {
       return impegnoDate >= today;
     }
@@ -808,22 +838,38 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
             </button>
           </div>
 
-          <div className="w-full sm:w-[240px]">
-            <Select
-              options={[
-                { id: 'all', label: 'Tutti gli Istruttori' },
-                ...istruttori.map(ist => ({
-                  id: ist.id,
-                  label: `${ist.cognome} ${ist.nome}`,
-                  color: ist.colore
-                }))
-              ]}
-              value={selectedIstruttoreId}
-              onChange={(val) => setSelectedIstruttoreId(val)}
-              icon={UserIcon}
-              placeholder="Filtra Istruttore"
-              searchable
-            />
+          <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+            {showStorico && (
+              <div className="w-full sm:w-[160px] relative">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full h-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 pr-8 text-[10px] font-black uppercase tracking-wider outline-none focus:border-orange-500 transition-all text-zinc-900 dark:text-white appearance-none cursor-pointer capitalize"
+                >
+                  {monthOptions.map((m: { value: string, label: string }) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={14} />
+              </div>
+            )}
+            <div className="w-full sm:w-[200px]">
+              <Select
+                options={[
+                  { id: 'all', label: 'Tutti gli Istruttori' },
+                  ...istruttori.map(ist => ({
+                    id: ist.id,
+                    label: `${ist.cognome} ${ist.nome}`,
+                    color: ist.colore
+                  }))
+                ]}
+                value={selectedIstruttoreId}
+                onChange={(val) => setSelectedIstruttoreId(val)}
+                icon={UserIcon}
+                placeholder="Filtra Istruttore"
+                searchable
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -848,8 +894,8 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
               key={i.id} 
               onClick={() => openEdit(i)}
               className={cn(
-                "bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer transition-all",
-                i.stato === 'annullato' ? "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950" : "hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/5"
+                "relative border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer transition-all pr-24",
+                i.stato === 'annullato' ? "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950" : "bg-white dark:bg-zinc-900/50 hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/5"
               )}
             >
               <div className="flex items-center gap-4">
@@ -875,15 +921,20 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
                       {format(new Date(i.data), 'dd MMM yyyy', { locale: it })}
                     </span>
                     <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 rounded uppercase">{i.ora_inizio.slice(0, 5)}</span>
-                    <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 rounded">{i.durata}m</span>
+                    <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 rounded text-[10px] uppercase font-black tracking-widest">
+                      {Number(i.durata) <= 60 
+                        ? `${i.durata}m` 
+                        : `${Math.floor(Number(i.durata) / 60)}h${Number(i.durata) % 60 > 0 ? ` e ${Number(i.durata) % 60}m` : ''}`
+                      }
+                    </span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="absolute top-3 right-3 z-10 flex gap-1.5 items-center">
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleClone(i); }} 
                   title="Duplica"
-                  className="p-2 text-zinc-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                  className="p-1.5 text-zinc-300 hover:text-blue-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg hover:border-blue-200 dark:hover:border-blue-900/50"
                 >
                   <Copy size={16} />
                 </button>
@@ -903,7 +954,7 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
                     trigger={
                       <button 
                         title="Annulla"
-                        className="p-2 text-zinc-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-xl transition-all"
+                        className="p-1.5 text-zinc-300 hover:text-orange-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg hover:border-orange-200 dark:hover:border-orange-900/50"
                       >
                         <X size={16} />
                       </button>
@@ -925,13 +976,12 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
                   trigger={
                     <button 
                       title="Elimina"
-                      className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                      className="p-1.5 text-zinc-300 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg hover:border-red-200 dark:hover:border-red-900/50"
                     >
                       <Trash2 size={16} />
                     </button>
                   }
                 />
-                <ChevronRight size={20} className="text-zinc-300 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all shrink-0" />
               </div>
             </div>
             ))}
@@ -950,25 +1000,474 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
   );
 };
 
+// ── Tab: Report ───────────────────────────────────────────────
+const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, role?: string, istruttoreId?: string }) => {
+  const [loading, setLoading] = useState(true);
+  const [istruttori, setIstruttori] = useState<any[]>([]);
+  const [patenti, setPatenti] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  
+  // Filtri
+  const [selectedIstruttori, setSelectedIstruttori] = useState<string[]>([]);
+  const [selectedPatente, setSelectedPatente] = useState<string>('all');
+  const [selectedImpegno, setSelectedImpegno] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+
+  // Generate last 12 months for selector
+  const monthOptions = useMemo(() => {
+    return Array.from({ length: 24 }, (_, i) => {
+      const d = addDays(new Date(), -i * 30); // Approximate, better use subMonths if available
+      // Let's use subMonths logic:
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      return {
+        value: format(date, 'yyyy-MM'),
+        label: format(date, 'MMMM yyyy', { locale: it })
+      };
+    });
+  }, []);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    
+    let query = supabase.from('appuntamenti')
+      .select('*, clienti(*), istruttori(*)')
+      .gte('data_solo', `${selectedMonth}-01`)
+      .lt('data_solo', format(addDays(new Date(`${selectedMonth}-01`), 32), 'yyyy-MM-01'));
+    
+    if (role === 'istruttore' && istruttoreId) {
+      query = query.eq('istruttore_id', istruttoreId);
+    }
+
+    const [
+      { data: iData }, 
+      { data: pData }, 
+      { data: aData }
+    ] = await Promise.all([
+      supabase.from('istruttori').select('*').order('cognome'),
+      supabase.from('patenti').select('*').order('tipo'),
+      query
+    ]);
+    
+    setIstruttori(iData ?? []);
+    setPatenti(pData ?? []);
+    setAppointments(aData ?? []);
+    setLoading(false);
+  }, [selectedMonth, refreshKey, role, istruttoreId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  // Logica di filtraggio locale per performance
+  const filteredData = appointments.filter(a => {
+    // Filtro Istruttori (Multiselect)
+    if (selectedIstruttori.length > 0 && !selectedIstruttori.includes(a.istruttore_id)) return false;
+    
+    // Filtro Patente
+    if (selectedPatente !== 'all' && a.clienti?.patente_richiesta_id !== selectedPatente) return false;
+
+    // Filtro Altro Impegno (Tipo)
+    if (selectedImpegno !== 'all') {
+       if (a.clienti?.nome === 'UFFICIO') {
+          if (a.clienti?.cognome !== selectedImpegno) return false;
+       } else {
+          return false; // Se cerchiamo un impegno specifico e questa è una guida, la escludiamo
+       }
+    }
+
+    return true;
+  });
+
+  // Calcoli Guide
+  const guide = filteredData.filter(a => a.clienti?.nome !== 'UFFICIO');
+  const guideCount = guide.length;
+  const guideMinutes = guide.reduce((acc, curr) => acc + (curr.durata || 0), 0);
+
+  // Calcoli Altri Impegni
+  const impegni = filteredData.filter(a => a.clienti?.nome === 'UFFICIO');
+  const impegniTimeByType = impegni.reduce((acc, curr) => {
+    const tipo = curr.clienti?.cognome || 'ALTRO';
+    acc[tipo] = (acc[tipo] || 0) + (curr.durata || 0);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const formatDuration = (mins: number) => {
+    if (mins < 60) return `${mins} min`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h} h${m > 0 ? `, ${m} min` : ''}`;
+  };
+
+  // Ripartizione Guide per Patente
+  const getGuideByPatente = (tipi: string[]) => {
+    const list = guide.filter(a => {
+      const p = patenti.find(p => p.id === a.clienti?.patente_richiesta_id);
+      return p && tipi.includes(p.tipo);
+    });
+    return {
+      count: list.length,
+      duration: list.reduce((acc, curr) => acc + (curr.durata || 0), 0)
+    };
+  };
+
+  const statsB = getGuideByPatente(['B']);
+  const statsMoto = getGuideByPatente(['A1', 'A2', 'A3', 'A']); // Includo A per completezza moto
+  const statsAM = getGuideByPatente(['AM']);
+  const statsAltre = {
+    count: guideCount - (statsB.count + statsMoto.count + statsAM.count),
+    duration: guideMinutes - (statsB.duration + statsMoto.duration + statsAM.duration)
+  };
+
+  const typesOfImpegni = Array.from(new Set(appointments.filter(a => a.clienti?.nome === 'UFFICIO').map(a => a.clienti?.cognome))).filter(Boolean);
+
+  const toggleIstruttore = (id: string) => {
+    setSelectedIstruttori(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden min-h-0">
+      <PrintStyles />
+      
+      {/* FILTRI REPORT - Hidden on Print */}
+      <div className="pb-4 flex-shrink-0 print:hidden">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[24px] shadow-sm overflow-hidden transition-all duration-300">
+          <button 
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            className="w-full flex items-center justify-between p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Search size={16} className="text-zinc-400 shrink-0" />
+              <span className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white truncate">Filtri Report</span>
+              {!isFiltersOpen && (
+                <span className="text-[10px] font-bold text-sky-500 bg-sky-50 dark:bg-sky-500/10 px-2 py-0.5 rounded-full uppercase whitespace-nowrap">
+                  {format(new Date(`${selectedMonth}-01`), 'MMMM', { locale: it })}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {!isFiltersOpen && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); window.print(); }}
+                  className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                  title="Stampa veloce"
+                >
+                  <Printer size={16} />
+                </button>
+              )}
+              <ChevronDown 
+                size={18} 
+                className={cn("text-zinc-400 transition-transform duration-300", !isFiltersOpen && "rotate-180")} 
+              />
+            </div>
+          </button>
+
+          {isFiltersOpen && (
+            <div className="px-4 pb-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Mese */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Periodo</label>
+                  <div className="relative">
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="w-full h-11 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 pr-10 text-sm font-bold outline-none focus:border-sky-500 transition-all appearance-none cursor-pointer capitalize"
+                    >
+                      {monthOptions.map((m: { value: string, label: string }) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Patente</label>
+                  <div className="relative">
+                    <select
+                      value={selectedPatente}
+                      onChange={(e) => setSelectedPatente(e.target.value)}
+                      className="w-full h-11 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 pr-10 text-sm font-bold outline-none focus:border-sky-500 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="all">Tutte le Patenti</option>
+                      {patenti.filter(p => !p.nascosta).map(p => (
+                        <option key={p.id} value={p.id}>{p.tipo}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+
+                {/* Tipo Impegno */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Tipo Impegno</label>
+                  <div className="relative">
+                    <select
+                      value={selectedImpegno}
+                      onChange={(e) => setSelectedImpegno(e.target.value)}
+                      className="w-full h-11 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 pr-10 text-sm font-bold outline-none focus:border-sky-500 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="all">Tutti (Guide + Impegni)</option>
+                      {typesOfImpegni.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Multiselect Istruttori */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Istruttori</label>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setSelectedIstruttori([])}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all",
+                      selectedIstruttori.length === 0 
+                      ? "bg-zinc-900 text-white border-zinc-900 shadow-lg" 
+                      : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400"
+                    )}
+                  >
+                    Tutti
+                  </button>
+                  {istruttori.map(ist => (
+                    <button
+                      key={ist.id}
+                      onClick={() => toggleIstruttore(ist.id)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all flex items-center gap-1.5",
+                        selectedIstruttori.includes(ist.id)
+                        ? "bg-sky-50 text-sky-600 border-sky-200 shadow-sm"
+                        : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-sky-200"
+                      )}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ist.colore }} />
+                      {ist.cognome} {ist.nome}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col items-end gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg hover:bg-zinc-800 transition-all active:scale-95 shadow-zinc-500/20"
+                >
+                  <Printer size={14} />
+                  Stampa PDF / Excel
+                </button>
+                <p className="text-[9px] text-zinc-400 font-medium italic">
+                  Tip: Su iOS, usa "Stampa" e poi l'icona "Condividi" per salvare come PDF.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RISULTATI REPORT */}
+      <div className="flex-1 overflow-y-auto scroll-container pb-20 print:p-0 no-scrollbar">
+        <div className="grid gap-6">
+          
+          {/* Header Stampa (Solo print) */}
+          <div className="hidden print:block mb-8 border-b-2 border-zinc-900 pb-4">
+            <h1 className="text-3xl font-black uppercase tracking-tighter">Report Attività</h1>
+            <div className="flex justify-between items-end mt-2">
+              <p className="text-sm font-bold text-zinc-600 uppercase">Periodo: {format(new Date(`${selectedMonth}-01`), 'MMMM yyyy', { locale: it })}</p>
+              <p className="text-xs text-zinc-400 italic">Generato il {format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+            </div>
+          </div>
+
+          {/* Sezione 1: Guide */}
+          <div className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-6 shadow-sm print:rounded-none print:shadow-none print:border-zinc-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center print:bg-emerald-50">
+                <Car size={20} />
+              </div>
+              <h3 className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-white">Statistiche Guide</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800 print:bg-white print:border-zinc-200">
+                <p className="text-[10px] font-black text-black dark:text-white uppercase tracking-widest mb-1">Totale Guide</p>
+                <p className="text-3xl font-black text-black dark:text-white">{guideCount}</p>
+              </div>
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800 print:bg-white print:border-zinc-200">
+                <p className="text-[10px] font-black text-black dark:text-white uppercase tracking-widest mb-1">Somma Ore</p>
+                <p className="text-3xl font-black text-black dark:text-white">{formatDuration(guideMinutes)}</p>
+              </div>
+            </div>
+
+            {/* Dettaglio Ripartizione */}
+            <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 grid gap-2">
+              <div className="flex items-center justify-between text-xs font-bold text-black dark:text-white bg-zinc-50 dark:bg-zinc-800/20 p-3 rounded-xl border border-zinc-100/50 dark:border-zinc-800/50">
+                <span className="uppercase tracking-tight">Guide B</span>
+                <span className="font-black text-black dark:text-white">{statsB.count} Guide + {formatDuration(statsB.duration)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs font-bold text-black dark:text-white bg-zinc-50 dark:bg-zinc-800/20 p-3 rounded-xl border border-zinc-100/50 dark:border-zinc-800/50">
+                <span className="uppercase tracking-tight">Guide Moto (A1-A2-A3)</span>
+                <span className="font-black text-black dark:text-white">{statsMoto.count} Guide + {formatDuration(statsMoto.duration)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs font-bold text-black dark:text-white bg-zinc-50 dark:bg-zinc-800/20 p-3 rounded-xl border border-zinc-100/50 dark:border-zinc-800/50">
+                <span className="uppercase tracking-tight">Guide AM</span>
+                <span className="font-black text-black dark:text-white">{statsAM.count} Guide + {formatDuration(statsAM.duration)}</span>
+              </div>
+              {statsAltre.count > 0 && (
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-500 p-3 rounded-xl border border-transparent">
+                  <span className="uppercase tracking-tight">Altre Guide (C/D/E)</span>
+                  <span className="font-black">{statsAltre.count} Guide • {formatDuration(statsAltre.duration)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sezione 2: Altri Impegni */}
+          <div className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-6 shadow-sm print:rounded-none print:shadow-none print:border-zinc-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center print:bg-orange-50">
+                <Clock size={20} />
+              </div>
+              <h3 className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-white">Altri Impegni</h3>
+            </div>
+
+            {Object.keys(impegniTimeByType).length === 0 ? (
+              <p className="text-center py-8 text-zinc-400 font-medium">Nessun impegno extra registrato nel periodo.</p>
+            ) : (
+              <div className="grid gap-3">
+                {Object.entries(impegniTimeByType).map(([tipo, mins]) => (
+                  <div key={tipo} className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-100 dark:border-zinc-800 print:bg-white print:border-zinc-200">
+                    <div>
+                      <p className="text-xs font-black text-black dark:text-white uppercase tracking-wider">{tipo}</p>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                        {impegni.filter((i: any) => i.clienti?.cognome === tipo).length} Sessioni
+                      </p>
+                    </div>
+                    <p className="text-lg font-black text-black dark:text-white">{formatDuration(mins as number)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Page principale ───────────────────────────────────────────
-type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti' | 'impegni' | 'mobile';
+type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti' | 'impegni' | 'report' | 'mobile' | 'impostazioni';
 
 const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'veicoli', label: 'Veicoli', icon: Car, color: 'emerald' },
   { id: 'istruttori', label: 'Istruttori', icon: Users, color: 'blue' },
   { id: 'impegni', label: 'Altri Impegni', icon: Clock, color: 'orange' },
+  { id: 'report', label: 'Report', icon: BadgeCheck, color: 'sky' },
   { id: 'patenti', label: 'Patenti', icon: BadgeCheck, color: 'purple' },
   { id: 'utenti', label: 'Utenti', icon: ShieldCheck, color: 'indigo' },
+  { id: 'impostazioni', label: 'Impostazioni', icon: Key, color: 'amber' },
   { id: 'mobile', label: 'App Mobile', icon: Smartphone, color: 'blue' },
 ];
 
+// ── Tab: Impostazioni ─────────────────────────────────────────
+const TabImpostazioni = () => {
+  const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState({ hide_gestione_for_others: false });
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('impostazioni_sistema').select('*').eq('id', 'config_globale').single();
+      if (data) setConfig(data);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const toggleHide = async () => {
+    const newValue = !config.hide_gestione_for_others;
+    const { error } = await supabase.from('impostazioni_sistema').update({ hide_gestione_for_others: newValue }).eq('id', 'config_globale');
+    if (!error) setConfig({ ...config, hide_gestione_for_others: newValue });
+  };
+
+  if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-amber-500" /></div>;
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white dark:bg-zinc-900 p-6 rounded-[32px] border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter mb-4 flex items-center gap-2">
+          <ShieldCheck className="text-amber-500" />
+          Restrizioni Accesso
+        </h3>
+        <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+          <div>
+            <p className="font-bold text-zinc-900 dark:text-white">Nascondi Gestione</p>
+            <p className="text-xs text-zinc-500">Nasconde le schede tecniche a Istruttori e Ufficio (mostra solo Report e Impegni).</p>
+          </div>
+          <button 
+            onClick={toggleHide}
+            className={cn(
+              "w-12 h-6 rounded-full transition-all relative",
+              config.hide_gestione_for_others ? "bg-amber-500" : "bg-zinc-300 dark:bg-zinc-700"
+            )}
+          >
+            <div className={cn(
+              "w-4 h-4 bg-white rounded-full absolute top-1 transition-all",
+              config.hide_gestione_for_others ? "right-1" : "left-1"
+            )} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function GestionePage() {
-  const [active, setActive] = useState<GestioneTab>('veicoli');
+  const { role, isAdmin, isSegreteria, isIstruttore, istruttoreId } = useAuth();
+  const [active, setActive] = useState<GestioneTab>('report'); // Default to report for better safety
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [hideGestione, setHideGestione] = useState(false);
 
-  const Tab = TABS.find(t => t.id === active)!;
-  const Icon = Tab.icon;
+  useEffect(() => {
+    async function checkInhibition() {
+      const { data } = await supabase.from('impostazioni_sistema').select('hide_gestione_for_others').eq('id', 'config_globale').single();
+      if (data) setHideGestione(data.hide_gestione_for_others);
+    }
+    checkInhibition();
+  }, []);
+
+  // Filter tabs based on role and admin settings
+  const filteredTabs = TABS.filter(tab => {
+    if (isAdmin) return true;
+    
+    // Logic for others
+    const isRestrictedByAdmin = hideGestione && (isIstruttore || isSegreteria);
+    
+    if (isRestrictedByAdmin) {
+      return tab.id === 'report' || tab.id === 'impegni';
+    }
+
+    if (isIstruttore) {
+      return tab.id === 'report' || tab.id === 'impegni';
+    }
+
+    if (isSegreteria) {
+      return ['veicoli', 'patenti', 'impegni', 'report'].includes(tab.id);
+    }
+
+    return tab.id === 'report'; // Safety fallback
+  });
+
+  // Ensure active tab is within filtered tabs
+  useEffect(() => {
+    if (filteredTabs.length > 0 && !filteredTabs.find(t => t.id === active)) {
+      setActive(filteredTabs[0].id as GestioneTab);
+    }
+  }, [filteredTabs, active]);
+
+  const Tab = TABS.find(t => t.id === active) || filteredTabs[0];
+  const Icon = Tab?.icon || Wrench;
 
   const handleAddSuccess = () => {
     setIsAddModalOpen(false);
@@ -997,125 +1496,109 @@ export default function GestionePage() {
 
   return (
     <div className="flex flex-col h-full animate-fade-in overflow-hidden">
+      <PrintStyles />
+      
       {/* Page Header - Fixed */}
-      <header className="pt-2 px-4 md:px-6 pb-4 flex-shrink-0 max-w-4xl mx-auto w-full">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display leading-none">Gestione</h1>
-          <RefreshButton onRefresh={() => setRefreshKey(prev => prev + 1)} className="h-8 w-8 p-0" />
-          <button 
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.location.href = window.location.pathname + '?v=' + new Date().getTime();
-              }
-            }}
-            className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-[9px] font-black rounded-lg uppercase tracking-tighter border border-red-200 dark:border-red-900/30 transition-all"
-          >
-            Forza Refresh PWA
-          </button>
+      <header className="pt-6 px-4 md:px-8 pb-4 flex-shrink-0 animate-in fade-in duration-500 print-hidden">
+        <div className="max-w-5xl mx-auto flex justify-between items-center bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl p-4 rounded-[32px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              "w-12 h-12 rounded-[22px] flex items-center justify-center shadow-lg transition-all",
+              `bg-${sectionColor}-500 text-white shadow-${sectionColor}-500/20`
+            )}>
+              <Icon size={24} strokeWidth={3} />
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter leading-none">
+                {Tab?.label}
+              </h1>
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                Amministrazione
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <RefreshButton onRefresh={() => setRefreshKey(prev => prev + 1)} />
+            {(active === 'veicoli' || active === 'istruttori' || active === 'patenti' || active === 'utenti') && isAdmin && (
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-3 rounded-[20px] font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg",
+                  `bg-zinc-900 dark:bg-sky-500 text-white shadow-zinc-900/20 dark:shadow-sky-500/20`
+                )}
+              >
+                <Plus size={16} strokeWidth={3} />
+                <span className="hidden sm:inline">{getAddTitle()}</span>
+              </button>
+            )}
+            {/* Forza Refresh Button for Debug / PWA Sync */}
+            <button 
+              onClick={() => { if (typeof window !== 'undefined') window.location.href = window.location.pathname + '?v=' + new Date().getTime(); }}
+              className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-[9px] font-black rounded-lg uppercase tracking-tighter border border-red-200 dark:border-red-900/30 transition-all hidden sm:block"
+            >
+              Forza Refresh
+            </button>
+          </div>
         </div>
-        <p className="text-zinc-500 dark:text-zinc-400 mt-0 text-xs font-semibold">Configura le risorse della scuola guida</p>
       </header>
 
-      {/* Tab Management Controls - Fixed */}
-      <div className="px-4 md:px-6 pb-2 flex-shrink-0 max-w-4xl mx-auto w-full">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-2xl w-fit overflow-x-auto max-w-full shadow-inner scrollbar-hide">
-            {TABS.map(tab => {
-              const TIcon = tab.icon;
+      {/* Tabs Menu - Scrollable */}
+      <nav className="px-4 md:px-8 pb-4 flex-shrink-0 animate-in fade-in slide-in-from-top-4 duration-500 delay-150 print-hidden">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md p-1.5 rounded-[22px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm overflow-x-auto no-scrollbar scrollbar-hide">
+            {filteredTabs.map(tab => {
+              const TabIcon = tab.icon;
               const isActive = active === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActive(tab.id)}
+                  onClick={() => setActive(tab.id as GestioneTab)}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
-                    isActive
-                      ? 'bg-white dark:bg-zinc-800 shadow-sm' +
-                      (tab.color === 'emerald' ? ' text-emerald-600 dark:text-emerald-400' :
-                        tab.color === 'blue' ? ' text-blue-600 dark:text-blue-400' :
-                          tab.color === 'orange' ? ' text-orange-600 dark:text-orange-400' :
-                          tab.color === 'purple' ? ' text-purple-600 dark:text-purple-400' :
-                            ' text-indigo-600 dark:text-indigo-400')
-                      : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                    "flex items-center gap-2 px-6 py-3 rounded-[18px] text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all flex-shrink-0",
+                    isActive 
+                      ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-700" 
+                      : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                   )}
                 >
-                  <TIcon size={14} />
+                  <TabIcon size={14} strokeWidth={3} className={isActive ? `text-${tab.color}-500` : ""} />
                   {tab.label}
                 </button>
               );
             })}
           </div>
-
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className={cn(
-              "flex items-center justify-center gap-2 px-4 py-2 text-white rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-lg active:scale-95 shrink-0",
-              sectionColor === 'emerald' ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20" : "bg-sky-500 hover:bg-sky-600 shadow-sky-500/20"
-            )}
-          >
-            <Plus size={16} />
-            {getAddTitle()}
-          </button>
         </div>
-      </div>
+      </nav>
 
-      {/* Tab Content Area - Internal scrolling handled by components */}
-      <div className="flex-1 overflow-hidden px-4 md:px-6 pb-32">
-        <div className="max-w-4xl mx-auto h-full flex flex-col">
-          <div className="flex-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} sectionColor={sectionColor} />}
-            {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} sectionColor={sectionColor} />}
-            {active === 'impegni' && <TabImpegni refreshKey={refreshKey} sectionColor={sectionColor} />}
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-hidden px-4 md:px-8 relative">
+        <div className="max-w-5xl mx-auto h-full flex flex-col pt-2 pb-32 no-scrollbar">
+          <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300 overflow-hidden h-full">
+            {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
+            {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
+            {active === 'report' && <TabReport refreshKey={refreshKey} role={role || undefined} istruttoreId={istruttoreId || undefined} />}
             {active === 'patenti' && <TabPatenti refreshKey={refreshKey} sectionColor={sectionColor} />}
             {active === 'utenti' && <TabUtenti refreshKey={refreshKey} sectionColor={sectionColor} />}
+            {active === 'impostazioni' && <TabImpostazioni />}
             {active === 'mobile' && <InstallPWA />}
+            {active === 'impegni' && <TabImpegni refreshKey={refreshKey} sectionColor={sectionColor} />}
           </div>
         </div>
-      </div>
+      </main>
 
+      {/* Modale Aggiunta Universale */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         title={getAddTitle()}
       >
-        {active === 'veicoli' && (
-          <VeicoloForm 
-            key="global-add-veicoli"
-            onSuccess={handleAddSuccess} 
-            onCancel={() => setIsAddModalOpen(false)} 
-          />
-        )}
-        {active === 'istruttori' && (
-          <IstruttoreForm 
-            key="global-add-istruttori"
-            onSuccess={handleAddSuccess} 
-            onCancel={() => setIsAddModalOpen(false)} 
-          />
-        )}
-        {active === 'impegni' && (
-          <AppointmentForm 
-            key="global-add-impegni"
-            onSuccess={handleAddSuccess} 
-            onCancel={() => setIsAddModalOpen(false)} 
-            defaultIsImpegno={true}
-          />
-        )}
-        {active === 'patenti' && (
-          <PatenteForm 
-            key="global-add-patenti"
-            onSuccess={handleAddSuccess} 
-            onCancel={() => setIsAddModalOpen(false)} 
-          />
-        )}
-        {active === 'utenti' && (
-          <UserForm 
-            key="global-add-utenti"
-            onSuccess={handleAddSuccess} 
-            onCancel={() => setIsAddModalOpen(false)} 
-          />
-        )}
+        <div className="mt-2">
+          {active === 'veicoli' && <VeicoloForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
+          {active === 'istruttori' && <IstruttoreForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
+          {active === 'patenti' && <PatenteForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
+          {active === 'utenti' && <UserForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
+          {active === 'impegni' && <ImpegnoForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
+        </div>
       </Modal>
-
     </div>
   );
 }

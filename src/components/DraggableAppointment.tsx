@@ -6,7 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { AlertTriangle, StickyNote, Trash2 } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
-import { isSameDay, parseISO } from 'date-fns';
+import { isSameDay, parseISO, format } from 'date-fns';
 
 interface DraggableAppointmentProps {
   appointment: Appointment;
@@ -16,6 +16,16 @@ interface DraggableAppointmentProps {
   isFirst?: boolean;
   granularity?: number;
 }
+
+const hexToRgba = (hex: string, alpha: number) => {
+  if (!hex) return `rgba(59, 130, 246, ${alpha})`;
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  const r = parseInt(hex.substring(0, 2), 16) || 59;
+  const g = parseInt(hex.substring(2, 4), 16) || 130;
+  const b = parseInt(hex.substring(4, 6), 16) || 246;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isStacked, isFirst, granularity = 15 }: DraggableAppointmentProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -37,6 +47,9 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
     transform: CSS.Translate.toString(transform),
   };
 
+  const instructorColor = appointment.istruttore?.color || '#3b82f6';
+  const instructorInitial = appointment.istruttore?.name ? appointment.istruttore.name.trim().charAt(0).toUpperCase() : '?';
+
   return (
     <div 
       ref={setNodeRef}
@@ -47,11 +60,10 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
         if (onClick) onClick(appointment);
       }}
       className={cn(
-        "relative w-full p-1.5 mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] shadow-sm flex flex-col justify-between border-l-4",
+        "relative w-full p-2 mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] flex flex-col justify-between border",
         isDragging ? "invisible" : "hover:scale-[1.02] hover:shadow-lg hover:z-[30]",
-        appointment.is_unavailability ? "bg-zinc-200 dark:bg-zinc-700/50" : "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md",
-        isOverlapping && "ring-2 ring-red-500 animate-pulse bg-red-500/10 dark:bg-red-500/20",
-        appointment.stato === 'annullato' && "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950 border-zinc-300 dark:border-zinc-700",
+        isOverlapping && "ring-2 ring-red-500 animate-pulse",
+        appointment.stato === 'annullato' && "opacity-60 grayscale border-zinc-300 dark:border-zinc-700",
         isInProgress && "ring-[3px] ring-blue-600/40 border-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(37,99,235,0.1)] animate-pulse-subtle"
       )}
       style={{ 
@@ -59,23 +71,34 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
         height: isStacked ? 'auto' : `${(appointment.duration / 15) * 40 - 2}px`,
         minHeight: isStacked ? '36px' : undefined,
         marginTop: (isStacked && !isFirst) ? '-4px' : undefined,
-        borderLeftColor: isOverlapping ? '#ef4444' : (appointment.istruttore?.color || '#3b82f6'),
-        boxShadow: isOverlapping ? '0 0 20px rgba(239, 68, 68, 0.2)' : `0 4px 12px -2px ${appointment.istruttore?.color}20`,
+        backgroundColor: appointment.stato === 'annullato' ? '#f4f4f5' : hexToRgba(instructorColor, 0.15),
+        borderColor: isOverlapping ? '#ef4444' : hexToRgba(instructorColor, 0.4),
+        boxShadow: isOverlapping ? '0 0 20px rgba(239, 68, 68, 0.2)' : `0 4px 12px -2px ${instructorColor}20`,
         borderRight: appointment.vehicle_color ? `4px solid ${appointment.vehicle_color}` : undefined,
       } as React.CSSProperties}
     >
       <div>
         <div className="flex items-start justify-between gap-1">
-          <p className={cn(
-            "text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight truncate",
-            appointment.stato === 'annullato' && "line-through text-zinc-500 dark:text-zinc-400"
-          )}>
-            {appointment.client_name}
-          </p>
+          <div className="flex items-center gap-1.5 overflow-hidden">
+             <div 
+               className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0 shadow-sm"
+               style={{ backgroundColor: instructorColor }}
+               title={appointment.istruttore?.name}
+             >
+               {instructorInitial}
+             </div>
+             <p className={cn(
+               "text-[11px] sm:text-[13px] font-black text-zinc-900 dark:text-zinc-100 leading-tight truncate",
+               appointment.stato === 'annullato' && "line-through text-zinc-500 dark:text-zinc-400"
+             )}>
+               {appointment.client_name}
+             </p>
+          </div>
+          
           <div className="flex items-center gap-1 shrink-0">
             {appointment.notes && appointment.notes.trim() !== '' && (
               <div className="flex items-center justify-center p-1 bg-amber-100 dark:bg-amber-900/40 rounded-lg text-amber-600 dark:text-amber-400 shadow-sm ring-1 ring-amber-500/20" title={appointment.notes}>
-                <StickyNote size={13} fill="currentColor" fillOpacity={0.2} />
+                <StickyNote size={12} fill="currentColor" fillOpacity={0.2} />
               </div>
             )}
             {isOverlapping && (
@@ -83,31 +106,31 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-1.5 mt-1 sm:mt-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] sm:text-xs font-bold uppercase py-0.5 px-1.5 bg-white dark:bg-black/20 rounded text-zinc-800 dark:text-zinc-200">
-              {appointment.license_type}
+        
+        <div className="flex flex-col gap-0.5 mt-1 sm:mt-1.5 text-left">
+          <div className="flex items-center gap-1.5 opacity-80">
+            <span className="text-[10px] font-bold text-zinc-800 dark:text-zinc-300">
+              {appointment.appointment_time.slice(0, 5)} — {format(endTime, 'HH:mm')}
             </span>
-            <span className="text-[10px] sm:text-xs font-semibold opacity-80 text-zinc-800 dark:text-zinc-300">
-              {appointment.appointment_time.slice(0, 5)}
+            <span className="w-1 h-1 rounded-full bg-zinc-400 dark:bg-zinc-600"></span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
+              {appointment.license_type}
             </span>
           </div>
           
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Note: This only opens the DetailsModal which has the delete button,
-              // or we could add a direct ConfirmBubble here if needed.
-              // For now, let's keep it consistent with the user's request for a quick button.
-              // IF we want to trigger deletion directly from here, we'd need a callback.
-              if (onClick) onClick(appointment);
-            }}
-            className="p-1 rounded-lg text-red-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
-            title="Dettagli ed eliminazione"
-          >
-            <Trash2 size={14} />
-          </button>
+          <div className="absolute right-2 bottom-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onClick) onClick(appointment);
+              }}
+              className="p-1 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-white/50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
+              title="Dettagli"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

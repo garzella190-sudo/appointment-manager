@@ -1,13 +1,19 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote, Trash2 } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Users, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote, Trash2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 import { format, addDays, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
+import ReactDatePicker, { registerLocale } from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
+import { isItalianHoliday, isWeekend } from '@/utils/holidays';
+
+registerLocale('it', it);
+
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import Select from '@/components/forms/Select';
@@ -20,8 +26,10 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showHeader, setShowHeader] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
   const lastScrollY = useRef(0);
+  const hasAutoScrolled = useRef(false);
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
@@ -113,14 +121,21 @@ export default function Home() {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  // Auto-scroll to nearest appointment on load
+  // Reset auto-scroll flag when date changes
   useEffect(() => {
-    if (!loading && appointments.length > 0 && isSameDay(currentDate, new Date()) && scrollContainerRef.current) {
+    hasAutoScrolled.current = false;
+  }, [currentDate]);
+
+  // Auto-scroll instantly once to the target appointment without looping
+  useEffect(() => {
+    if (!loading && appointments.length > 0 && isSameDay(currentDate, new Date()) && scrollContainerRef.current && !hasAutoScrolled.current) {
+      // Small timeout to allow DOM to render completely
       const timer = setTimeout(() => {
+        if (hasAutoScrolled.current) return;
+        
         const now = new Date();
         const currentTime = format(now, 'HH:mm');
         
-        // Find best appointment to scroll to
         const sorted = [...appointments].sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
         const targetApt = sorted.find(a => a.appointment_time >= currentTime) || sorted[sorted.length - 1];
         
@@ -128,19 +143,25 @@ export default function Home() {
           const element = document.getElementById(`apt-${targetApt.id}`);
           const container = scrollContainerRef.current;
           if (element && container) {
-            const scrollPos = element.offsetTop - 12;
-            container.scrollTo({ top: scrollPos, behavior: 'smooth' });
+            hasAutoScrolled.current = true;
+            // Immediate scroll to avoid smooth-scroll onScroll conflicts
+            container.scrollTo({ top: element.offsetTop - 12, behavior: 'auto' });
           }
         }
-      }, 500);
+      }, 100);
       return () => clearTimeout(timer);
     }
-  }, [loading, appointments.length, currentDate]);
+  }, [loading, appointments, currentDate]);
+
+  const getDayClass = (date: Date) => {
+    if (isItalianHoliday(date) || isWeekend(date)) return "is-holiday";
+    return "";
+  };
 
   // Search and Filter logic
   const filteredAppointments = useMemo(() => {
     let result = appointments;
-    
+
     if (selectedInstructorId) {
       result = result.filter(a => a.trainer_id === selectedInstructorId);
     }
@@ -169,12 +190,9 @@ export default function Home() {
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const currentY = e.currentTarget.scrollTop;
-    if (currentY < 10) {
-      setShowHeader(true);
-    } else if (currentY > lastScrollY.current && currentY > 50) {
-      setShowHeader(false);
-    } else if (currentY < lastScrollY.current) {
-      setShowHeader(true);
+    if (currentY > lastScrollY.current && currentY > 50) {
+      if (showSearch) setShowSearch(false);
+      if (showFilter) setShowFilter(false);
     }
     lastScrollY.current = currentY;
   };
@@ -217,50 +235,89 @@ export default function Home() {
                 >
                   <ChevronRight size={18} />
                 </button>
+                
+                <div className="w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
+                
+                <ReactDatePicker
+                  selected={currentDate}
+                  onChange={(date: Date | null) => { if (date) setCurrentDate(date); }}
+                  customInput={
+                    <button className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-sky-600 dark:text-zinc-400 focus:outline-none flex items-center justify-center cursor-pointer">
+                      <CalendarIconSmall size={18} />
+                    </button>
+                  }
+                  locale="it"
+                  withPortal
+                  portalId="datepicker-portal"
+                  calendarClassName="premium-calendar"
+                  dayClassName={getDayClass}
+                />
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-sky-500 px-4 h-9 rounded-xl text-white font-black shadow-lg shadow-sky-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 text-[11px] uppercase tracking-wider"
-          >
-            <Plus size={16} />
-            <span>Nuovo</span>
-          </button>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <button
+              onClick={() => { setShowSearch(!showSearch); setShowFilter(false); }}
+              title="Cerca appuntamento"
+              className={cn("p-2 h-9 rounded-xl transition-all shadow-sm flex items-center justify-center", showSearch ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-inner" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
+            >
+              <Search size={16} />
+            </button>
+            <button
+              onClick={() => { setShowFilter(!showFilter); setShowSearch(false); }}
+              title="Filtra Istruttori"
+              className={cn("p-2 h-9 rounded-xl transition-all shadow-sm flex items-center justify-center", showFilter || selectedInstructorId ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
+            >
+              <Users size={16} />
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-sky-500 px-3 md:px-4 h-9 ml-1 rounded-xl text-white font-black shadow-lg shadow-sky-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 text-[11px] uppercase tracking-wider"
+            >
+              <Plus size={16} />
+              <span className="hidden sm:inline">Nuovo</span>
+            </button>
+          </div>
         </header>
 
         <div className={cn(
-          "transition-all duration-500 ease-in-out origin-top overflow-hidden",
-          showHeader ? "max-h-[200px] opacity-100 mb-3 translate-y-0" : "max-h-0 opacity-0 mb-0 -translate-y-4"
+          "transition-all duration-300 ease-in-out overflow-hidden origin-top",
+          (showSearch || showFilter) ? "max-h-[200px] opacity-100 mb-3" : "max-h-0 opacity-0 mb-0"
         )}>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative group flex-1">
+          {showSearch && (
+            <div className="relative group w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-sky-500 transition-colors" size={20} />
               <input
+                autoFocus
                 type="text"
-                placeholder="Cerca..."
+                placeholder="Cerca cliente, istruttore, o telefono..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all text-sm shadow-sm appearance-none"
               />
             </div>
-            <div className="min-w-[180px] shrink-0">
+          )}
+          {showFilter && (
+            <div className="w-full">
               <Select
                 options={[
-                  { id: '', label: 'Tutti' },
+                  { id: '', label: 'Tutti gli Istruttori' },
                   ...istruttori.map(i => ({ 
                     id: i.id, 
                     label: `${i.cognome} ${i.nome}`
                   }))
                 ]}
                 value={selectedInstructorId}
-                onChange={(val) => setSelectedInstructorId(val)}
-                icon={User}
-                placeholder="Istruttore"
+                onChange={(val) => {
+                  setSelectedInstructorId(val);
+                  setShowFilter(false); // Nascondi dopo aver scelto
+                }}
+                icon={Users}
+                placeholder="Filtra Istruttore"
                 searchable
               />
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -297,7 +354,7 @@ export default function Home() {
                     key={apt.id}
                     id={`apt-${apt.id}`}
                     onClick={() => setSelectedAppointment(apt)}
-                    className="bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left"
+                    className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-14"
                   >
                     <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
                       <div 
@@ -347,9 +404,7 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/50">
-                      <div className="flex items-center gap-2">
+                    <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
                         <ConfirmBubble
                           title="Elimina"
                           message="Sicuro?"
@@ -361,15 +416,13 @@ export default function Home() {
                           }}
                           trigger={
                             <button
-                              className="p-2.5 rounded-xl text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all"
+                              className="p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Trash2 size={18} />
+                              <Trash2 size={16} />
                             </button>
                           }
                         />
-                      </div>
-                      <ChevronRight size={20} className="text-zinc-300 group-hover:text-sky-500 group-hover:translate-x-1 transition-all" />
                     </div>
                   </div>
                 );

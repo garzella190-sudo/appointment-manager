@@ -78,3 +78,33 @@ export async function deleteClienteAction(id: string) {
 
   return { success: true };
 }
+export async function toggleProntoEsameAction(id: string, pronto: boolean, sessioneId?: string | null) {
+  const supabase = await createClient();
+
+  const updatePayload: any = { 
+    pronto_esame: pronto,
+    data_pronto_esame: pronto ? new Date().toISOString() : null 
+  };
+
+  if (sessioneId !== undefined) {
+    updatePayload.sessione_esame_id = sessioneId;
+  }
+
+  const { data, error } = await supabase
+    .from('clienti')
+    .update(updatePayload)
+    .eq('id', id)
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error updating pronto_esame:', error.message);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/calendar');
+  revalidatePath('/clienti');
+  revalidatePath('/esami');
+
+  return { success: true, id: data.id };
+}

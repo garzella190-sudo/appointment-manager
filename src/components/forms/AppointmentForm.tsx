@@ -10,6 +10,9 @@ import { Cliente, Istruttore, Veicolo, Patente, StatoAppuntamento } from '@/lib/
 import { cn } from '@/lib/utils';
 import { createAppointmentAction, updateAppointmentAction } from '@/actions/appointments';
 import { deleteAppointmentAction, cancelAppointmentAction, updateAppointmentNoteAction } from '@/actions/appointment_actions';
+import { toggleProntoEsameAction } from '@/actions/clienti';
+import { useAuth } from '@/hooks/useAuth';
+import { GraduationCap, CheckCircle2 } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
 import { ClientAutocomplete } from './ClientAutocomplete';
@@ -17,6 +20,7 @@ import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
 import { Modal } from '../Modal';
 import { SchedaClienteForm } from './SchedaClienteForm';
+import { AssignExamSessionModal } from '../modals/AssignExamSessionModal';
 
 import Select from './Select';
 import { ConfirmBubble } from '../ConfirmBubble';
@@ -44,10 +48,13 @@ const TIME_OPTIONS = Array.from({ length: (22 - 8) * 4 + 1 }, (_, i) => {
 });
 
 export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
+  const { role, isAdmin, isSegreteria } = useAuth();
   const [mode, setMode] = useState<'create' | 'edit' | 'view'>(appointmentId ? initialMode : 'create');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const { showToast } = useToast();
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Data Options
   const [clienti, setClienti] = useState<Cliente[]>([]);
@@ -185,6 +192,16 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           } catch {
             // Session not available, skip auto-fill
           }
+          
+          // Auto-fill memory dates if not provided by calendar explicit click
+          const memoryDate = localStorage.getItem('lastApptDate');
+          const memoryTime = localStorage.getItem('lastApptTime');
+          if (!initialDate && memoryDate) {
+            setForm(prev => ({ ...prev, data: memoryDate }));
+          }
+          if (!initialTime && memoryTime) {
+            setForm(prev => ({ ...prev, ora: memoryTime }));
+          }
         }
       } catch {
         // Ignored
@@ -245,16 +262,16 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
   }, [form.data, form.ora, form.durata, fetching, istruttori, veicoli, appointmentId]);
 
-  const handleClienteChange = (cliente: Cliente) => {
+  const handleClienteChange = async (cliente: Cliente) => {
     setSelectedCliente(cliente);
     
-    // Auto-fill from client profile
+    // Base updates from client profile
     const updates: Partial<typeof form> = { 
       cliente_id: cliente.id,
       cambio: cliente.preferenza_cambio || 'manuale'
     };
 
-    // 1. Set License type if specified in client profile
+    // Set License type if specified in client profile
     let currentPatenteTipo = 'B';
     if (cliente.patente_richiesta_id) {
       updates.patente_id = cliente.patente_richiesta_id;
@@ -270,25 +287,98 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       }
     }
 
-    // 2. Intelligent Vehicle Auto-Selection
-    // PRIORITY 1: If instructor is already selected AND has a default vehicle compatible with this client
-    const instrDefaultId = selectedIstruttore?.veicolo_id;
-    if (instrDefaultId) {
-      const instrVeh = veicoli.find(v => v.id === instrDefaultId);
-      if (instrVeh) {
-        const isGearboxMatch = instrVeh.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
-        const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
-        const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(instrVeh.tipo_patente) : instrVeh.tipo_patente === currentPatenteTipo;
-        
-        if (isGearboxMatch && isLicenseMatch) {
-          setSelectedVeicolo(instrVeh);
-          setForm(prev => ({ ...prev, ...updates, veicolo_id: instrVeh.id }));
-          return;
+    // ─── PRIORITY 1: Storico cliente — copia istruttore e veicolo dall'ultimo appuntamento ───
+    try {
+      const { data: lastApt } = await supabase
+        .from('appuntamenti')
+        .select('istruttore_id, veicolo_id')
+        .eq('cliente_id', cliente.id)
+        .neq('stato', 'annullato')
+        .order('data', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastApt?.istruttore_id) {
+        const histInstr = istruttori.find(i => i.id === lastApt.istruttore_id);
+        const histVeh = lastApt.veicolo_id ? veicoli.find(v => v.id === lastApt.veicolo_id) : null;
+
+        if (histInstr) {
+          setSelectedIstruttore(histInstr);
+          updates.istruttore_id = histInstr.id;
+
+          if (histVeh) {
+            setSelectedVeicolo(histVeh);
+            updates.veicolo_id = histVeh.id;
+          }
+
+          setForm(prev => ({ ...prev, ...updates }));
+          return; // Storico trovato → uscita immediata
+        }
+      }
+    } catch {
+      // Nessuno storico trovato, procedi al fallback
+    }
+
+    // ─── PRIORITY 2: Profilo utente — istruttore collegato alla sessione ───
+    try {
+      const browserSupabase = createClient();
+      const { data: { user } } = await browserSupabase.auth.getUser();
+      const linkedInstrId = user?.user_metadata?.istruttore_id;
+      if (linkedInstrId) {
+        const profileInstr = istruttori.find(i => i.id === linkedInstrId);
+        if (profileInstr) {
+          setSelectedIstruttore(profileInstr);
+          updates.istruttore_id = profileInstr.id;
+
+          // Auto-select instructor's default vehicle if compatible
+          if (profileInstr.veicolo_id) {
+            const instrVeh = veicoli.find(v => v.id === profileInstr.veicolo_id);
+            if (instrVeh) {
+              const isGearboxMatch = instrVeh.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
+              const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+              const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(instrVeh.tipo_patente) : instrVeh.tipo_patente === currentPatenteTipo;
+              if (isGearboxMatch && isLicenseMatch) {
+                setSelectedVeicolo(instrVeh);
+                updates.veicolo_id = instrVeh.id;
+              }
+            }
+          }
+
+          setForm(prev => ({ ...prev, ...updates }));
+          return; // Profilo trovato → uscita
+        }
+      }
+    } catch {
+      // Sessione non disponibile, procedi al fallback
+    }
+
+    // ─── PRIORITY 3: Matching per patente — veicolo compatibile + istruttore abilitato ───
+    // 3a. Trova un istruttore abilitato per questa patente
+    const enabledInstructors = istruttori.filter(i => 
+      i.patenti_abilitate && i.patenti_abilitate.includes(currentPatenteTipo as any)
+    );
+    if (enabledInstructors.length > 0) {
+      const bestInstr = enabledInstructors[0];
+      setSelectedIstruttore(bestInstr);
+      updates.istruttore_id = bestInstr.id;
+
+      // Se l'istruttore ha un veicolo default compatibile, usalo
+      if (bestInstr.veicolo_id) {
+        const instrVeh = veicoli.find(v => v.id === bestInstr.veicolo_id);
+        if (instrVeh) {
+          const isGearboxMatch = instrVeh.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
+          const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+          const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(instrVeh.tipo_patente) : instrVeh.tipo_patente === currentPatenteTipo;
+          if (isGearboxMatch && isLicenseMatch) {
+            setSelectedVeicolo(instrVeh);
+            setForm(prev => ({ ...prev, ...updates, veicolo_id: instrVeh.id }));
+            return;
+          }
         }
       }
     }
 
-    // PRIORITY 2: Best client match from all vehicles
+    // 3b. Trova un veicolo compatibile per tipo patente e cambio
     const compatibleVehicles = veicoli.filter(v => {
       const isGearboxMatch = v.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
       const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
@@ -457,6 +547,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
     
     showToast(appointmentId ? 'Appuntamento aggiornato con successo!' : 'Appuntamento creato con successo!', 'success');
+    
+    if (!appointmentId) {
+      localStorage.setItem('lastApptDate', form.data);
+      localStorage.setItem('lastApptTime', form.ora);
+    }
+    
     onSuccess?.();
   };
 
@@ -550,28 +646,30 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               <div className="flex-1 min-w-0 pr-4">
                 <div className="flex items-baseline gap-2 min-w-0">
                   <p className="truncate font-bold">{selectedCliente ? `${selectedCliente.cognome} ${selectedCliente.nome}` : 'Nessun cliente'}</p>
-                  {selectedCliente?.telefono && (
-                    <a 
-                      href={`tel:${selectedCliente.telefono.replace(/\D/g, '')}`} 
-                      className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black hover:underline shrink-0"
-                    >
-                      {selectedCliente.telefono}
-                    </a>
-                  )}
                 </div>
               </div>
               {selectedCliente && (
-                <div className="flex gap-1.5 shrink-0">
+                <div className="flex gap-2 shrink-0 items-center">
                   {selectedCliente.telefono && (
-                    <WhatsAppButton 
-                      phone={selectedCliente.telefono} 
-                      appointmentData={{ date: form.data, time: form.ora, duration: form.durata }}
-                      showLabel={false}
-                      variant="ghost"
-                      className="bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
-                    />
+                    <>
+                      <a 
+                        href={`tel:${selectedCliente.telefono.replace(/\D/g, '')}`} 
+                        className="h-10 px-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-100 transition-colors flex items-center gap-2 group"
+                        title="Chiama"
+                      >
+                        <Phone size={14} className="shrink-0" />
+                        <span className="hidden sm:inline text-[10px] font-black uppercase tracking-wider">{selectedCliente.telefono}</span>
+                      </a>
+                      <WhatsAppButton 
+                        phone={selectedCliente.telefono} 
+                        appointmentData={{ date: form.data, time: form.ora, duration: form.durata }}
+                        showLabel={false}
+                        variant="ghost"
+                        className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors h-10 shadow-sm border border-emerald-100/50"
+                      />
+                    </>
                   )}
-                  <Link href={`/clienti/${form.cliente_id}`} className="p-2 bg-zinc-100 text-zinc-400 rounded-xl hover:bg-zinc-200 transition-colors">
+                  <Link href={`/clienti/${form.cliente_id}`} className="w-10 h-10 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-xl hover:bg-zinc-200 transition-colors flex items-center justify-center shadow-sm border border-zinc-100 dark:border-zinc-800/50">
                     <ExternalLink size={14} />
                   </Link>
                 </div>
@@ -597,16 +695,16 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               </div>
             )
           )}
-          {/* QUICK ACTIONS BAR (View mode only) */}
           {isView && appointmentId && (
-            <div className="flex bg-zinc-50 dark:bg-zinc-900/50 p-1.5 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 items-center justify-between gap-1 shadow-sm mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+            <div className="flex justify-center gap-4 mb-4 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
               {/* MODIFICA */}
               <button
                 type="button"
                 onClick={() => setMode('edit')}
-                className="flex-1 h-10 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-100 transition-all active:scale-95"
+                className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-all active:scale-95 shadow-sm border border-blue-100/50 dark:border-blue-900/30"
+                title="Modifica"
               >
-                <Edit3 size={14} /> Modifica
+                <Pencil size={18} />
               </button>
 
               {/* ANNULLA */}
@@ -629,9 +727,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   <button 
                     type="button" 
                     disabled={form.stato === 'annullato'}  
-                    className="flex-1 h-10 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-orange-100 transition-all active:scale-95 disabled:opacity-30"
+                    className="w-10 h-10 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center hover:bg-orange-100 transition-all active:scale-95 disabled:opacity-30 shadow-sm border border-orange-100/50 dark:border-orange-900/30"
+                    title="Annulla"
                   >
-                    <X size={14} /> Annulla
+                    <X size={18} />
                   </button>
                 }
               />
@@ -653,11 +752,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   }
                 }}
                 trigger={
-                  <div
-                    className="flex-1 h-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-100 transition-all cursor-pointer active:scale-95 px-2"
+                  <button
+                    type="button"
+                    className="w-10 h-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all active:scale-95 shadow-sm border border-red-100/50 dark:border-red-900/30"
+                    title="Elimina"
                   >
-                    <Trash2 size={14} /> Elimina
-                  </div>
+                    <Trash2 size={18} />
+                  </button>
                 }
               />
             </div>
@@ -1152,17 +1253,33 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         <div className="pt-6">
           {isView ? (
             <div className="flex flex-col gap-3">
-              <button 
-                type="button" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onCancel();
-                }} 
-                className="w-full h-14 bg-zinc-900 text-white font-extrabold rounded-2xl text-[11px] uppercase tracking-widest transition-all hover:bg-black"
-              >
-                CHIUDI
-              </button>
+              {/* Pronto per Esame */}
+              {!isImpegno && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (!form.cliente_id) return;
+                      setIsExamModalOpen(true);
+                    }}
+                    className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <GraduationCap size={18} />
+                    Pronto per Esame
+                  </button>
+
+                  <AssignExamSessionModal 
+                    isOpen={isExamModalOpen}
+                    onClose={() => setIsExamModalOpen(false)}
+                    clienteId={form.cliente_id}
+                    onSuccess={() => {
+                      showToast('Allievo pronto per esame!', 'success');
+                      onSuccess();
+                    }}
+                  />
+                </>
+              )}
               
               {isCompleted && (
                 <div className="text-center pt-2">

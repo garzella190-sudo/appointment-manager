@@ -237,7 +237,14 @@
   align-items: center !important;
   justify-content: center !important;
   pointer-events: none;
-  z-index: 999999 !important;
+  z-index: 9999999 !important;
+  transition: all 0.3s ease;
+}
+
+#datepicker-portal:has(.react-datepicker-popper) {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
 }
 
 #datepicker-portal .react-datepicker-popper {

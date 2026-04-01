@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, User, Calendar as CalendarIcon, StickyNote } from 'lucide-react';
+import ReactDatePicker, { registerLocale } from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
+
+import { useRouter } from 'next/navigation';
+import { ChevronLeft, ChevronRight, ChevronDown, Loader2, User, Users, Calendar as CalendarIcon, StickyNote } from 'lucide-react';
 import Select from '@/components/forms/Select';
 import {
   DndContext,
@@ -16,6 +20,7 @@ import {
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { startOfWeek, addDays, format, isSameDay, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
+registerLocale('it', it);
 import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
 import { DroppableCell } from '@/components/DroppableCell';
@@ -28,6 +33,23 @@ import DetailsModal from '@/components/modals/DetailsModal';
 import { Clock } from 'lucide-react';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 import { updateAppointmentAction } from '@/actions/appointments';
+
+class SmartPointerSensor extends PointerSensor {
+  static activators = [
+    {
+      eventName: 'onPointerDown' as const,
+      handler: ({ nativeEvent: event }: { nativeEvent: PointerEvent }) => {
+        if (typeof window !== 'undefined' && window.innerWidth < 768) {
+          return false; // Disable dragging on mobile
+        }
+        if (!event.isPrimary || event.button !== 0) {
+          return false;
+        }
+        return true;
+      },
+    },
+  ];
+}
 
 const supabaseClient = createClient();
 
@@ -66,6 +88,7 @@ export interface AppointmentRow {
 
 export default function CalendarPage() {
   const supabase = supabaseClient;
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,14 +100,17 @@ export default function CalendarPage() {
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
+  const [showFilter, setShowFilter] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
   const [granularity, setGranularity] = useState<15 | 30 | 60>(15);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Usa l'hook per gestire responsive in modo solido dopo l'idratazione
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
+    setIsMobile(window.innerWidth < 768);
     
     // Caricamento impostazioni da localStorage
     const savedInstructorId = localStorage.getItem('calendar_selectedInstructorId');
@@ -118,8 +144,13 @@ export default function CalendarPage() {
       }
     };
     handleResize(); // Chiamata iniziale
+    const handleMobileCheck = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', handleMobileCheck);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleMobileCheck);
+    };
   }, []);
 
   // Salvataggio impostazioni in localStorage
@@ -132,8 +163,14 @@ export default function CalendarPage() {
     localStorage.setItem('calendar_granularity', granularity.toString());
   }, [selectedInstructorId, viewDays, showWeekends, currentDate, granularity, mounted]);
 
+  const getDayClass = (date: Date) => {
+    if (isItalianHoliday(date) || isWeekend(date)) return "is-holiday";
+    return "";
+  };
+
+  // Disable drag & drop on mobile using SmartPointerSensor to avoid changing hooks array length
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(SmartPointerSensor, {
       activationConstraint: {
         distance: 8,
       },
@@ -248,16 +285,16 @@ export default function CalendarPage() {
     if (mounted) fetchWeekAppointments();
   }, [currentDate, effectiveViewDays, mounted, fetchWeekAppointments]);
 
-  // Auto-scroll to current time on load
+  // Auto-scroll logic: go to current time if apps exist near, otherwise start at 09:00
   useEffect(() => {
     if (!loading && mounted && scrollContainerRef.current) {
-      // Small timeout to ensure DOM is ready after loading state change
+      // Small timeout to ensure DOM is ready
       const timer = setTimeout(() => {
         const now = new Date();
         const currentH = now.getHours();
         const currentM = now.getMinutes();
+        const nowStr = format(now, 'yyyy-MM-dd');
         
-        // Clamp time within 08:00 - 22:00
         let targetH = currentH;
         let targetM = Math.floor(currentM / granularity) * granularity;
         
@@ -269,18 +306,46 @@ export default function CalendarPage() {
           targetM = 0;
         }
         
-        const targetSlot = `${targetH.toString().padStart(2, '0')}:${targetM.toString().padStart(2, '0')}`;
+        // Controlla se ci sono appuntamenti nelle prossime 2-3 ore o in corso
+        const hasApptNear = appointments.some(a => {
+          if (!a.appointment_time || a.appointment_date !== nowStr) return false;
+          const [aptH, aptM] = a.appointment_time.split(':').map(Number);
+          const startD = new Date(now);
+          startD.setHours(aptH, aptM, 0, 0);
+          
+          const endD = new Date(startD);
+          endD.setMinutes(endD.getMinutes() + (a.duration || 60));
+          
+          const timeDiff = Math.abs((startD.getTime() - now.getTime()) / (1000 * 60 * 60));
+          return (now >= startD && now <= endD) || timeDiff <= 2.5; 
+        });
+
+        const container = scrollContainerRef.current;
+        if (!container) return;
         
-        const element = document.getElementById(`slot-${targetSlot}`);
-        if (element && scrollContainerRef.current) {
-          const container = scrollContainerRef.current;
-          const scrollPos = element.offsetTop - (container.clientHeight / 2) + (element.clientHeight / 2);
+        let scrollPos = 0;
+
+        if (hasApptNear) {
+          const targetSlot = `${targetH.toString().padStart(2, '0')}:${targetM.toString().padStart(2, '0')}`;
+          const element = document.getElementById(`slot-${targetSlot}`);
+          if (element) {
+            scrollPos = element.offsetTop - (container.clientHeight / 2) + (element.clientHeight / 2);
+          }
+        } else {
+          // Posizionati alle 9 come primo rigo visibile
+          const element = document.getElementById(`slot-09:00`);
+          if (element) {
+            scrollPos = element.offsetTop - 10;
+          }
+        }
+
+        if (scrollPos > 0) {
           container.scrollTo({ top: scrollPos, behavior: 'smooth' });
         }
       }, 500); // 500ms to be safe with animations
       return () => clearTimeout(timer);
     }
-  }, [loading, mounted]);
+  }, [loading, mounted, appointments, granularity]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -380,18 +445,31 @@ export default function CalendarPage() {
               </p>
             </div>
 
-            <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
-              {/* ... (pulsanti vista) */}
-              <div className="flex flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl shadow-inner overflow-x-auto scrollbar-hide">
+            <div className="flex flex-row items-center justify-start sm:justify-end gap-1.5 sm:gap-3 w-full lg:w-auto mt-2 lg:mt-0 overflow-x-auto scrollbar-hide pb-1 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+              {/* Vista Giorni: Dropdown su mobile, pulsanti su desktop */}
+              <div className="relative shrink-0 sm:hidden flex items-center shrink-0 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+                <select
+                  value={viewDays}
+                  onChange={(e) => setViewDays(parseInt(e.target.value) as 1 | 3 | 5 | 7)}
+                  className="appearance-none bg-transparent h-8 w-[48px] px-2 text-center text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all cursor-pointer outline-none border-none shadow-none"
+                >
+                  <option value={1}>1 G</option>
+                  <option value={3}>3 G</option>
+                  <option value={5}>5 G</option>
+                  <option value={7}>7 G</option>
+                </select>
+              </div>
+              
+              <div className="hidden sm:flex shrink-0 flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
                 {[1, 3, 5, 7].map((days) => (
                   <button
                     key={days}
                     onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
                     className={cn(
-                      "px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black transition-all whitespace-nowrap uppercase tracking-wider",
+                      "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
                       viewDays === days 
-                        ? "bg-purple-600 text-white shadow-md shadow-purple-500/20" 
-                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                        ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800 shadow-sm" 
+                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800"
                     )}
                   >
                     {days} G
@@ -399,66 +477,102 @@ export default function CalendarPage() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl w-fit shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
-                <button
-                  onClick={() => navigateWeek(-1)}
-                  title="Settimana precedente"
-                  className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <button
-                  onClick={() => setCurrentDate(new Date())}
-                  title="Vai a oggi"
-                  className="px-4 py-2 text-sm font-bold text-zinc-900 dark:text-zinc-100"
-                >
-                  Oggi
-                </button>
-                <button
-                  onClick={() => navigateWeek(1)}
-                  title="Settimana successiva"
-                  className="p-2 hover:bg-white dark:hover:bg-zinc-800 rounded-xl transition-all text-zinc-600 dark:text-zinc-400"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-
-              {/* Granularity filter removed as per user request */}
-
-
-              {viewDays !== 7 && (
-                <div className="flex bg-zinc-100 dark:bg-zinc-900/50 p-1.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
+              <div className="flex items-center shrink-0 gap-1.5 md:gap-2">
+                {viewDays !== 7 && (
                   <button
                     onClick={() => setShowWeekends(!showWeekends)}
+                    title={!showWeekends ? "Mostra Weekend" : "Nascondi Weekend"}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap",
-                      showWeekends 
-                        ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-500" 
-                        : "bg-white dark:bg-zinc-700 text-purple-600 shadow-sm"
+                      "h-10 px-3 md:px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap shadow-sm border",
+                      !showWeekends
+                        ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-red-500"
                     )}
                   >
-                    Sab-Dom: {showWeekends ? 'Sì' : 'No'}
+                    Weekend
                   </button>
-                </div>
-              )}
+                )}
 
-              <div className="min-w-[150px]">
-                <Select
-                  options={[
-                    { id: '', label: 'Tutti gli istruttori' },
-                    ...istruttori.map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}` }))
-                  ]}
-                  value={selectedInstructorId}
-                  onChange={(val) => setSelectedInstructorId(val)}
-                  icon={User}
-                  placeholder="Istruttore"
-                  searchable
-                />
+                <button
+                  onClick={() => setShowFilter(!showFilter)}
+                  title="Filtra Istruttori"
+                  className={cn("h-10 w-10 shrink-0 flex items-center justify-center rounded-xl transition-all shadow-sm border", 
+                    showFilter || selectedInstructorId 
+                      ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" 
+                      : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
+                >
+                  <Users size={16} />
+                </button>
+
+                <div className="flex items-center shrink-0 h-10 gap-1 sm:gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+                  <button
+                    onClick={() => navigateWeek(-1)}
+                    title="Settimana precedente"
+                    className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    onClick={() => setCurrentDate(new Date())}
+                    title="Vai a oggi"
+                    className="px-3 h-8 text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all flex items-center"
+                  >
+                    Oggi
+                  </button>
+                  <button
+                    onClick={() => navigateWeek(1)}
+                    title="Settimana successiva"
+                    className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  
+                  <div className="w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
+                  
+                  <ReactDatePicker
+                    selected={currentDate}
+                    onChange={(date: Date | null) => { if (date) setCurrentDate(date); }}
+                    customInput={
+                      <button className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer" title="Scegli una data">
+                        <CalendarIcon size={18} />
+                      </button>
+                    }
+                    locale="it"
+                    withPortal
+                    portalId="datepicker-portal"
+                    calendarClassName="premium-calendar"
+                    dayClassName={getDayClass}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className={cn(
+               "transition-all duration-300 ease-in-out overflow-hidden origin-top",
+               showFilter ? "max-h-[100px] opacity-100 mt-2" : "max-h-0 opacity-0 mt-0"
+            )}>
+              <div className="flex justify-start lg:justify-end">
+                <div className="w-full sm:w-[250px]">
+                  <Select
+                    options={[
+                      { id: '', label: 'Tutti gli istruttori' },
+                      ...istruttori.map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}` }))
+                    ]}
+                    value={selectedInstructorId}
+                    onChange={(val) => {
+                      setSelectedInstructorId(val);
+                      setShowFilter(false); 
+                    }}
+                    icon={Users}
+                    placeholder="Filtra Istruttore"
+                    searchable
+                  />
+                </div>
               </div>
             </div>
           </header>
 
-          <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-24 overflow-hidden flex flex-col">
+          <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col">
             <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px]">
               {/* Intestazione Giorni Fissa */}
               <div 
@@ -510,20 +624,43 @@ export default function CalendarPage() {
 
                 {timeSlots.map((slot) => {
                   const isFullHour = slot.endsWith(':00');
+                  const [slotH, slotM] = slot.split(':').map(Number);
+                  
+                  const nowLine = new Date();
+                  const currentHLine = nowLine.getHours();
+                  const currentMLine = nowLine.getMinutes();
+                  const slotStartMinutes = slotH * 60 + slotM;
+                  const currentTotalMinutes = currentHLine * 60 + currentMLine;
+                  const isCurrentSlot = currentTotalMinutes >= slotStartMinutes && currentTotalMinutes < slotStartMinutes + granularity;
+                  const hasToday = displayDays.some(d => isSameDay(d, nowLine));
+
                   return (
                     <div 
                       key={slot} 
                       id={`slot-${slot}`}
                       className={cn(
-                        "grid border-b last:border-0 min-h-[40px] transition-colors",
-                        isFullHour ? "border-zinc-200 dark:border-zinc-700" : "border-zinc-100/50 dark:border-zinc-800/30"
+                        "grid min-h-[40px] transition-colors relative",
+                        isFullHour ? "border-zinc-200 dark:border-zinc-700 border-b" : "border-zinc-100/50 dark:border-zinc-800/30 border-b"
                       )}
                       style={{ 
                         gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))`,
-                        zIndex: timeSlots.length - timeSlots.indexOf(slot),
-                        position: 'relative'
+                        zIndex: isCurrentSlot ? 40 : timeSlots.length - timeSlots.indexOf(slot),
                       } as React.CSSProperties}
                     >
+                      {isCurrentSlot && hasToday && (
+                        <div 
+                          className="absolute left-0 right-0 z-50 flex items-center pointer-events-none"
+                          style={{ top: `${((currentTotalMinutes - slotStartMinutes) / granularity) * 100}%`, transform: 'translateY(-50%)' }}
+                        >
+                          <div className="w-[60px] flex justify-end pr-1 sm:pr-3">
+                            <span className="text-[10px] font-black text-red-500 bg-white dark:bg-zinc-900 px-1 rounded-sm shadow-sm">{format(nowLine, 'HH:mm')}</span>
+                          </div>
+                          <div className="flex-1 h-[2px] bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] flex relative">
+                            <div className="absolute left-0 w-2 h-2 rounded-full bg-red-500 top-1/2 -translate-y-1/2"></div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className={cn(
                         "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
                         isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
@@ -599,7 +736,7 @@ export default function CalendarPage() {
                       {activeAppointment.license_type}
                     </span>
                     <span className="text-[10px] font-bold opacity-80">
-                      {activeAppointment.appointment_time.slice(0, 5)}
+                      {activeAppointment.appointment_time.slice(0, 5)} — {format(addMinutes(parseISO(`${activeAppointment.appointment_date}T${activeAppointment.appointment_time}`), activeAppointment.duration), 'HH:mm')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -631,10 +768,13 @@ export default function CalendarPage() {
           setIsNewModalOpen(false);
           setNewModalInitialData(null);
         }}
-        onSuccess={() => {
+        onSuccess={async () => {
           setIsNewModalOpen(false);
           setNewModalInitialData(null);
-          fetchWeekAppointments();
+          router.refresh();
+          // Small delay to let DB propagate the new record
+          await new Promise(r => setTimeout(r, 300));
+          await fetchWeekAppointments();
         }}
         initialDate={newModalInitialData?.date}
         initialTime={newModalInitialData?.time}
@@ -644,9 +784,11 @@ export default function CalendarPage() {
         <DetailsModal
           isOpen={true}
           onClose={() => setSelectedAppointment(null)}
-          onSuccess={() => {
+          onSuccess={async () => {
             setSelectedAppointment(null);
-            fetchWeekAppointments();
+            router.refresh();
+            await new Promise(r => setTimeout(r, 300));
+            await fetchWeekAppointments();
           }}
           appointmentId={selectedAppointment.id}
         />
