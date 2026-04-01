@@ -7,6 +7,8 @@ ALTER TABLE sessioni_esame ENABLE ROW LEVEL SECURITY;
 -- Pulizia policy esistenti (per sicurezza)
 DROP POLICY IF EXISTS "Admin full access" ON sessioni_esame;
 DROP POLICY IF EXISTS "Authenticated read access" ON sessioni_esame;
+DROP POLICY IF EXISTS "Segreteria access" ON sessioni_esame;
+DROP POLICY IF EXISTS "Istruttore access" ON sessioni_esame;
 
 -- Policy per Admin: Accesso totale (Insert, Update, Delete, Select)
 CREATE POLICY "Admin full access" 
