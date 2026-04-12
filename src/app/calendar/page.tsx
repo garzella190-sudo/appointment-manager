@@ -1,8 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import ReactDatePicker, { registerLocale } from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
 
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, ChevronDown, Loader2, User, Users, Calendar as CalendarIcon, StickyNote } from 'lucide-react';
@@ -20,7 +18,6 @@ import {
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { startOfWeek, addDays, format, isSameDay, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
-registerLocale('it', it);
 import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
 import { DroppableCell } from '@/components/DroppableCell';
@@ -31,6 +28,7 @@ import { Toast } from '@/components/Toast';
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import { Clock } from 'lucide-react';
+import DatePickerModal from '@/components/modals/DatePickerModal';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 import { updateAppointmentAction } from '@/actions/appointments';
 
@@ -86,6 +84,8 @@ export interface AppointmentRow {
   } | null;
 }
 
+let datePickerCloseTime = 0;
+
 export default function CalendarPage() {
   const supabase = supabaseClient;
   const router = useRouter();
@@ -96,6 +96,7 @@ export default function CalendarPage() {
   const [overId, setOverId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [viewDays, setViewDays] = useState<1 | 3 | 5 | 7>(7);
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
@@ -132,9 +133,6 @@ export default function CalendarPage() {
     }
 
     const handleResize = () => {
-      // Solo se non abbiamo una preferenza salvata o se cambiamo breakpoint in modo significativo?
-      // In realtà, la regola d'oro è "ricorda sempre la visualizzazione scelta".
-      // Se l'utente non ha mai salvato nulla, usiamo il responsive.
       if (!savedViewDays) {
         if (window.innerWidth < 768) {
           setViewDays(3);
@@ -420,6 +418,7 @@ export default function CalendarPage() {
   const [newModalInitialData, setNewModalInitialData] = useState<{ date: string; time: string } | null>(null);
 
   const handleCellClick = (dateStr: string, slot: string) => {
+    if (Date.now() - datePickerCloseTime < 500) return;
     setNewModalInitialData({ date: dateStr, time: slot });
     setIsNewModalOpen(true);
   };
@@ -529,20 +528,13 @@ export default function CalendarPage() {
                   
                   <div className="w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
                   
-                  <ReactDatePicker
-                    selected={currentDate}
-                    onChange={(date: Date | null) => { if (date) setCurrentDate(date); }}
-                    customInput={
-                      <button className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer" title="Scegli una data">
-                        <CalendarIcon size={18} />
-                      </button>
-                    }
-                    locale="it"
-                    withPortal
-                    portalId="datepicker-portal"
-                    calendarClassName="premium-calendar"
-                    dayClassName={getDayClass}
-                  />
+                  <button
+                    onClick={() => setIsDatePickerOpen(true)}
+                    className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
+                    title="Scegli una data"
+                  >
+                    <CalendarIcon size={18} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -801,6 +793,16 @@ export default function CalendarPage() {
           onClose={() => setToast(null)}
         />
       )}
+
+      <DatePickerModal
+        isOpen={isDatePickerOpen}
+        onClose={() => {
+          setIsDatePickerOpen(false);
+          datePickerCloseTime = Date.now();
+        }}
+        selectedDate={currentDate}
+        onSelect={(date) => setCurrentDate(date)}
+      />
     </>
   );
 }

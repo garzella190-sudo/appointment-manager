@@ -80,10 +80,13 @@ const Select = ({
         <span className="flex-1 text-left truncate">
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown 
-          size={16} 
-          className={cn("ml-2 text-zinc-400 transition-transform duration-200", isOpen ? "rotate-180" : "")} 
-        />
+        <div className="flex items-center gap-2">
+          {searchable && !isOpen && <Search size={14} className="text-zinc-300" />}
+          <ChevronDown 
+            size={16} 
+            className={cn("text-zinc-400 transition-transform duration-200", isOpen ? "rotate-180" : "")}
+          />
+        </div>
       </button>
 
       {isOpen && (
@@ -95,11 +98,20 @@ const Select = ({
                 <input
                   autoFocus
                   type="text"
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-xl pl-9 pr-4 py-2 text-base font-semibold outline-none focus:ring-2 focus:ring-blue-500/10"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-xl pl-9 pr-10 py-2.5 text-base font-semibold outline-none focus:ring-2 focus:ring-blue-500/10"
                   placeholder="Cerca..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
+                {query && (
+                  <button 
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             </div>
           )}

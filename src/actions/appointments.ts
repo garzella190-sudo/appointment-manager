@@ -159,12 +159,19 @@ export async function createAppointmentAction(payload: {
   }
 
   // 2. Insert appointment (with inizio and fine)
-  const { email_fallback, preferenza_cambio, is_impegno, nome_impegno, ...dbPayload } = payload;
+  const { email_fallback, preferenza_cambio, is_impegno, nome_impegno, importo: payloadImporto, ...dbPayload } = payload;
+  
+  let finalImporto = payloadImporto;
+  if (!is_impegno && finalImporto === null) {
+    if (payload.durata === 30) finalImporto = 25;
+    else if (payload.durata === 60) finalImporto = 50;
+  }
   
   const { data: appointment, error: appointmentError } = await supabase
     .from('appuntamenti')
     .insert({
       ...dbPayload,
+      importo: finalImporto,
       cliente_id: finalClienteId,
       inizio: startISO,
       fine: endISO,

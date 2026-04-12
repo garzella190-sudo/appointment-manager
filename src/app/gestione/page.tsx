@@ -193,7 +193,6 @@ const TabVeicoli = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number,
                               !isAdmin && "hidden"
                             )}
                             title="Elimina veicolo"
-                            onClick={(e) => e.stopPropagation()}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -362,7 +361,6 @@ const TabIstruttori = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: numb
                               "p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50",
                               !isAdmin && "hidden"
                             )}
-                            onClick={(e) => e.stopPropagation()}
                           >
                             <Trash2 size={16} />
                           </button>

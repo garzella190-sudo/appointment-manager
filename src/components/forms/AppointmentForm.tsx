@@ -696,7 +696,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             )
           )}
           {isView && appointmentId && (
-            <div className="flex justify-center gap-4 mb-4 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+            <div className="flex justify-center gap-3 mb-4 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
               {/* MODIFICA */}
               <button
                 type="button"
@@ -706,6 +706,22 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               >
                 <Pencil size={18} />
               </button>
+
+              {/* PRONTO PER ESAME */}
+              {!isImpegno && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (!form.cliente_id) return;
+                    setIsExamModalOpen(true);
+                  }}
+                  className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center hover:bg-emerald-100 transition-all active:scale-95 shadow-sm border border-emerald-100/50 dark:border-emerald-900/30"
+                  title="Pronto per Esame"
+                >
+                  <GraduationCap size={18} />
+                </button>
+              )}
 
               {/* ANNULLA */}
               <ConfirmBubble
@@ -890,16 +906,16 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         </Modal>
 
         {/* DATA E ORARI */}
-        <div className="flex flex-col sm:flex-row gap-4 items-end">
-          <div className="space-y-2 w-full sm:w-fit min-w-[160px]">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-end">
+          <div className="space-y-2 w-full sm:w-[150px] shrink-0">
             <label className={LABEL_CLS}>📅 DATA</label>
             {isView ? (
-              <div className={VIEW_BLOCK_CLS}>{format(parseISO(form.data), 'dd MMMM yyyy', { locale: it })}</div>
+              <div className={VIEW_BLOCK_CLS}>{format(parseISO(form.data), 'dd MMM yyyy', { locale: it })}</div>
             ) : (
               <DatePicker selected={form.data ? new Date(form.data) : new Date()} onChange={(date) => date && setForm(prev => ({ ...prev, data: date.toISOString().split('T')[0] }))} required />
             )}
           </div>
-          <div className="space-y-2 flex-1 w-full">
+          <div className="space-y-2 flex-1 w-full min-w-[80px]">
             <label className={LABEL_CLS}>🕒 INIZIO</label>
             {isView ? (
               <div className={VIEW_BLOCK_CLS}>{form.ora}</div>
@@ -912,7 +928,49 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               />
             )}
           </div>
-          <div className="space-y-2 flex-1 w-full">
+          <div className="space-y-2 flex-1 w-full min-w-[100px]">
+            <label className={LABEL_CLS}><Clock size={13} /> DURATA</label>
+            {isView ? (
+              <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
+            ) : durationMode !== 'custom' ? (
+              <Select
+                options={[
+                  { id: '30', label: '30 min' },
+                  { id: '60', label: '60 min' },
+                  { id: 'custom', label: 'Personalizzato' }
+                ]}
+                value={durationMode}
+                onChange={(val) => {
+                  if (val === 'custom') {
+                    setDurationMode('custom');
+                  } else {
+                    const numVal = Number(val);
+                    setDurationMode(val as '30' | '60');
+                    setForm(prev => ({ ...prev, durata: numVal }));
+                  }
+                }}
+              />
+            ) : (
+              <div className="flex gap-1">
+                <input 
+                  type="number" 
+                  title="Minuti" 
+                  autoFocus 
+                  value={form.durata} 
+                  onChange={(e) => setForm(prev => ({ ...prev, durata: Number(e.target.value) }))} 
+                  className={cn(INPUT_CLS, "px-2 text-center")} 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => { setDurationMode('60'); setForm(prev => ({ ...prev, durata: 60 })); }} 
+                  className="w-8 h-12 rounded-[16px] bg-zinc-100 text-zinc-500 hover:bg-zinc-200 transition-all flex items-center justify-center shrink-0"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2 flex-1 w-full min-w-[80px]">
             <label className={LABEL_CLS}>🏁 FINE</label>
             {isView ? (
               <div className={cn(VIEW_BLOCK_CLS, 'text-blue-600 font-bold border-blue-50 bg-blue-50/20 justify-center')}>
@@ -1027,56 +1085,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           </div>
         )}
 
-        {/* DURATA, PATENTE E CAMBIO (Solo per Guida Cliente) */}
+        {/* PATENTE E CAMBIO (Solo per Guida Cliente) */}
         {!isImpegno && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-            <div className="space-y-2">
-              <label className={LABEL_CLS}><Clock size={13} /> DURATA (MIN)</label>
-              {isView ? (
-                <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
-              ) : durationMode !== 'custom' ? (
-                <Select
-                  options={[
-                    { id: '30', label: '30 min' },
-                    { id: '60', label: '60 min' },
-                    { id: 'custom', label: 'Personalizzato...' }
-                  ]}
-                  value={durationMode}
-                  onChange={(val) => {
-                    if (val === 'custom') {
-                      setDurationMode('custom');
-                    } else {
-                      const numVal = Number(val);
-                      setDurationMode(val as '30' | '60');
-                      setForm(prev => ({ ...prev, durata: numVal }));
-                    }
-                  }}
-                />
-              ) : (
-                <div className="flex gap-2">
-                  <input 
-                    type="number" 
-                    title="Durata personalizzata" 
-                    aria-label="Durata personalizzata" 
-                    autoFocus 
-                    value={form.durata} 
-                    onChange={(e) => setForm(prev => ({ ...prev, durata: Number(e.target.value) }))} 
-                    className={INPUT_CLS} 
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      setDurationMode('60'); 
-                      setForm(prev => ({ ...prev, durata: 60 })); 
-                    }} 
-                    className="px-4 h-12 rounded-[16px] bg-zinc-100 text-zinc-500 font-bold text-[10px] uppercase tracking-wider shrink-0 hover:bg-zinc-200 transition-all"
-                  >
-                    Annulla
-                  </button>
-                </div>
-              )}
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
               <label className={LABEL_CLS}><ShieldCheck size={13} /> PATENTE</label>
               {isView ? (
@@ -1104,7 +1115,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           </div>
         )}
 
-        {/* ISTRUTTORE & VEICOLO (or ISTRUTTORE & DURATA if impegno) */}
+        {/* ISTRUTTORE & VEICOLO (or ISTRUTTORE if impegno) */}
         {!isImpegno ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1167,7 +1178,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
              <div className="space-y-2">
               <label className={LABEL_CLS}>👤 ISTRUTTORE</label>
               {isView ? (
@@ -1195,57 +1206,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 />
               )}
             </div>
-
-            <div className="space-y-2">
-              <label className={LABEL_CLS}><Clock size={13} /> DURATA (MIN)</label>
-              {isView ? (
-                <div className={VIEW_BLOCK_CLS}>{form.durata} min</div>
-              ) : durationMode !== 'custom' ? (
-                <Select
-                  options={[
-                    { id: '30', label: '30 min' },
-                    { id: '60', label: '60 min' },
-                    { id: 'custom', label: 'Personalizzato...' }
-                  ]}
-                  value={durationMode}
-                  onChange={(val) => {
-                    if (val === 'custom') {
-                      setDurationMode('custom');
-                    } else {
-                      const numVal = Number(val);
-                      setDurationMode(val as '30' | '60');
-                      setForm(prev => ({ ...prev, durata: numVal }));
-                    }
-                  }}
-                />
-              ) : (
-                <div className="flex gap-2">
-                  <input 
-                    type="number" 
-                    title="Durata personalizzata" 
-                    aria-label="Durata personalizzata" 
-                    autoFocus 
-                    value={form.durata} 
-                    onChange={(e) => setForm(prev => ({ ...prev, durata: Number(e.target.value) }))} 
-                    className={INPUT_CLS} 
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      setDurationMode('60'); 
-                      setForm(prev => ({ ...prev, durata: 60 })); 
-                    }} 
-                    className="px-4 h-12 rounded-[16px] bg-zinc-100 text-zinc-500 font-bold text-[10px] uppercase tracking-wider shrink-0 hover:bg-zinc-200 transition-all"
-                  >
-                    Annulla
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
         )}
-
-
 
         {serverError && <p className="p-4 bg-red-50 text-red-600 text-[11px] font-black rounded-2xl border border-red-100 text-center uppercase tracking-wide">{serverError}</p>}
 
@@ -1253,22 +1215,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         <div className="pt-6">
           {isView ? (
             <div className="flex flex-col gap-3">
-              {/* Pronto per Esame */}
+              {/* Pronto per Esame Modal */}
               {!isImpegno && (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (!form.cliente_id) return;
-                      setIsExamModalOpen(true);
-                    }}
-                    className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <GraduationCap size={18} />
-                    Pronto per Esame
-                  </button>
-
                   <AssignExamSessionModal 
                     isOpen={isExamModalOpen}
                     onClose={() => setIsExamModalOpen(false)}
@@ -1278,7 +1226,6 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                       onSuccess();
                     }}
                   />
-                </>
               )}
               
               {isCompleted && (

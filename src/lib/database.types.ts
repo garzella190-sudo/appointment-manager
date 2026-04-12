@@ -45,6 +45,10 @@ export interface Cliente {
   preferenza_cambio: TipoCambio | null; // manuale, automatico
   riceve_email: boolean;
   riceve_whatsapp: boolean;
+  pronto_esame?: boolean;              // Optional depending on view
+  data_pronto_esame?: string | null;   // Optional depending on view
+  sessione_esame_id?: string | null;   // FK
+  istruttore_pronto_id?: string | null; // FK -> istruttori.id
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +82,7 @@ export interface Appuntamento {
   stato: StatoAppuntamento;
   importo: number | null;              // in centesimi o decimale
   note: string | null;
+  annullato: boolean;
   send_email: boolean;
   send_whatsapp: boolean;
   created_at: string;
@@ -93,6 +98,7 @@ export interface AppuntamentoConDettagli {
   stato: StatoAppuntamento;
   importo: number | null;
   note: string | null;
+  annullato: boolean;
   istruttore: {
     id: string;
     nome: string;

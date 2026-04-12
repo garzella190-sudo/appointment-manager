@@ -89,6 +89,14 @@ export async function toggleProntoEsameAction(id: string, pronto: boolean, sessi
   if (sessioneId !== undefined) {
     updatePayload.sessione_esame_id = sessioneId;
   }
+  
+  if (pronto) {
+    const { data: { user } } = await supabase.auth.getUser();
+    const userIstruttoreId = user?.user_metadata?.istruttore_id || null;
+    updatePayload.istruttore_pronto_id = userIstruttoreId;
+  } else {
+    updatePayload.istruttore_pronto_id = null;
+  }
 
   const { data, error } = await supabase
     .from('clienti')

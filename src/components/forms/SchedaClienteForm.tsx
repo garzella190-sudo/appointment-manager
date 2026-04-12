@@ -193,6 +193,7 @@ export const SchedaClienteForm = ({
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Patente Richiesta</label>
           <Select
+            searchable={true}
             options={patenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
             value={form.patente_richiesta_id || ''}
             onChange={(val) => setForm(prev => ({ ...prev, patente_richiesta_id: val }))}

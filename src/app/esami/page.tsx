@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/useToast';
 import { useRouter } from 'next/navigation';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import DatePicker from '@/components/DatePicker';
+import { toggleProntoEsameAction } from '@/actions/clienti';
 
 const supabase = createClient();
 
@@ -22,8 +23,11 @@ export default function EsamiPage() {
   const [activeTab, setActiveTab] = useState<'pronti' | 'sedute'>('pronti');
   const [loading, setLoading] = useState(true);
   const [pronti, setPronti] = useState<any[]>([]);
+  const [notPronti, setNotPronti] = useState<any[]>([]);
   const [sedute, setSedute] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddProntoModalOpen, setIsAddProntoModalOpen] = useState(false);
+  const [searchQueryPronto, setSearchQueryPronto] = useState('');
   const [formData, setFormData] = useState({ nome: '', data: '', n_candidati: 0, note: '' });
   
   // Stati per il dettaglio della seduta
@@ -36,8 +40,9 @@ export default function EsamiPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   
-  // Stato per gestire il collasso delle schede allievo
+  // Stato per gestire il collasso delle schede allievo ed istruttori
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedInstructors, setExpandedInstructors] = useState<Set<string>>(new Set());
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedIds);
@@ -46,22 +51,35 @@ export default function EsamiPage() {
     setExpandedIds(newExpanded);
   };
 
+  const toggleInstructor = (id: string) => {
+    const newExpanded = new Set(expandedInstructors);
+    if (newExpanded.has(id)) newExpanded.delete(id);
+    else newExpanded.add(id);
+    setExpandedInstructors(newExpanded);
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [
       { data: pData },
+      { data: npData },
       { data: sData }
     ] = await Promise.all([
       supabase.from('clienti')
-        .select('*, patenti(tipo), sessioni_esame(nome, data)')
+        .select('*, patenti(tipo), sessioni_esame(nome, data), istruttori(id, nome, cognome, colore)')
         .eq('pronto_esame', true)
         .order('data_pronto_esame', { ascending: false }),
+      supabase.from('clienti')
+        .select('*, patenti(tipo)')
+        .eq('pronto_esame', false)
+        .order('cognome', { ascending: true }),
       supabase.from('sessioni_esame')
         .select('*, clienti(count)')
         .order('data', { ascending: true })
     ]);
 
     setPronti(pData || []);
+    setNotPronti(npData || []);
     setSedute(sData || []);
     setLoading(false);
   }, []);
@@ -150,12 +168,21 @@ export default function EsamiPage() {
   const handleRemovePronto = async (id: string, removeSessionOnly = false) => {
     const updatePayload = removeSessionOnly 
       ? { sessione_esame_id: null }
-      : { pronto_esame: false, data_pronto_esame: null, sessione_esame_id: null };
+      : { pronto_esame: false, data_pronto_esame: null, sessione_esame_id: null, istruttore_pronto_id: null };
 
     const { error } = await supabase.from('clienti')
       .update(updatePayload)
       .eq('id', id);
     if (!error) fetchData();
+  };
+
+  const handleAddPronto = async (clienteId: string) => {
+    const res = await toggleProntoEsameAction(clienteId, true);
+    if (res.success) {
+      showToast('Allievo dichiarato pronto per esame!', 'success');
+      setIsAddProntoModalOpen(false);
+      fetchData();
+    }
   };
 
   return (
@@ -206,145 +233,196 @@ export default function EsamiPage() {
           </button>
         </div>
       </div>
-
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-32 no-scrollbar">
         <div className="max-w-5xl mx-auto">
           {activeTab === 'pronti' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {pronti.length === 0 ? (
-                <div className="col-span-full py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
+                <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
                   Nessun allievo pronto per esame
                 </div>
-               ) : pronti.map((c) => {
-                 const isExpanded = expandedIds.has(c.id);
-                 return (
-                   <div 
-                     key={c.id} 
-                     className={cn(
-                       "group relative bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden",
-                       isExpanded ? "rounded-[32px] p-5" : "rounded-2xl p-4"
-                     )}
-                   >
-                     {/* Header Card - Sempre visibile */}
-                     <div className="flex items-center justify-between gap-3">
-                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
-                           <UserCircle size={24} />
-                         </div>
-                         <div>
-                           <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase leading-tight truncate max-w-[140px]">
-                             {c.cognome} {c.nome}
-                           </h3>
-                           {!isExpanded && (
-                              <div className="flex items-center gap-2 mt-0.5">
-                                 <span className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md text-[8px] font-black uppercase">
-                                   {c.patenti?.tipo || 'N/D'}
-                                 </span>
-                                 {c.sessioni_esame && (
-                                   <span className="text-[8px] font-black text-sky-500 uppercase tracking-widest flex items-center gap-1">
-                                      <CalendarIcon size={8} /> {format(new Date(c.sessioni_esame.data), 'dd/MM')}
-                                   </span>
-                                 )}
-                              </div>
-                           )}
-                         </div>
-                       </div>
-                       
-                       <div className="flex items-center gap-2">
-                         <button 
-                           onClick={() => toggleExpand(c.id)}
-                           className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 flex items-center justify-center hover:bg-zinc-100 transition-all shadow-sm"
-                         >
-                           <ChevronDown className={cn("transition-transform duration-300", isExpanded && "rotate-180")} size={20} />
-                         </button>
-                       </div>
-                     </div>
-                     
-                     {/* Sezione Dettagli - Visibile solo se espanso */}
-                     {isExpanded && (
-                       <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
-                         {/* Info Patente */}
-                         <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/30 p-3 rounded-2xl">
-                           <div className="flex flex-col">
-                             <span className="text-[9px] font-black uppercase text-zinc-400">Patente richiesta</span>
-                             <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase">{c.patenti?.tipo || 'N/D'}</span>
-                           </div>
-                           <div className="flex items-center gap-1 text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg">
-                             <CheckCircle2 size={12} strokeWidth={3} />
-                             <span className="text-[9px] font-black uppercase tracking-widest">Pronto</span>
-                           </div>
-                         </div>
-                         
-                         <div className="space-y-2">
-                           {/* Status Data */}
-                           <div className="flex items-center gap-1 text-zinc-400">
-                             <Clock size={12} />
-                             <span className="text-[9px] font-bold uppercase tracking-widest">
-                               Dal: {c.data_pronto_esame ? format(new Date(c.data_pronto_esame), 'dd MMMM yyyy', { locale: it }) : 'N/D'}
-                             </span>
-                           </div>
- 
-                           {/* Seduta */}
-                           {c.sessioni_esame ? (
-                             <div className="flex items-center justify-between bg-sky-50 dark:bg-sky-500/5 border border-sky-100 dark:border-sky-800/20 p-3 rounded-2xl animate-in zoom-in-95 duration-200">
-                               <div>
-                                 <p className="text-[8px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest">Seduta Assegnata</p>
-                                 <p className="text-xs font-black text-zinc-900 dark:text-white uppercase truncate max-w-[120px]">{c.sessioni_esame.nome || 'Esame'}</p>
-                                 <p className="text-[10px] font-bold text-sky-600/60">{format(new Date(c.sessioni_esame.data), 'dd MMMM', { locale: it })}</p>
-                               </div>
-                               <ConfirmBubble
-                                 title="Rimuovi dalla seduta"
-                                 message="Vuoi rimuovere questo allievo dalla sessione d'esame?"
-                                 confirmLabel="Rimuovi"
-                                 onConfirm={() => handleRemovePronto(c.id, true)}
-                                 trigger={
-                                   <button className="p-2 text-sky-300 hover:text-red-500 transition-colors">
-                                     <XCircle size={18} />
-                                   </button>
-                                 }
-                               />
+               ) : (
+                  Object.values(pronti.reduce<Record<string, {istruttore: any, clienti: any[]}>>((acc, c) => {
+                    const istrId = c.istruttore_pronto_id || 'unassigned';
+                    if (!acc[istrId]) {
+                      acc[istrId] = {
+                        istruttore: c.istruttori || { id: 'unassigned', nome: 'Dichiarazioni', cognome: 'Generiche', colore: '#a1a1aa' },
+                        clienti: []
+                      };
+                    }
+                    acc[istrId].clienti.push(c);
+                    return acc;
+                  }, {})).map((group) => {
+                    // By default expand, but allow toggling
+                    const isGroupExpanded = !expandedInstructors.has(group.istruttore.id);
+                    
+                    return (
+                      <div key={group.istruttore.id} className="bg-white/50 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-zinc-800/50 rounded-[32px] p-2 shadow-sm">
+                        {/* Intestazione Istruttore */}
+                        <div 
+                          onClick={() => toggleInstructor(group.istruttore.id)}
+                          className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 rounded-[24px] cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/80 shadow-sm transition-all select-none"
+                        >
+                          <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${group.istruttore.colore}20`, color: group.istruttore.colore }}>
+                               <UserCircle size={24} />
                              </div>
-                           ) : (
-                             <button 
-                               onClick={() => {
-                                 setSelectedStudent(c);
-                                 setIsAssignModalOpen(true);
-                               }}
-                               className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-400 hover:text-sky-500 hover:border-sky-500/50 hover:bg-sky-50/50 transition-all group"
-                             >
-                               <CalendarIcon size={14} />
-                               <span className="text-[9px] font-black uppercase tracking-widest">Assegna Seduta</span>
-                             </button>
-                           )}
-                         </div>
- 
-                         {/* Bottom Actions */}
-                         <div className="flex gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                           <button 
-                             onClick={() => handleRemovePronto(c.id)}
-                             className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
-                           >
-                             NON PRONTO
-                           </button>
-                           {isAdmin && (
-                             <ConfirmBubble
-                               title="Rimuovi allievo"
-                               message="Vuoi togliere definitivamente questo allievo dalla lista pronti?"
-                               onConfirm={() => handleRemovePronto(c.id)}
-                               trigger={
-                                 <button className="p-3 bg-red-50 dark:bg-red-500/10 text-red-500 rounded-2xl hover:scale-105 transition-all">
-                                   <Trash2 size={16} />
-                                 </button>
-                               }
-                             />
-                           )}
-                         </div>
-                       </div>
-                     )}
-                   </div>
-                 );
-               })}
+                             <div>
+                               <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight">
+                                 {group.istruttore.cognome} {group.istruttore.nome}
+                               </h3>
+                               <p className="text-[10px] font-bold text-zinc-400 uppercase">{group.clienti.length} Allievi Pronti</p>
+                             </div>
+                          </div>
+                          <ChevronDown className={cn("text-zinc-400 transition-transform duration-300", isGroupExpanded && "rotate-180")} size={20} />
+                        </div>
+                        
+                        {/* Griglia Clienti */}
+                        {isGroupExpanded && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 px-2 pb-2">
+                            {group.clienti.map((c) => {
+                              const isExpanded = expandedIds.has(c.id);
+                              return (
+                                <div 
+                                  key={c.id} 
+                                  className={cn(
+                                    "group relative bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden",
+                                    isExpanded ? "rounded-[32px] p-5" : "rounded-2xl p-4"
+                                  )}
+                                >
+                                  {/* Header Card - Sempre visibile */}
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
+                                        <GraduationCap size={24} />
+                                      </div>
+                                      <div>
+                                        <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase leading-tight truncate max-w-[140px]">
+                                          {c.cognome} {c.nome}
+                                        </h3>
+                                        {!isExpanded && (
+                                           <div className="flex items-center gap-2 mt-0.5">
+                                              <span className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-md text-[8px] font-black uppercase">
+                                                {c.patenti?.tipo || 'N/D'}
+                                              </span>
+                                              {c.sessioni_esame && (
+                                                <span className="text-[8px] font-black text-sky-500 uppercase tracking-widest flex items-center gap-1">
+                                                   <CalendarIcon size={8} /> {format(new Date(c.sessioni_esame.data), 'dd/MM')}
+                                                </span>
+                                              )}
+                                           </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2">
+                                      <button 
+                                        onClick={() => toggleExpand(c.id)}
+                                        className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 flex items-center justify-center hover:bg-zinc-100 transition-all shadow-sm"
+                                      >
+                                        <ChevronDown className={cn("transition-transform duration-300", isExpanded && "rotate-180")} size={20} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Sezione Dettagli - Visibile solo se espanso */}
+                                  {isExpanded && (
+                                    <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                                      <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/30 p-3 rounded-2xl">
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] font-black uppercase text-zinc-400">Patente richiesta</span>
+                                          <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase">{c.patenti?.tipo || 'N/D'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg">
+                                          <CheckCircle2 size={12} strokeWidth={3} />
+                                          <span className="text-[9px] font-black uppercase tracking-widest">Pronto</span>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="space-y-2">
+                                        <div className="flex items-center gap-1 text-zinc-400">
+                                          <Clock size={12} />
+                                          <span className="text-[9px] font-bold uppercase tracking-widest">
+                                            Dal: {c.data_pronto_esame ? format(new Date(c.data_pronto_esame), 'dd MMMM yyyy', { locale: it }) : 'N/D'}
+                                          </span>
+                                        </div>
+              
+                                        {c.sessioni_esame ? (
+                                          <div className="flex items-center justify-between bg-sky-50 dark:bg-sky-500/5 border border-sky-100 dark:border-sky-800/20 p-3 rounded-2xl animate-in zoom-in-95 duration-200">
+                                            <div>
+                                              <p className="text-[8px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest">Seduta Assegnata</p>
+                                              <p className="text-xs font-black text-zinc-900 dark:text-white uppercase truncate max-w-[120px]">{c.sessioni_esame.nome || 'Esame'}</p>
+                                              <p className="text-[10px] font-bold text-sky-600/60">{format(new Date(c.sessioni_esame.data), 'dd MMMM', { locale: it })}</p>
+                                            </div>
+                                            <ConfirmBubble
+                                              title="Rimuovi dalla seduta"
+                                              message="Vuoi rimuovere questo allievo dalla sessione d'esame?"
+                                              confirmLabel="Rimuovi"
+                                              onConfirm={() => handleRemovePronto(c.id, true)}
+                                              trigger={
+                                                <button className="p-2 text-sky-300 hover:text-red-500 transition-colors">
+                                                  <XCircle size={18} />
+                                                </button>
+                                              }
+                                            />
+                                          </div>
+                                        ) : (
+                                          <button 
+                                            onClick={() => {
+                                              setSelectedStudent(c);
+                                              setIsAssignModalOpen(true);
+                                            }}
+                                            className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-400 hover:text-sky-500 hover:border-sky-500/50 hover:bg-sky-50/50 transition-all group"
+                                          >
+                                            <CalendarIcon size={14} />
+                                            <span className="text-[9px] font-black uppercase tracking-widest">Assegna Seduta</span>
+                                          </button>
+                                        )}
+                                      </div>
+              
+                                      <div className="flex gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                                        <button 
+                                          onClick={() => handleRemovePronto(c.id)}
+                                          className="flex-1 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                                        >
+                                          NON PRONTO
+                                        </button>
+                                        {isAdmin && (
+                                          <ConfirmBubble
+                                            title="Rimuovi allievo"
+                                            message="Vuoi togliere definitivamente questo allievo dalla lista pronti?"
+                                            onConfirm={() => handleRemovePronto(c.id)}
+                                            trigger={
+                                              <button className="p-3 bg-red-50 dark:bg-red-500/10 text-red-500 rounded-2xl transition-all">
+                                                <Trash2 size={16} />
+                                              </button>
+                                            }
+                                          />
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+               )}
+               
+               {/* Tasto generale Scegli da Clienti */}
+               <button 
+                 onClick={() => setIsAddProntoModalOpen(true)}
+                 className="w-full mt-4 py-5 border-[3px] border-dashed border-sky-100 dark:border-sky-900/50 rounded-[32px] text-sky-600 dark:text-sky-500 hover:bg-sky-50/50 dark:hover:bg-sky-900/10 hover:border-sky-500/50 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2 group"
+               >
+                 <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-sky-500 group-hover:text-white transition-all duration-300">
+                    <Plus size={24} strokeWidth={3} />
+                 </div>
+                 <span className="text-xs font-black uppercase tracking-widest">Scegli da Clienti</span>
+               </button>
             </div>
           ) : (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -380,19 +458,21 @@ export default function EsamiPage() {
                     </div>
                   </div>
                   {isAdmin && (
-                    <ConfirmBubble
-                      title="Elimina seduta"
-                      message="Sei sicuro di voler eliminare questa seduta d'esame?"
-                      confirmLabel="Elimina"
-                      onConfirm={() => handleDeleteSeduta(s.id)}
-                      trigger={
-                        <button 
-                          className="p-4 text-red-500 bg-red-50 dark:bg-red-950/30 rounded-2xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all active:scale-90"
-                        >
-                          <Trash2 size={20} />
-                        </button>
-                      }
-                    />
+                    <div className="flex-shrink-0">
+                      <ConfirmBubble
+                        title="Elimina seduta"
+                        message="Sei sicuro di voler eliminare questa seduta d'esame?"
+                        confirmLabel="Elimina"
+                        onConfirm={() => handleDeleteSeduta(s.id)}
+                        trigger={
+                          <button 
+                            className="p-4 text-red-500 bg-red-50 dark:bg-red-950/30 rounded-2xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        }
+                      />
+                    </div>
                   )}
                 </div>
               ))}
@@ -626,6 +706,68 @@ export default function EsamiPage() {
                 </button>
               );
             })}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Aggiungi Pronto d'Esame da Anagrafica */}
+      <Modal
+        isOpen={isAddProntoModalOpen}
+        onClose={() => {
+          setIsAddProntoModalOpen(false);
+          setSearchQueryPronto('');
+        }}
+        title="Dichiara Allievo Pronto"
+      >
+        <div className="space-y-4 pt-4 pb-4">
+          <div className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input 
+              type="text"
+              placeholder="Cerca per nome o cognome..."
+              value={searchQueryPronto}
+              onChange={(e) => setSearchQueryPronto(e.target.value)}
+              className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl py-3 pl-12 pr-4 outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all text-sm font-semibold"
+            />
+          </div>
+          
+          <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Scegli un allievo dall'anagrafica clienti</p>
+          
+          <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-2 no-scrollbar">
+            {notPronti
+              .filter(c => {
+                const q = searchQueryPronto.toLowerCase();
+                return c.nome.toLowerCase().includes(q) || c.cognome.toLowerCase().includes(q);
+              })
+              .length === 0 ? (
+               <div className="py-20 text-center bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                  <p className="text-xs font-bold text-zinc-400 uppercase">{searchQueryPronto ? 'Nessun risultato trovato' : 'Nessun allievo disponibile'}</p>
+               </div>
+            ) : notPronti
+                .filter(c => {
+                  const q = searchQueryPronto.toLowerCase();
+                  return c.nome.toLowerCase().includes(q) || c.cognome.toLowerCase().includes(q);
+                })
+                .map(c => (
+              <button
+                key={c.id}
+                onClick={() => handleAddPronto(c.id)}
+                className="w-full text-left p-4 rounded-[20px] border border-zinc-100 dark:border-zinc-800 hover:border-sky-500/50 hover:bg-sky-50/10 bg-white dark:bg-zinc-900 shadow-sm transition-all flex items-center justify-between group active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-4">
+                   <div className="w-10 h-10 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 group-hover:bg-sky-500 group-hover:text-white transition-colors flex items-center justify-center">
+                     <UserCircle size={20} />
+                   </div>
+                   <div>
+                      <p className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight">{c.cognome} {c.nome}</p>
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase mt-0.5">Patente {c.patenti?.tipo || 'N/D'}</p>
+                   </div>
+                </div>
+                <div className="w-8 h-8 rounded-full border-2 border-zinc-200 dark:border-zinc-800 flex items-center justify-center group-hover:border-sky-500 group-hover:bg-sky-500 group-hover:text-white text-zinc-300 transition-all">
+                   <Plus size={16} strokeWidth={3} />
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </Modal>

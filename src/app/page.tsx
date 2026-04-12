@@ -8,23 +8,21 @@ import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 import { format, addDays, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
-import ReactDatePicker, { registerLocale } from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
-
-registerLocale('it', it);
 
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import Select from '@/components/forms/Select';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
+import DatePickerModal from '@/components/modals/DatePickerModal';
 
 export default function Home() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
@@ -140,23 +138,24 @@ export default function Home() {
         const targetApt = sorted.find(a => a.appointment_time >= currentTime) || sorted[sorted.length - 1];
         
         if (targetApt) {
-          const element = document.getElementById(`apt-${targetApt.id}`);
+          const aptElement = document.getElementById(`apt-${targetApt.id}`);
           const container = scrollContainerRef.current;
-          if (element && container) {
+          const timeLineElement = document.getElementById('current-time-line');
+
+          const elementToScroll = timeLineElement || aptElement;
+          
+          if (elementToScroll && container) {
             hasAutoScrolled.current = true;
-            // Immediate scroll to avoid smooth-scroll onScroll conflicts
-            container.scrollTo({ top: element.offsetTop - 12, behavior: 'auto' });
+            container.scrollTo({ 
+              top: elementToScroll.offsetTop - (container.clientHeight / 2) + (elementToScroll.clientHeight / 2), 
+              behavior: 'smooth' 
+            });
           }
         }
       }, 100);
       return () => clearTimeout(timer);
     }
   }, [loading, appointments, currentDate]);
-
-  const getDayClass = (date: Date) => {
-    if (isItalianHoliday(date) || isWeekend(date)) return "is-holiday";
-    return "";
-  };
 
   // Search and Filter logic
   const filteredAppointments = useMemo(() => {
@@ -238,20 +237,13 @@ export default function Home() {
                 
                 <div className="w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
                 
-                <ReactDatePicker
-                  selected={currentDate}
-                  onChange={(date: Date | null) => { if (date) setCurrentDate(date); }}
-                  customInput={
-                    <button className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-sky-600 dark:text-zinc-400 focus:outline-none flex items-center justify-center cursor-pointer">
-                      <CalendarIconSmall size={18} />
-                    </button>
-                  }
-                  locale="it"
-                  withPortal
-                  portalId="datepicker-portal"
-                  calendarClassName="premium-calendar"
-                  dayClassName={getDayClass}
-                />
+                <button
+                  onClick={() => setIsDatePickerOpen(true)}
+                  className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-sky-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
+                  title="Scegli una data"
+                >
+                  <CalendarIconSmall size={18} />
+                </button>
               </div>
             </div>
           </div>
@@ -340,7 +332,7 @@ export default function Home() {
             </div>
           ) : filteredAppointments.length > 0 ? (
             <div className="grid gap-3">
-              {filteredAppointments.map((apt) => {
+              {filteredAppointments.map((apt, index) => {
                 const initials = apt.client_name
                   .split(' ')
                   .filter(Boolean)
@@ -349,65 +341,94 @@ export default function Home() {
                   .toUpperCase()
                   .slice(0, 2);
 
-                return (
-                  <div 
-                    key={apt.id}
-                    id={`apt-${apt.id}`}
-                    onClick={() => setSelectedAppointment(apt)}
-                    className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-14"
-                  >
-                    <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
-                      <div 
-                        className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0 shadow-inner"
-                        style={{ 
-                          backgroundColor: `${apt.istruttore?.color}20` || '#f1f5f9',
-                          color: apt.istruttore?.color || '#0ea5e9'
-                        }}
-                      >
-                        {initials}
-                      </div>
+                const now = new Date();
+                const isToday = isSameDay(currentDate, now);
+                const currentTimeStr = format(now, 'HH:mm');
+                const nextApt = filteredAppointments[index + 1];
+                
+                let insertLineBefore = false;
+                let insertLineAfter = false;
+                
+                if (isToday) {
+                  if (index === 0 && apt.appointment_time > currentTimeStr) {
+                    insertLineBefore = true;
+                  } else if (apt.appointment_time <= currentTimeStr && (!nextApt || nextApt.appointment_time > currentTimeStr)) {
+                    insertLineAfter = true;
+                  }
+                }
 
-                      <div className="min-w-0 flex-1">
-                        <h4 className="font-bold text-zinc-900 dark:text-white truncate flex items-center gap-2">
-                          <span className="text-sky-600 dark:text-sky-400 tabular-nums text-xs font-black">{apt.appointment_time}</span>
-                          {apt.client_name}
-                        </h4>
-                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-1.5">
-                          {apt.phone && (
-                            <a
-                              href={`tel:${apt.phone.replace(/\D/g, '')}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline"
-                            >
-                              <Phone size={10} />
-                              {apt.phone}
-                            </a>
-                          )}
-                          <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
-                            <User size={10} className="text-zinc-400" />
-                            <span className="truncate">{apt.istruttore?.name}</span>
-                          </div>
-                          <span className="px-2 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider">
-                            {apt.duration} min
-                          </span>
-                          {apt.license_type && (
-                            <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md text-[10px] font-black uppercase tracking-wider">
-                              Pat. {apt.license_type}
+                const CurrentTimeLine = ({ time }: { time: string }) => (
+                  <div className="flex items-center gap-2 my-1 -mx-2 px-2 relative" id={insertLineAfter || insertLineBefore ? "current-time-line" : undefined}>
+                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] border-2 border-white dark:border-zinc-900 z-10 shrink-0"></div>
+                    <div className="flex-1 h-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] rounded-full"></div>
+                    <div className="text-[10px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800 shadow-sm shrink-0">
+                      {time}
+                    </div>
+                  </div>
+                );
+
+                return (
+                  <React.Fragment key={apt.id}>
+                    {insertLineBefore && <CurrentTimeLine time={currentTimeStr} />}
+                    <div 
+                      id={`apt-${apt.id}`}
+                      onClick={() => {
+                        setSelectedAppointment(apt);
+                      }}
+                      className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-14"
+                    >
+                      <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
+                        <div 
+                          className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0 shadow-inner"
+                          style={{ 
+                            backgroundColor: `${apt.istruttore?.color}20` || '#f1f5f9',
+                            color: apt.istruttore?.color || '#0ea5e9'
+                          }}
+                        >
+                          {initials}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-zinc-900 dark:text-white truncate flex items-center gap-2">
+                            <span className="text-sky-600 dark:text-sky-400 tabular-nums text-xs font-black">{apt.appointment_time}</span>
+                            {apt.client_name}
+                          </h4>
+                          <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-1.5">
+                            {apt.phone && (
+                              <a
+                                href={`tel:${apt.phone.replace(/\D/g, '')}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline"
+                              >
+                                <Phone size={10} />
+                                {apt.phone}
+                              </a>
+                            )}
+                            <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
+                              <User size={10} className="text-zinc-400" />
+                              <span className="truncate">{apt.istruttore?.name}</span>
+                            </div>
+                            <span className="px-2 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                              {apt.duration} min
                             </span>
+                            {apt.license_type && (
+                              <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:purple-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                                Pat. {apt.license_type}
+                              </span>
+                            )}
+                          </div>
+                          {apt.notes && apt.notes.trim() !== '' && (
+                            <div className="flex items-center gap-1 mt-2 text-zinc-400 italic">
+                              <StickyNote size={10} className="shrink-0" />
+                              <p className="text-[10px] truncate leading-none">{apt.notes}</p>
+                            </div>
                           )}
                         </div>
-                        {apt.notes && apt.notes.trim() !== '' && (
-                          <div className="flex items-center gap-1 mt-2 text-zinc-400 italic">
-                            <StickyNote size={10} className="shrink-0" />
-                            <p className="text-[10px] truncate leading-none">{apt.notes}</p>
-                          </div>
-                        )}
                       </div>
-                    </div>
-                    <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
+                      <div className="absolute top-3 right-3 z-10">
                         <ConfirmBubble
-                          title="Elimina"
-                          message="Sicuro?"
+                          title="Elimina Guida"
+                          message="Sei sicuro di voler eliminare questo appuntamento?"
                           confirmLabel="Elimina"
                           onConfirm={async () => {
                             const { deleteAppointmentAction } = await import('@/actions/appointment_actions');
@@ -415,16 +436,15 @@ export default function Home() {
                             fetchAppointments();
                           }}
                           trigger={
-                            <button
-                              className="p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50"
-                              onClick={(e) => e.stopPropagation()}
-                            >
+                            <button className="p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50">
                               <Trash2 size={16} />
                             </button>
                           }
                         />
+                      </div>
                     </div>
-                  </div>
+                    {insertLineAfter && <CurrentTimeLine time={currentTimeStr} />}
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -456,6 +476,13 @@ export default function Home() {
           appointmentId={selectedAppointment.id}
         />
       )}
+
+      <DatePickerModal
+        isOpen={isDatePickerOpen}
+        onClose={() => setIsDatePickerOpen(false)}
+        selectedDate={currentDate}
+        onSelect={(date) => setCurrentDate(date)}
+      />
     </div>
   );
 }

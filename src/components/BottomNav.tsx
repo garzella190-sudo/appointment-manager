@@ -131,7 +131,7 @@ const BottomNav = () => {
             </button>
           </div>
 
-          {/* Right: NavRight + Logout */}
+          {/* Right: NavRight */}
           <div className="flex items-center justify-end gap-3 sm:gap-5 overflow-hidden">
             <div className="flex items-center gap-3 sm:gap-5">
               {navRight.map((item) => {
@@ -161,23 +161,6 @@ const BottomNav = () => {
                 );
               })}
             </div>
-
-            <ConfirmBubble
-              title="Esci dall'app"
-              message="Vuoi terminare la sessione attuale?"
-              confirmLabel="Esci"
-              onConfirm={handleLogout}
-              trigger={
-                <button
-                  disabled={isLoggingOut}
-                  className="flex flex-col items-center gap-0.5 px-2 text-red-500 hover:text-red-600 transition-all active:scale-90 disabled:opacity-50"
-                  title="Esci"
-                >
-                  <LogOut size={20} strokeWidth={2.5} />
-                  <span className="text-[9px] sm:text-[10px] font-bold tracking-tight text-center">Esci</span>
-                </button>
-              }
-            />
           </div>
         </div>
       </nav>
@@ -231,12 +214,28 @@ const BottomNav = () => {
             </div>
           </div>
 
-          <button
-            onClick={() => setIsPermissionsModalOpen(false)}
-            className="w-full h-14 bg-zinc-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-500/20"
-          >
-            Ricevuto
-          </button>
+          <div className="flex gap-2">
+            <ConfirmBubble
+              title="Esci dall'app"
+              message="Vuoi terminare la sessione attuale?"
+              confirmLabel="Esci"
+              onConfirm={handleLogout}
+              trigger={
+                <button
+                  disabled={isLoggingOut}
+                  className="flex-1 h-14 bg-red-50 text-red-600 rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <LogOut size={16} /> Esci
+                </button>
+              }
+            />
+            <button
+              onClick={() => setIsPermissionsModalOpen(false)}
+              className="flex-[2] h-14 bg-zinc-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-500/20"
+            >
+              Ricevuto
+            </button>
+          </div>
         </div>
       </Modal>
     </>

@@ -158,7 +158,7 @@ export default function ClientiPage() {
                     </div>
                   </div>
 
-                  <div className="absolute top-3 right-3 z-10 flex gap-2">
+                  <div className="absolute top-3 right-3 z-10">
                     <ConfirmBubble
                       title="Elimina Cliente"
                       message="Sei sicuro di voler eliminare questo cliente? L'azione è definitiva."
@@ -175,7 +175,6 @@ export default function ClientiPage() {
                         <button
                           className="p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50"
                           title="Elimina cliente"
-                          onClick={(e) => { e.stopPropagation(); }}
                         >
                           <Trash2 size={16} />
                         </button>

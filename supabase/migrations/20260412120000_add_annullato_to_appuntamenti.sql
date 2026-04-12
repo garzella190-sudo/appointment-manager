@@ -1,0 +1,2 @@
+ALTER TABLE appuntamenti
+ADD COLUMN annullato BOOLEAN DEFAULT FALSE;

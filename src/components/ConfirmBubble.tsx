@@ -117,8 +117,20 @@ export const ConfirmBubble = ({
   );
 
   return (
-    <div className="inline-block">
-      <div onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}>
+    <div 
+      className="inline-block relative z-[15]"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+    >
+      <div 
+        className="cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+      >
         {trigger}
       </div>
       {mounted && isOpen ? createPortal(modalContent, document.body) : null}
