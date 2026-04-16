@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -95,7 +96,7 @@ function generateICS(apt: any) {
 }
 
 export async function sendConfirmationEmailAction(appointmentId: string) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: apt, error } = await supabase
     .from('appuntamenti')
@@ -157,7 +158,7 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
 }
 
 export async function sendReminderEmailAction(appointmentId: string) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: apt, error } = await supabase
     .from('appuntamenti')
