@@ -30,7 +30,7 @@ import DetailsModal from '@/components/modals/DetailsModal';
 import { Clock } from 'lucide-react';
 import DatePickerModal from '@/components/modals/DatePickerModal';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
-import { updateAppointmentAction } from '@/actions/appointments';
+
 
 class SmartPointerSensor extends PointerSensor {
   static activators = [
@@ -246,6 +246,8 @@ export default function CalendarPage() {
         const rowDate = new Date(row.data);
         const patenteId = row.clienti?.patente_richiesta_id;
         
+        const isUfficio = row.clienti?.nome === 'UFFICIO';
+        const tipoImpegno = isUfficio ? (row.clienti?.cognome || '') : null;
         return {
           id: row.id,
           cliente_id: row.clienti?.id || '',
@@ -267,7 +269,9 @@ export default function CalendarPage() {
             name: row.istruttori ? `${row.istruttori.cognome} ${row.istruttori.nome}` : 'Non ass.',
             color: row.istruttori?.colore || '#3b82f6'
           },
-          vehicle_color: row.veicoli?.colore
+          vehicle_color: row.veicoli?.colore,
+          is_impegno: isUfficio,
+          tipo_impegno: tipoImpegno,
         };
       });
 
@@ -281,6 +285,14 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (mounted) fetchWeekAppointments();
+
+    const handleUpdate = () => {
+      console.log("Calendar sync global triggered...");
+      fetchWeekAppointments();
+    };
+
+    window.addEventListener('appointments-updated', handleUpdate);
+    return () => window.removeEventListener('appointments-updated', handleUpdate);
   }, [currentDate, effectiveViewDays, mounted, fetchWeekAppointments]);
 
   // Auto-scroll logic: go to current time if apps exist near, otherwise start at 09:00
@@ -386,22 +398,27 @@ export default function CalendarPage() {
       const startISO = startDateTime.toISOString();
       const endISO = endDateTime.toISOString();
 
-      // Call server action for robust validation and revalidation
-      const result = await updateAppointmentAction(active.id as string, { 
-        ...targetApt,
-        data: startISO,
-        inizio: startISO,
-        fine: endISO,
-        data_solo: dateStr,
-        cliente_id: targetApt.cliente_id
-      });
+      // Direct minimal Supabase update — only date/time fields change on drag.
+      // Using updateAppointmentAction would fail silently because the client-side
+      // Appointment object uses 'duration' but the server action expects 'durata'.
+      const { error: dragError } = await supabase
+        .from('appuntamenti')
+        .update({
+          data: startISO,
+          inizio: startISO,
+          fine: endISO,
+          data_solo: dateStr,
+        })
+        .eq('id', active.id as string);
 
-      if (result && !result.success) {
+      if (dragError) {
+        console.error('Drag & Drop save error:', dragError);
         setToast({
-          message: result.error || 'Errore durante lo spostamento',
+          message: 'Errore durante il salvataggio dello spostamento. Riprova.',
           type: 'error'
         });
-        if (mounted) fetchWeekAppointments(); 
+        // Revert optimistic update
+        if (mounted) fetchWeekAppointments();
       }
     }
   };
@@ -577,6 +594,13 @@ export default function CalendarPage() {
                 {displayDays.map((day: Date) => {
                   const isHoliday = isItalianHoliday(day) || isWeekend(day);
                   const isToday = isSameDay(day, new Date());
+                  const dayStr = format(day, 'yyyy-MM-dd');
+                  // Check for exam-type impegni on this day
+                  const hasEsame = appointments.some(a =>
+                    a.appointment_date === dayStr &&
+                    a.is_impegno &&
+                    a.tipo_impegno?.toUpperCase().includes('ESAME')
+                  );
                   return (
                     <div key={day.toString()} className={cn(
                       "p-1 sm:p-2 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
@@ -598,6 +622,11 @@ export default function CalendarPage() {
                       )}>
                         {format(day, 'd')}
                       </span>
+                      {hasEsame && (
+                        <div className="mt-0.5 mx-auto w-fit px-1.5 py-0.5 bg-amber-400 dark:bg-amber-500 text-white rounded text-[8px] font-black uppercase tracking-wider leading-none flex items-center gap-0.5 shadow-sm shadow-amber-400/30">
+                          🎓 Esame
+                        </div>
+                      )}
                     </div>
                   );
                 })}

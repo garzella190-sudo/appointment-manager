@@ -1,6 +1,9 @@
 'use server';
 
 import { createAdminClient } from '@/utils/supabase/admin';
+import { createClient } from '@/utils/supabase/server';
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 
 export async function createUserAction(formData: {
   email: string;
@@ -80,13 +83,10 @@ export async function updateUserAction(userId: string, data: {
 
 
 export async function signOutAction() {
-  const supabase = await createAdminClient(); // Or use the standard server client if preferred for session
-  // Actually, for signout we should use the standard server client to clear cookies
-  // I'll import createClient from @/utils/supabase/server inside the function or at top
-  const { createClient: createServerClient } = await import('@/utils/supabase/server');
-  const supabaseServer = await createServerClient();
-  await supabaseServer.auth.signOut();
-  return { success: true };
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  revalidatePath('/', 'layout');
+  redirect('/login');
 }
 
 export async function deleteUserAction(userId: string) {

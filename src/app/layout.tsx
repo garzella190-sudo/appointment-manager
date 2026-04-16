@@ -10,13 +10,13 @@ import { createClient } from "@/utils/supabase/server";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Agenda Guide",
+  title: "Agenda Guide Manu",
   description: "Gestione guide e appuntamenti",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Agenda Guide",
+    title: "Agenda Guide Manu",
   },
 };
 

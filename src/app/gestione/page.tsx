@@ -579,7 +579,7 @@ const TabPatenti = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
 };
 
 // ── Tab: Utenti ───────────────────────────────────────────────
-const TabUtenti = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
+const TabUtenti = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, sectionColor: string, isAdmin: boolean }) => {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [istruttoriList, setIstruttoriList] = useState<{id: string; nome: string; cognome: string}[]>([]);
@@ -706,6 +706,7 @@ const TabUtenti = ({ refreshKey, sectionColor }: { refreshKey: number, sectionCo
       >
         <UserForm
           user={editingUser}
+          isAdmin={isAdmin}
           onSuccess={handleEditSuccess}
           onCancel={() => setEditingUser(null)}
         />
@@ -1575,7 +1576,7 @@ export default function GestionePage() {
             {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
             {active === 'report' && <TabReport refreshKey={refreshKey} role={role || undefined} istruttoreId={istruttoreId || undefined} />}
             {active === 'patenti' && <TabPatenti refreshKey={refreshKey} sectionColor={sectionColor} />}
-            {active === 'utenti' && <TabUtenti refreshKey={refreshKey} sectionColor={sectionColor} />}
+            {active === 'utenti' && <TabUtenti refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
             {active === 'impostazioni' && <TabImpostazioni />}
             {active === 'mobile' && <InstallPWA />}
             {active === 'impegni' && <TabImpegni refreshKey={refreshKey} sectionColor={sectionColor} />}
@@ -1593,7 +1594,7 @@ export default function GestionePage() {
           {active === 'veicoli' && <VeicoloForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
           {active === 'istruttori' && <IstruttoreForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
           {active === 'patenti' && <PatenteForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
-          {active === 'utenti' && <UserForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
+          {active === 'utenti' && <UserForm isAdmin={isAdmin} onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
           {active === 'impegni' && <ImpegnoForm onSuccess={handleAddSuccess} onCancel={() => setIsAddModalOpen(false)} />}
         </div>
       </Modal>

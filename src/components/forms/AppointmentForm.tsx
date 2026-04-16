@@ -81,6 +81,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     stato: 'programmato' as StatoAppuntamento,
   });
   
+  const [sendEmail, setSendEmail] = useState(true);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedIstruttore, setSelectedIstruttore] = useState<Istruttore | null>(null);
   const [selectedVeicolo, setSelectedVeicolo] = useState<Veicolo | null>(null);
@@ -534,7 +535,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       stato: form.stato,
       note: form.note || null,
       importo: null,
-      send_email: !isImpegno,
+      send_email: sendEmail && !isImpegno,
       send_whatsapp: !isImpegno,
       preferenza_cambio: isImpegno ? null : form.cambio,
     };
@@ -546,7 +547,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       return setServerError(result.error);
     }
     
-    showToast(appointmentId ? 'Appuntamento aggiornato con successo!' : 'Appuntamento creato con successo!', 'success');
+    let successMsg = appointmentId ? 'Appuntamento aggiornato!' : 'Appuntamento creato!';
+    if (result.notificationSent) successMsg += ' ✉️ Email inviata.';
+    
+    showToast(successMsg, 'success');
     
     if (!appointmentId) {
       localStorage.setItem('lastApptDate', form.data);
@@ -1210,6 +1214,44 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         )}
 
         {serverError && <p className="p-4 bg-red-50 text-red-600 text-[11px] font-black rounded-2xl border border-red-100 text-center uppercase tracking-wide">{serverError}</p>}
+
+        {/* NOTIFICATION TOGGLE */}
+        {!isImpegno && !isView && (
+          <div className="pt-2 animate-in fade-in slide-in-from-top-2">
+            <button
+              type="button"
+              onClick={() => setSendEmail(!sendEmail)}
+              className={cn(
+                "w-full flex items-center justify-between p-4 rounded-2xl border transition-all",
+                sendEmail 
+                  ? "bg-blue-50/50 border-blue-100 text-blue-700" 
+                  : "bg-zinc-50 border-zinc-100 text-zinc-400"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                  sendEmail ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "bg-zinc-200 text-zinc-400"
+                )}>
+                  <MessageCircle size={18} />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase tracking-widest">Notifica Email</p>
+                  <p className="text-[10px] font-medium opacity-70">Invia conferma all'allievo</p>
+                </div>
+              </div>
+              <div className={cn(
+                "w-12 h-6 rounded-full relative transition-all duration-300",
+                sendEmail ? "bg-blue-600" : "bg-zinc-300"
+              )}>
+                <div className={cn(
+                  "absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300",
+                  sendEmail ? "left-7" : "left-1"
+                )} />
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* BOTTOM ACTIONS */}
         <div className="pt-6">

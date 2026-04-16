@@ -66,16 +66,16 @@ export default function Home() {
         const clienteObj = Array.isArray(row.clienti) ? row.clienti[0] : row.clienti;
         const istruttoreObj = Array.isArray(row.istruttori) ? row.istruttori[0] : row.istruttori;
         const veicoloObj = Array.isArray(row.veicoli) ? row.veicoli[0] : row.veicoli;
-        
         const patenteId = clienteObj?.patente_richiesta_id;
-
+        const isUfficio = clienteObj?.nome === 'UFFICIO';
         return {
           id: row.id,
           cliente_id: clienteObj?.id || '',
           appointment_date: format(rowDate, 'yyyy-MM-dd'),
           appointment_time: format(rowDate, 'HH:mm'),
-          client_name: clienteObj?.nome === 'UFFICIO' ? clienteObj.cognome : (clienteObj ? `${clienteObj.cognome} ${clienteObj.nome}` : 'Sconosciuto'),
-          is_impegno: clienteObj?.nome === 'UFFICIO',
+          client_name: isUfficio ? clienteObj.cognome : (clienteObj ? `${clienteObj.cognome} ${clienteObj.nome}` : 'Sconosciuto'),
+          is_impegno: isUfficio,
+          tipo_impegno: isUfficio ? (clienteObj?.cognome || '') : null,
           phone: clienteObj?.telefono || '',
           trainer_id: row.istruttore_id,
           vehicle_id: veicoloObj ? `${veicoloObj.nome} (${veicoloObj.targa})` : 'Nessuno',
@@ -117,6 +117,14 @@ export default function Home() {
       }
     }
     fetchAppointments();
+
+    const handleUpdate = () => {
+      console.log("Sync global triggered: fetching appointments...");
+      fetchAppointments();
+    };
+
+    window.addEventListener('appointments-updated', handleUpdate);
+    return () => window.removeEventListener('appointments-updated', handleUpdate);
   }, [fetchAppointments]);
 
   // Reset auto-scroll flag when date changes
@@ -209,9 +217,19 @@ export default function Home() {
               <RefreshButton onRefresh={fetchAppointments} className="h-8 w-8 p-0" />
             </div>
             <div className="flex items-center gap-3 mt-0">
-              <p className="text-zinc-500 dark:text-zinc-400 capitalize text-sm font-semibold">
-                {format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-zinc-500 dark:text-zinc-400 capitalize text-sm font-semibold">
+                  {format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}
+                </p>
+                {appointments.some(a =>
+                  a.is_impegno &&
+                  (a as any).tipo_impegno?.toUpperCase().includes('ESAME')
+                ) && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-400 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm shadow-amber-400/30">
+                    🎓 Esame
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
                 <button
                   onClick={(e) => { e.preventDefault(); navigateDay(-1); }}

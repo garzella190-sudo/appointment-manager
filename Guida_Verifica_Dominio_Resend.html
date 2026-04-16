@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guida Professionale: Verifica Dominio Resend - Autoscuola Toscana Fauglia</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --text: #1f2937;
+            --bg: #f9fafb;
+            --white: #ffffff;
+            --border: #e5e7eb;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text);
+            line-height: 1.6;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--white);
+            padding: 50px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+        }
+        h1 { color: var(--primary); margin: 0; font-size: 28px; }
+        h2 { color: var(--primary); border-left: 4px solid var(--primary); padding-left: 15px; margin-top: 40px; font-size: 20px; }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f3f4f6;
+            border-radius: 8px;
+        }
+        .step-number {
+            background: var(--primary);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .dns-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .dns-table th, .dns-table td {
+            text-align: left;
+            padding: 12px;
+            border: 1px solid var(--border);
+        }
+        .dns-table th { background: #f3f4f6; font-weight: bold; }
+        .alert {
+            background: #fff7ed;
+            border-left: 4px solid #f97316;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .btn-print {
+            display: block;
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            text-align: center;
+            padding: 15px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            margin-top: 50px;
+        }
+        @media print {
+            .btn-print { display: none; }
+            body { padding: 0; background: white; }
+            .container { box-shadow: none; border: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://resend.com/static/images/resend-logo.png" alt="Resend Logo" width="120" style="margin-bottom: 10px;">
+            <h1>Guida alla Verifica del Dominio</h1>
+            <p>Progetto: <strong>Agenda Guide - Autoscuola Toscana Fauglia</strong></p>
+        </div>
+
+        <p>Questa guida ti aiuterà a configurare il tuo dominio su <strong>Resend</strong> per inviare le email delle guide in modo professionale, evitando che finiscano nello SPAM e permettendo ai clienti di risponderti direttamente.</p>
+
+        <h2>1. Perché verificare il dominio?</h2>
+        <ul>
+            <li><strong>Identità</strong>: Le mail partiranno da <code>segreteria@autoscuolafauglia.it</code> invece che da <code>onboarding@resend.dev</code>.</li>
+            <li><strong>Affidabilità</strong>: Google e Outlook vedranno che la mail è "certificata" e non la bloccheranno.</li>
+            <li><strong>Risposte</strong>: Ogni risposta dell'allievo arriverà direttamente nella tua casella email.</li>
+        </ul>
+
+        <h2>2. Procedura Passo-Passo</h2>
+
+        <div class="step">
+            <div class="step-number">1</div>
+            <div>
+                <strong>Aggiunta del Dominio su Resend</strong><br>
+                Accedi al tuo account Resend, vai nella sezione <strong>Domains</strong> e clicca su <strong>Add Domain</strong>. Digita il tuo dominio (es. <code>autoscuolafauglia.it</code>) e seleziona la regione più vicina (es. <code>Ireland - eu-west-1</code>).
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <div>
+                <strong>Ottenimento dei Record DNS</strong><br>
+                Resend ti fornirà una tabella con alcuni codici (Record MX e TXT). Dovrai copiare questi valori per incollarli nel pannello del tuo sito.
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <div>
+                <strong>Inserimento nel Pannello del Provider</strong><br>
+                Entra nel pannello di gestione del tuo dominio (es. Aruba, Register) e cerca la sezione <strong>Gestione DNS</strong>. Dovrai aggiungere i nuovi record esattamente come mostrati su Resend.
+            </div>
+        </div>
+
+        <h2>3. Cosa incollare (Esempio)</h2>
+        <table class="dns-table">
+            <tr>
+                <th>Tipo</th>
+                <th>Nome/Host</th>
+                <th>Valore/Puntatore</th>
+            </tr>
+            <tr>
+                <td>MX</td>
+                <td>@ (o vuoto)</td>
+                <td>feedback-smtp.eu-west-1.amazonses.com</td>
+            </tr>
+            <tr>
+                <td>TXT</td>
+                <td>_amazonses</td>
+                <td>[Codice alfanumerico fornito da Resend]</td>
+            </tr>
+            <tr>
+                <td>TXT</td>
+                <td>resend._domainkey</td>
+                <td>v=DKIM1; k=rsa; p=[Codice fornito da Resend]</td>
+            </tr>
+        </table>
+
+        <div class="alert">
+            <strong>⚠️ Attenzione:</strong> La propagazione delle modifiche DNS può richiedere da 1 a 24 ore. Una volta inseriti i dati, clicca su "Verify" su Resend ogni tanto finché non vedrai la scritta verde <strong>Verified</strong>.
+        </div>
+
+        <h2>4. Link alle guide ufficiali dei Provider</h2>
+        <ul>
+            <li><a href="https://guide.aruba.it/it/hosting/dns/gestione-dns.aspx" target="_blank">Guida Gestione DNS Aruba</a></li>
+            <li><a href="https://assistenza.register.it/configurazioni-dns/gestione-dns/" target="_blank">Guida Gestione DNS Register.it</a></li>
+            <li><a href="https://it.siteground.com/tutorials/cpanel/gestione-dns/" target="_blank">Guida Gestione DNS SiteGround</a></li>
+        </ul>
+
+        <a href="javascript:window.print()" class="btn-print">PREMI QUI PER SALVARE COME PDF</a>
+
+        <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #9ca3af;">
+            Manuale tecnico generato dal sistema Antigravity per Autoscuola Toscana Fauglia.
+        </div>
+    </div>
+</body>
+</html>

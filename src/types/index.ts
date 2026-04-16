@@ -9,6 +9,7 @@ export interface Appointment {
   cliente_id?: string; // <--- AGGIUNTO IL '?' PER RENDERLO OPZIONALE
   client_name: string;
   is_impegno?: boolean;
+  tipo_impegno?: string | null;
   phone?: string;
   trainer_id: string;
   vehicle_id: string;

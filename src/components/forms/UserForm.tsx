@@ -1,17 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { createUserAction, updateUserAction } from '@/actions/auth';
-import { Loader2, UserPlus, Shield, User, Mail, Lock } from 'lucide-react';
+import { createUserAction, updateUserAction, deleteUserAction } from '@/actions/auth';
+import { Loader2, UserPlus, Shield, User, Mail, Lock, Trash2, Plus } from 'lucide-react';
 import Select from './Select';
+import { ConfirmBubble } from '../ConfirmBubble';
 
 interface UserFormProps {
-  user?: any; // Se presente, siamo in modalità edit
+  user?: any;
+  isAdmin?: boolean;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
+export function UserForm({ user, isAdmin, onSuccess, onCancel }: UserFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -131,24 +133,53 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
         </div>
       )}
 
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-3 pt-4">
+        {isEdit && isAdmin && (
+          <ConfirmBubble
+            title="Elimina Utente"
+            message={`Sei sicuro di voler eliminare definitivamente ${user?.user_metadata?.full_name || 'questo utente'}?`}
+            confirmLabel="Elimina"
+            onConfirm={async () => {
+              setLoading(true);
+              const result = await deleteUserAction(user.id);
+              if (result.success) {
+                setSuccess(true);
+                setTimeout(onSuccess, 1000);
+              } else {
+                setError(result.error || "Errore durante l'eliminazione.");
+                setLoading(false);
+              }
+            }}
+            trigger={
+              <button
+                type="button"
+                disabled={loading}
+                className="w-12 h-12 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all border border-red-100"
+                title="Elimina Utente"
+              >
+                <Trash2 size={18} />
+              </button>
+            }
+          />
+        )}
+        
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 px-5 py-3 rounded-xl font-bold text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all"
+          className="flex-1 px-5 py-3 rounded-xl font-bold text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all border border-zinc-200 dark:border-zinc-800"
         >
           Annulla
         </button>
         <button
           type="submit"
           disabled={loading || success}
-          className="flex-[2] flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+          className="flex-[2] flex items-center justify-center gap-2 px-5 py-3 bg-zinc-900 dark:bg-sky-500 text-white rounded-xl font-bold text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-zinc-500/20 disabled:opacity-50"
         >
           {loading ? (
             <Loader2 className="animate-spin" size={16} />
           ) : (
             <>
-              {isEdit ? <Shield size={16} /> : <UserPlus size={16} />}
+              {isEdit ? <Shield size={16} /> : <Plus size={16} />}
               {isEdit ? 'Salva Modifiche' : 'Crea Utente'}
             </>
           )}

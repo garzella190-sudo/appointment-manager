@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { sendConfirmationEmailAction } from './notifications';
 
 // Initialized lazily inside the action
 
@@ -189,47 +190,22 @@ export async function createAppointmentAction(payload: {
   }
 
 
-  // 3. Email notification (unchanged logic)
-  if (finalEmail && (payload.send_email ?? clientData.riceve_email) && resendApiKey) {
+  // 3. Email notification (Centralized logic)
+  let notificationSent = false;
+  if (finalEmail && (payload.send_email ?? clientData.riceve_email)) {
     try {
-      const resend = new Resend(resendApiKey);
-      const startDate = parseISO(payload.data);
-      const endDate = addMinutes(startDate, payload.durata);
-      const dateStr = format(startDate, 'dd/MM/yyyy', { locale: it });
-      const timeStr = format(startDate, 'HH:mm', { locale: it });
-
-      const formatGCal = (date: Date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
-      const gcalStart = formatGCal(startDate);
-      const gcalEnd = formatGCal(endDate);
-
-      const calendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=Lezione+di+Guida+-+Autoscuola+Toscana+Fauglia&dates=${gcalStart}/${gcalEnd}&location=ci+troviamo+in+autoscuola+salvo+diversi+accordi`;
-      
-      const emailHtml = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333 text-align: left;">
-          <h2 style="color: #10b981;">Prenotazione Confermata</h2>
-          <p>Ciao <strong>${clientData.nome}</strong>,</p>
-          <p>Ti confermo la prenotazione per il giorno <strong>${dateStr}</strong> alle ore <strong>${timeStr}</strong>.</p>
-          <div style="margin: 30px 0;">
-            <a href="${calendarUrl}" style="background-color: #3b82f6; color: white; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; display: inline-block;">Aggiungi al Calendario</a>
-          </div>
-          <p style="font-size: 14px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">Ci troviamo in autoscuola salvo diversi accordi.</p>
-        </div>
-      `;
-
-      await resend.emails.send({
-        from: 'Autoscuola <onboarding@resend.dev>',
-        to: finalEmail,
-        subject: 'Conferma Prenotazione Guida',
-        html: emailHtml,
-      });
-    } catch (e) {}
+      const emailRes = await sendConfirmationEmailAction(appointment.id);
+      if (emailRes.success) notificationSent = true;
+    } catch (e) {
+      console.error('Notification Error:', e);
+    }
   }
 
   revalidatePath('/calendar');
   revalidatePath('/gestione');
   revalidatePath('/');
 
-  return { success: true, appointment };
+  return { success: true, appointment, notificationSent };
 }
 
 export async function updateAppointmentAction(id: string, payload: any) {
@@ -359,9 +335,20 @@ export async function updateAppointmentAction(id: string, payload: any) {
       .eq('id', payload.cliente_id || finalClienteId);
   }
 
+  // 3. Email notification (Centralized logic)
+  let notificationSent = false;
+  if (data && payload.send_email) {
+    try {
+      const emailRes = await sendConfirmationEmailAction(data.id);
+      if (emailRes.success) notificationSent = true;
+    } catch (e) {
+      console.error('Notification Error:', e);
+    }
+  }
+
   revalidatePath('/calendar');
   revalidatePath('/gestione');
   revalidatePath('/');
 
-  return { success: true, appointment: data };
+  return { success: true, appointment: data, notificationSent };
 }

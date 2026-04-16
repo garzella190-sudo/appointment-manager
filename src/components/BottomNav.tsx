@@ -25,8 +25,12 @@ const BottomNav = () => {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    await signOutAction();
-    window.location.href = '/login';
+    try {
+      await signOutAction();
+    } catch {
+      // redirect() in Next.js throws internally — this is expected
+      window.location.href = '/login';
+    }
   };
 
   const getPermissions = () => {
@@ -174,6 +178,8 @@ const BottomNav = () => {
           onSuccess={() => {
             setIsModalOpen(false);
             router.refresh(); 
+            // Trigger automatic sync for client components
+            window.dispatchEvent(new CustomEvent('appointments-updated'));
           }} 
           onCancel={() => setIsModalOpen(false)} 
         />
@@ -214,7 +220,13 @@ const BottomNav = () => {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setIsPermissionsModalOpen(false)}
+              className="flex-1 h-14 bg-zinc-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-500/20"
+            >
+              Ricevuto
+            </button>
             <ConfirmBubble
               title="Esci dall'app"
               message="Vuoi terminare la sessione attuale?"
@@ -229,12 +241,6 @@ const BottomNav = () => {
                 </button>
               }
             />
-            <button
-              onClick={() => setIsPermissionsModalOpen(false)}
-              className="flex-[2] h-14 bg-zinc-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-zinc-500/20"
-            >
-              Ricevuto
-            </button>
           </div>
         </div>
       </Modal>
