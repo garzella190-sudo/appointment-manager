@@ -219,6 +219,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       if (!form.data || !form.ora) return;
       
       const startDate = new Date(`${form.data}T${form.ora}`);
+      if (isNaN(startDate.getTime())) return;
+      
       const startISO = startDate.toISOString();
       const endISO = new Date(startDate.getTime() + form.durata * 60000).toISOString();
 
@@ -243,12 +245,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         const nextVehicleIds = veicoli.map(v => v.id).filter(id => !busyVehicles.includes(id));
 
         setAvailableSlots(prev => {
-          const isSameI = prev.instructor_ids.length === nextInstructorIds.length && 
-                          prev.instructor_ids.every((id, idx) => id === nextInstructorIds[idx]);
-          const isSameV = prev.vehicle_ids.length === nextVehicleIds.length && 
-                          prev.vehicle_ids.every((id, idx) => id === nextVehicleIds[idx]);
-          const isSameC = prev.busy_client_ids?.length === busyClients.length &&
-                          prev.busy_client_ids.every((id: string, idx: number) => id === busyClients[idx]);
+          const isSameI = prev.instructor_ids.slice().sort().join(',') === nextInstructorIds.slice().sort().join(',');
+          const isSameV = prev.vehicle_ids.slice().sort().join(',') === nextVehicleIds.slice().sort().join(',');
+          const isSameC = (prev.busy_client_ids || []).slice().sort().join(',') === busyClients.slice().sort().join(',');
           
           if (isSameI && isSameV && isSameC) return prev;
           return { instructor_ids: nextInstructorIds, vehicle_ids: nextVehicleIds, busy_client_ids: busyClients };
@@ -522,42 +521,51 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
     
     setLoading(true);
-    const startDateTime = new Date(`${form.data}T${form.ora}`).toISOString();
-    const payload = {
-      cliente_id: isImpegno ? undefined : form.cliente_id,
-      is_impegno: isImpegno,
-      nome_impegno: isImpegno ? nomeImpegno : undefined,
-      istruttore_id: form.istruttore_id,
-      veicolo_id: isImpegno ? null : (form.veicolo_id || null),
-      data: startDateTime,
-      data_solo: form.data,
-      durata: form.durata,
-      stato: form.stato,
-      note: form.note || null,
-      importo: null,
-      send_email: sendEmail && !isImpegno,
-      send_whatsapp: !isImpegno,
-      preferenza_cambio: isImpegno ? null : form.cambio,
-    };
-    const result = appointmentId ? await updateAppointmentAction(appointmentId, payload) : await createAppointmentAction(payload);
-    setLoading(false);
-    
-    if (result && result.error) {
-      showToast(result.error, 'error');
-      return setServerError(result.error);
+    setServerError(null);
+    try {
+      const startDateTime = new Date(`${form.data}T${form.ora}`).toISOString();
+      const payload = {
+        cliente_id: isImpegno ? undefined : form.cliente_id,
+        is_impegno: isImpegno,
+        nome_impegno: isImpegno ? nomeImpegno : undefined,
+        istruttore_id: form.istruttore_id,
+        veicolo_id: isImpegno ? null : (form.veicolo_id || null),
+        data: startDateTime,
+        data_solo: form.data,
+        durata: form.durata,
+        stato: form.stato,
+        note: form.note || null,
+        importo: null,
+        send_email: sendEmail && !isImpegno,
+        send_whatsapp: !isImpegno,
+        preferenza_cambio: isImpegno ? null : form.cambio,
+      };
+      const result = appointmentId ? await updateAppointmentAction(appointmentId, payload) : await createAppointmentAction(payload);
+      
+      if (result && result.error) {
+        showToast(result.error, 'error');
+        setServerError(result.error);
+        setLoading(false);
+        return;
+      }
+      
+      let successMsg = appointmentId ? 'Appuntamento aggiornato!' : 'Appuntamento creato!';
+      if (result.notificationSent) successMsg += ' ✉️ Email inviata.';
+      
+      showToast(successMsg, 'success');
+      
+      if (!appointmentId) {
+        localStorage.setItem('lastApptDate', form.data);
+        localStorage.setItem('lastApptTime', form.ora);
+      }
+      
+      setLoading(false);
+      onSuccess?.();
+    } catch (error: any) {
+      console.error("Submission error: ", error);
+      setServerError(error.message || "Errore imprevisto durante il salvataggio.");
+      setLoading(false);
     }
-    
-    let successMsg = appointmentId ? 'Appuntamento aggiornato!' : 'Appuntamento creato!';
-    if (result.notificationSent) successMsg += ' ✉️ Email inviata.';
-    
-    showToast(successMsg, 'success');
-    
-    if (!appointmentId) {
-      localStorage.setItem('lastApptDate', form.data);
-      localStorage.setItem('lastApptTime', form.ora);
-    }
-    
-    onSuccess?.();
   };
 
   if (fetching) return <div className="py-24 flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={40} /></div>;
