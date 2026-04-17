@@ -62,6 +62,7 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 - **Automazione Impegni**: La creazione di una "Seduta d'Esame" permette di selezionare gli istruttori partecipanti e un orario di inizio. Il sistema crea automaticamente un blocco di **3 ore** (Impegno di tipo 'Esame') per ogni istruttore coinvolto.
 - **Sincronizzazione**: La cancellazione di una seduta d'esame comporta la rimozione automatica di tutti i blocchi d'impegno associati nei calendari degli istruttori.
 - **Assegnazione Allievi**: Gli allievi pronti per l'esame possono essere assegnati a una seduta specifica, con controllo del numero massimo di candidati.
+- **Indicatori Visivi**: Le schede delle guide in Agenda e Calendario mostrano un'icona `GraduationCap` dinamica: **Verde** per chi ha l'esame fissato, **Grigio Chiaro** per chi è solo segnato come "Pronto".
 
 ### ⏰ Automazione Promemoria (Cron)
 - **Logica**: Il cron job giornaliero (`/api/cron/reminders`) invia promemoria per le guide del **giorno successivo** (Domani), garantendo un preavviso adeguato.
