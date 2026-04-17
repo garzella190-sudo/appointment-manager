@@ -6,7 +6,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Resend is initialized lazily inside actions to avoid build-time errors if API key is missing
 const SENDER = 'Autoscuola Toscana Fauglia <onboarding@resend.dev>';
 
 /**
@@ -137,6 +137,7 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
       isReminder: false
     });
 
+    const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
       from: SENDER,
       to: cliente.email,
@@ -199,6 +200,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
       isReminder: true
     });
 
+    const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
       from: SENDER,
       to: cliente.email,
