@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import DatePicker from '@/components/DatePicker';
 import { toggleProntoEsameAction } from '@/actions/clienti';
+import { createImpegnoAction, deleteImpegniBySessionAction } from '@/actions/impegni';
 
 const supabase = createClient();
 
@@ -25,10 +26,18 @@ export default function EsamiPage() {
   const [pronti, setPronti] = useState<any[]>([]);
   const [notPronti, setNotPronti] = useState<any[]>([]);
   const [sedute, setSedute] = useState<any[]>([]);
+  const [istruttori, setIstruttori] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddProntoModalOpen, setIsAddProntoModalOpen] = useState(false);
   const [searchQueryPronto, setSearchQueryPronto] = useState('');
-  const [formData, setFormData] = useState({ nome: '', data: '', n_candidati: 0, note: '' });
+  const [formData, setFormData] = useState({ 
+    nome: '', 
+    data: format(new Date(), 'yyyy-MM-dd'), 
+    n_candidati: 0, 
+    note: '',
+    ora_inizio: '08:30',
+    istruttori_ids: [] as string[]
+  });
   
   // Stati per il dettaglio della seduta
   const [selectedSeduta, setSelectedSeduta] = useState<any | null>(null);
@@ -63,7 +72,8 @@ export default function EsamiPage() {
     const [
       { data: pData },
       { data: npData },
-      { data: sData }
+      { data: sData },
+      { data: iData }
     ] = await Promise.all([
       supabase.from('clienti')
         .select('*, patenti(tipo), sessioni_esame(nome, data), istruttori(id, nome, cognome, colore)')
@@ -75,12 +85,16 @@ export default function EsamiPage() {
         .order('cognome', { ascending: true }),
       supabase.from('sessioni_esame')
         .select('*, clienti(count)')
-        .order('data', { ascending: true })
+        .order('data', { ascending: true }),
+      supabase.from('istruttori')
+        .select('*')
+        .order('cognome', { ascending: true })
     ]);
 
     setPronti(pData || []);
     setNotPronti(npData || []);
     setSedute(sData || []);
+    setIstruttori(iData || []);
     setLoading(false);
   }, []);
 
@@ -103,9 +117,44 @@ export default function EsamiPage() {
     
     if (!error) {
       showToast(selectedSeduta ? 'Seduta aggiornata' : 'Seduta d\'esame creata', 'success');
+      
+      // LOGICA AUTOMAZIONE IMPEGNI (Solo Nuova Seduta o if needed)
+      // Se è una nuova seduta, creiamo gli impegni per gli istruttori selezionati
+      if (!selectedSeduta && formData.istruttori_ids.length > 0) {
+        // Troviamo l'ID della seduta appena creata (serve una query se insert non ritorna l'oggetto, ma qui possiamo recuperarlo dal fetch o farlo tornare)
+        const { data: newSession } = await supabase
+          .from('sessioni_esame')
+          .select('id')
+          .eq('data', formData.data)
+          .eq('nome', formData.nome)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (newSession) {
+          for (const instrId of formData.istruttori_ids) {
+            await createImpegnoAction({
+              istruttore_id: instrId,
+              tipo: 'Esame',
+              data: formData.data,
+              ora_inizio: formData.ora_inizio,
+              durata: 180, // 3 ore come richiesto
+              note: `[SEDUTA_ID:${newSession.id}] Blocco automatico per esame ${formData.nome}`
+            });
+          }
+        }
+      }
+
       setIsModalOpen(false);
       setSelectedSeduta(null);
-      setFormData({ nome: '', data: '', n_candidati: 0, note: '' });
+      setFormData({ 
+        nome: '', 
+        data: format(new Date(), 'yyyy-MM-dd'), 
+        n_candidati: 0, 
+        note: '',
+        ora_inizio: '08:30',
+        istruttori_ids: []
+      });
       if (!selectedSeduta) setActiveTab('sedute'); 
       fetchData();
       router.refresh(); 
@@ -116,9 +165,13 @@ export default function EsamiPage() {
   };
 
   const handleDeleteSeduta = async (id: string) => {
+    // 1. Eliminiamo i blocchi d'impegno associati
+    await deleteImpegniBySessionAction(id);
+
+    // 2. Eliminiamo la seduta
     const { error } = await supabase.from('sessioni_esame').delete().eq('id', id);
     if (!error) {
-      showToast('Seduta eliminata', 'info');
+      showToast('Seduta (e impegni associati) eliminata', 'info');
       fetchData();
     }
   };
@@ -504,16 +557,62 @@ export default function EsamiPage() {
               className="h-14 font-bold"
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Numero Candidati Massimi</label>
-            <input 
-              required
-              type="number" 
-              value={formData.n_candidati === 0 ? '' : formData.n_candidati}
-              onChange={(e) => setFormData({ ...formData, n_candidati: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
-              className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all"
-            />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Ora Inizio Blocco</label>
+              <input 
+                required
+                type="time" 
+                value={formData.ora_inizio}
+                onChange={(e) => setFormData({ ...formData, ora_inizio: e.target.value })}
+                className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Candidati Max</label>
+              <input 
+                required
+                type="number" 
+                value={formData.n_candidati === 0 ? '' : formData.n_candidati}
+                onChange={(e) => setFormData({ ...formData, n_candidati: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+                className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all"
+              />
+            </div>
           </div>
+
+          {!selectedSeduta && (
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1 flex items-center gap-2">
+                <Users size={12} /> Istruttori Partecipanti (Blocco 3h)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto p-1 no-scrollbar">
+                {istruttori.map(istr => (
+                  <button
+                    key={istr.id}
+                    type="button"
+                    onClick={() => {
+                      const current = formData.istruttori_ids;
+                      if (current.includes(istr.id)) {
+                        setFormData({ ...formData, istruttori_ids: current.filter(id => id !== istr.id) });
+                      } else {
+                        setFormData({ ...formData, istruttori_ids: [...current, istr.id] });
+                      }
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
+                      formData.istruttori_ids.includes(istr.id)
+                        ? "bg-sky-50 border-sky-200 text-sky-700"
+                        : "bg-white border-zinc-100 text-zinc-500"
+                    )}
+                  >
+                    <div className="w-6 h-6 rounded-full shrink-0" style={{ backgroundColor: istr.colore }} />
+                    <span className="text-[10px] font-bold uppercase truncate">{istr.cognome} {istr.nome}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Note (Opzionale)</label>
             <textarea 
@@ -550,7 +649,9 @@ export default function EsamiPage() {
                             nome: selectedSeduta.nome || '',
                             data: selectedSeduta.data || '',
                             n_candidati: selectedSeduta.n_candidati || 0,
-                            note: selectedSeduta.note || ''
+                            note: selectedSeduta.note || '',
+                            ora_inizio: '08:30', // In upgrade we don't have it saved yet
+                            istruttori_ids: []
                         });
                         setIsDetailModalOpen(false);
                         setIsModalOpen(true);

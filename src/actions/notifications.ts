@@ -6,7 +6,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 
-// Resend is initialized lazily inside actions to avoid build-time errors if API key is missing
+// Note: use onboarding@resend.dev until domain is verified
 const SENDER = 'Autoscuola Toscana Fauglia <onboarding@resend.dev>';
 
 /**
@@ -137,8 +137,14 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
       isReminder: false
     });
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      console.error('RESEND_API_KEY is not defined in the environment variables');
+      return { success: false, error: 'Configurazione email mancante (API Key)' };
+    }
+
+    const resend = new Resend(resendApiKey);
+    const { data, error: resendError } = await resend.emails.send({
       from: SENDER,
       to: cliente.email,
       subject: `Prenotazione effettuata - Conferma Guida: ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr}`,
@@ -151,10 +157,16 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
       ]
     });
 
+    if (resendError) {
+      console.error('Resend Error:', resendError);
+      return { success: false, error: `Errore Resend: ${resendError.message}` };
+    }
+
+    console.log('Confirmation email sent successfully to:', cliente.email, 'Data:', data);
     return { success: true };
   } catch (error) {
-    console.error('Errore invio email:', error);
-    return { success: false, error: 'Errore durante l\'invio dell\'email' };
+    console.error('Errore imprevisto invio email:', error);
+    return { success: false, error: 'Errore imprevisto durante l\'invio dell\'email' };
   }
 }
 
@@ -200,8 +212,14 @@ export async function sendReminderEmailAction(appointmentId: string) {
       isReminder: true
     });
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      console.error('RESEND_API_KEY is not defined in the environment variables');
+      return { success: false, error: 'Configurazione email mancante (API Key)' };
+    }
+
+    const resend = new Resend(resendApiKey);
+    const { data, error: resendError } = await resend.emails.send({
       from: SENDER,
       to: cliente.email,
       subject: `Promemoria: Lezione di Guida - ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr}`,
@@ -214,9 +232,15 @@ export async function sendReminderEmailAction(appointmentId: string) {
       ]
     });
 
+    if (resendError) {
+      console.error('Resend Reminder Error:', resendError);
+      return { success: false, error: `Errore Resend Promemoria: ${resendError.message}` };
+    }
+
+    console.log('Reminder email sent successfully to:', cliente.email, 'Data:', data);
     return { success: true };
   } catch (error) {
-    console.error('Errore invio email:', error);
-    return { success: false, error: 'Errore durante l\'invio dell\'email' };
+    console.error('Errore imprevisto invio promemoria:', error);
+    return { success: false, error: 'Errore imprevisto durante l\'invio del promemoria' };
   }
 }

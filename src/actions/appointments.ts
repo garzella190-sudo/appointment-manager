@@ -192,12 +192,18 @@ export async function createAppointmentAction(payload: {
 
   // 3. Email notification (Centralized logic)
   let notificationSent = false;
+  let emailError = null;
   if (finalEmail && (payload.send_email ?? clientData.riceve_email)) {
     try {
       const emailRes = await sendConfirmationEmailAction(appointment.id);
-      if (emailRes.success) notificationSent = true;
-    } catch (e) {
+      if (emailRes.success) {
+        notificationSent = true;
+      } else {
+        emailError = emailRes.error;
+      }
+    } catch (e: any) {
       console.error('Notification Error:', e);
+      emailError = e.message;
     }
   }
 
@@ -205,7 +211,7 @@ export async function createAppointmentAction(payload: {
   revalidatePath('/gestione');
   revalidatePath('/');
 
-  return { success: true, appointment, notificationSent };
+  return { success: true, appointment, notificationSent, emailError };
 }
 
 export async function updateAppointmentAction(id: string, payload: any) {
@@ -337,12 +343,18 @@ export async function updateAppointmentAction(id: string, payload: any) {
 
   // 3. Email notification (Centralized logic)
   let notificationSent = false;
+  let emailError = null;
   if (data && payload.send_email) {
     try {
       const emailRes = await sendConfirmationEmailAction(data.id);
-      if (emailRes.success) notificationSent = true;
-    } catch (e) {
+      if (emailRes.success) {
+        notificationSent = true;
+      } else {
+        emailError = emailRes.error;
+      }
+    } catch (e: any) {
       console.error('Notification Error:', e);
+      emailError = e.message;
     }
   }
 
@@ -350,5 +362,5 @@ export async function updateAppointmentAction(id: string, payload: any) {
   revalidatePath('/gestione');
   revalidatePath('/');
 
-  return { success: true, appointment: data, notificationSent };
+  return { success: true, appointment: data, notificationSent, emailError };
 }

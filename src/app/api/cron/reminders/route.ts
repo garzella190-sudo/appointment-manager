@@ -16,18 +16,19 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const now = new Date();
-  const todayStart = startOfDay(now).toISOString();
-  const todayEnd = endOfDay(now).toISOString();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStart = startOfDay(tomorrow).toISOString();
+  const tomorrowEnd = endOfDay(tomorrow).toISOString();
 
-  // Find all appointments for today
+  // Find all appointments for tomorrow
   const { data: appointments, error } = await supabase
     .from('appuntamenti')
     .select('id, send_email, stato')
     .eq('send_email', true)
     .neq('stato', 'annullato')
-    .gte('inizio', todayStart)
-    .lte('inizio', todayEnd);
+    .gte('inizio', tomorrowStart)
+    .lte('inizio', tomorrowEnd);
 
   if (error) {
     console.error('Error fetching today appointments for cron:', error.message);

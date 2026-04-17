@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/useToast';
 import { Modal } from '../Modal';
 import { SchedaClienteForm } from './SchedaClienteForm';
 import { AssignExamSessionModal } from '../modals/AssignExamSessionModal';
+import { generateWhatsAppLink } from '@/utils/whatsapp';
 
 import Select from './Select';
 import { ConfirmBubble } from '../ConfirmBubble';
@@ -82,6 +83,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   });
   
   const [sendEmail, setSendEmail] = useState(true);
+  const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedIstruttore, setSelectedIstruttore] = useState<Istruttore | null>(null);
   const [selectedVeicolo, setSelectedVeicolo] = useState<Veicolo | null>(null);
@@ -550,9 +552,28 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       }
       
       let successMsg = appointmentId ? 'Appuntamento aggiornato!' : 'Appuntamento creato!';
-      if (result.notificationSent) successMsg += ' ✉️ Email inviata.';
-      
-      showToast(successMsg, 'success');
+      if (result.notificationSent) {
+        successMsg += ' ✉️ Email inviata.';
+        showToast(successMsg, 'success');
+      } else if (result.emailError) {
+        showToast(successMsg, 'success');
+        showToast(`Attenzione: ${result.emailError}`, 'info');
+      } else {
+        showToast(successMsg, 'success');
+      }
+
+      // 3. WhatsApp Redirect (Free notification)
+      if (sendWhatsApp && selectedCliente?.telefono) {
+        const dateStr = format(parseISO(form.data), 'dd/MM/yyyy', { locale: it });
+        const timeStr = form.ora;
+        const msg = `Ciao ${selectedCliente.nome}, ti confermo la guida per il ${dateStr} alle ore ${timeStr}. Ricordati che le guide vanno disdette almeno 24h prima. A presto!`;
+        const waLink = generateWhatsAppLink(selectedCliente.telefono, false, msg);
+        
+        // Open WhatsApp in a new tab
+        setTimeout(() => {
+          window.open(waLink, '_blank');
+        }, 1000); // Small delay to let the toast be seen
+      }
       
       if (!appointmentId) {
         localStorage.setItem('lastApptDate', form.data);
@@ -1255,6 +1276,39 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 <div className={cn(
                   "absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300",
                   sendEmail ? "left-7" : "left-1"
+                )} />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSendWhatsApp(!sendWhatsApp)}
+              className={cn(
+                "w-full flex items-center justify-between p-4 rounded-2xl border transition-all mt-3",
+                sendWhatsApp 
+                  ? "bg-emerald-50/50 border-emerald-100 text-emerald-700" 
+                  : "bg-zinc-50 border-zinc-100 text-zinc-400"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                  sendWhatsApp ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "bg-zinc-200 text-zinc-400"
+                )}>
+                  <MessageCircle size={18} />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase tracking-widest">Notifica WhatsApp</p>
+                  <p className="text-[10px] font-medium opacity-70">Apri invio rapido conferma</p>
+                </div>
+              </div>
+              <div className={cn(
+                "w-12 h-6 rounded-full relative transition-all duration-300",
+                sendWhatsApp ? "bg-emerald-600" : "bg-zinc-300"
+              )}>
+                <div className={cn(
+                  "absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300",
+                  sendWhatsApp ? "left-7" : "left-1"
                 )} />
               </div>
             </button>

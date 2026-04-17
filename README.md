@@ -7,7 +7,10 @@ Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco v
 - **Calendario Interattivo**: Griglia multi-giorno (1, 3, 5, 7 giorni) con granularità variabile (15, 30, 60 minuti).
 - **Gestione Master**: Anagrafica clienti, istruttori e veicoli con controllo scadenze.
 - **PWA Ready**: Installabile su dispositivi mobili con supporto offline di base.
-- **WhatsApp Integration**: Invio rapido di promemoria e chat dirette.
+- **Notifiche Smart**: Invio email di conferma tramite Resend con allegato calendario (ICS).
+- **Automazione Promemoria**: Cron job giornaliero che invia promemoria per le guide del giorno successivo.
+- **WhatsApp Integration**: Invio gratuito di conferme e promemoria con messaggi pre-compilati (Click-to-Chat).
+- **Automazione Esami**: Creazione sedute esame con generazione automatica di blocchi d'impegno per gli istruttori.
 
 ## 🎨 Design System
 - **Ultra-Compact UI**: Navigazione unificata in una singola barra inferiore (BottomNav) che integra il profilo utente e il logout.

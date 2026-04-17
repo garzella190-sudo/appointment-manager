@@ -13,6 +13,8 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 - `/src/app/layout.tsx` -> **Shell Globale**: Gestisce il recupero sessione utente e lo scroll-lock dello sfondo.
 - `/src/components/modals/NewAppointmentModal.tsx` -> Master per la creazione guide.
 - `/src/components/forms/AppointmentForm.tsx` -> Logica di business per calcolo orari e compatibilità.
+- `/src/app/api/cron/reminders/route.ts` -> **Cron Reminders**: Gestione automatizzata invio promemoria (Domani).
+- `/src/actions/notifications.ts` -> **Notification Hub**: Logica centralizzata Resend e template email.
 
 ## 🎨 Token di Stile
 - `/src/app/globals.css` -> Definizione border-radius (32px/40px) e scrollbar overrides.

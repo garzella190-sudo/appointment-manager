@@ -108,3 +108,23 @@ export async function deleteImpegnoAction(id: string) {
 
   return { success: true };
 }
+
+export async function deleteImpegniBySessionAction(sessioneId: string) {
+  const supabase = await createClient();
+
+  // Cerchiamo impegni che contengono il riferimento [SEDUTA_ID:uuid] nelle note
+  const { error } = await supabase
+    .from('impegni')
+    .delete()
+    .ilike('note', `%[SEDUTA_ID:${sessioneId}]%`);
+
+  if (error) {
+    console.error('Error deleting session commitments:', error.message);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/calendar');
+  revalidatePath('/gestione');
+
+  return { success: true };
+}
