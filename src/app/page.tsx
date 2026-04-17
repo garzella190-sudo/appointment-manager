@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Users, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote, Trash2 } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Users, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote, Trash2, GraduationCap } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Appointment } from '@/types';
@@ -46,7 +46,7 @@ export default function Home() {
           .from('appuntamenti')
           .select(`
             id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine,
-            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
+            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
           `)
@@ -90,7 +90,8 @@ export default function Home() {
           istruttore: {
             name: istruttoreObj ? `${istruttoreObj.cognome} ${istruttoreObj.nome}` : 'Non ass.',
             color: istruttoreObj?.colore || '#3b82f6'
-          }
+          },
+          exam_status: clienteObj?.sessione_esame_id ? 'scheduled' : (clienteObj?.pronto_esame ? 'ready' : 'none')
         };
       });
 
@@ -410,6 +411,15 @@ export default function Home() {
                           <h4 className="font-bold text-zinc-900 dark:text-white truncate flex items-center gap-2">
                             <span className="text-sky-600 dark:text-sky-400 tabular-nums text-xs font-black">{apt.appointment_time}</span>
                             {apt.client_name}
+                            {apt.exam_status && apt.exam_status !== 'none' && (
+                              <GraduationCap 
+                                size={14} 
+                                className={cn(
+                                  "shrink-0",
+                                  apt.exam_status === 'scheduled' ? "text-emerald-500 fill-emerald-500/10" : "text-zinc-300"
+                                )} 
+                              />
+                            )}
                           </h4>
                           <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-1.5">
                             {apt.phone && (

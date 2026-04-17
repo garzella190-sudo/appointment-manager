@@ -226,7 +226,7 @@ export default function CalendarPage() {
           .from('appuntamenti')
           .select(`
             id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo,
-            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id ),
+            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
           `)
@@ -272,6 +272,7 @@ export default function CalendarPage() {
           vehicle_color: row.veicoli?.colore,
           is_impegno: isUfficio,
           tipo_impegno: tipoImpegno,
+          exam_status: row.clienti?.sessione_esame_id ? 'scheduled' : (row.clienti?.pronto_esame ? 'ready' : 'none')
         };
       });
 

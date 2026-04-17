@@ -30,4 +30,5 @@ export interface Appointment {
     color: string;
   };
   vehicle_color?: string;
+  exam_status?: 'scheduled' | 'ready' | 'none';
 }

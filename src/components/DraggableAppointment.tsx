@@ -3,7 +3,7 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle, StickyNote, Trash2 } from 'lucide-react';
+import { AlertTriangle, StickyNote, Trash2, GraduationCap } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 import { isSameDay, parseISO, format } from 'date-fns';
@@ -93,6 +93,15 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
              )}>
                {appointment.client_name}
              </p>
+             {appointment.exam_status && appointment.exam_status !== 'none' && (
+               <GraduationCap 
+                 size={14} 
+                 className={cn(
+                   "shrink-0",
+                   appointment.exam_status === 'scheduled' ? "text-emerald-500 fill-emerald-500/10" : "text-zinc-300"
+                 )} 
+               />
+             )}
           </div>
           
           <div className="flex items-center gap-1 shrink-0">
