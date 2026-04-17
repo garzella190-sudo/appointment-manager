@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil, X, Plus, ChevronDown, Check } from 'lucide-react';
-import { format, addMinutes, parseISO, isAfter } from 'date-fns';
+import { format, addMinutes, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Cliente, Istruttore, Veicolo, Patente, StatoAppuntamento } from '@/lib/database.types';
 import { cn } from '@/lib/utils';
@@ -113,7 +113,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       setFetching(true);
       try {
         const [cRes, iRes, vRes, pRes, impRes] = await Promise.all([
-          supabase.from('clienti').select('*').neq('nome', 'UFFICIO').order('cognome'),
+          supabase.from('clienti').select('*, sessioni_esame(data)').neq('nome', 'UFFICIO').order('cognome'),
           supabase.from('istruttori').select('*').order('cognome'),
           supabase.from('veicoli').select('*').order('nome'),
           supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
@@ -124,7 +124,16 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         const uniqueNames = Array.from(new Set((impRes.data ?? []).map((c: {cognome: string}) => c.cognome))).filter(Boolean).sort() as string[];
         setImpegniNames(uniqueNames);
 
-        const sortedClienti = cRes.data ?? [];
+        // Filter active clients: not archived and no past exam
+        const today = startOfDay(new Date());
+        const sortedClienti = (cRes.data ?? []).filter((c: any) => {
+           if (c.id === appointmentId) return true; // Keep current client if editing
+           if (c.archiviato) return false;
+           
+           const examDate = c.sessioni_esame?.data ? startOfDay(parseISO(c.sessioni_esame.data)) : null;
+           const isPast = examDate && isBefore(examDate, today);
+           return !isPast;
+        });
         const sortedIstruttori = iRes.data ?? [];
         const sortedVeicoli = vRes.data ?? [];
         const sortedPatenti = pRes.data ?? [];

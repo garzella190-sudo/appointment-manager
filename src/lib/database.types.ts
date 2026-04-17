@@ -49,6 +49,7 @@ export interface Cliente {
   data_pronto_esame?: string | null;   // Optional depending on view
   sessione_esame_id?: string | null;   // FK
   istruttore_pronto_id?: string | null; // FK -> istruttori.id
+  archiviato?: boolean;
   created_at: string;
   updated_at: string;
 }

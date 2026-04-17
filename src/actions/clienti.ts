@@ -113,6 +113,30 @@ export async function toggleProntoEsameAction(id: string, pronto: boolean, sessi
   revalidatePath('/calendar');
   revalidatePath('/clienti');
   revalidatePath('/esami');
+  revalidatePath(`/clienti/${id}`);
+
+  return { success: true, id: data.id };
+}
+
+export async function archiveClienteAction(id: string, archiviato: boolean) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('clienti')
+    .update({ archiviato })
+    .eq('id', id)
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error archiving client:', error.message);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/calendar');
+  revalidatePath('/clienti');
+  revalidatePath(`/clienti/${id}`);
+  revalidatePath('/esami');
 
   return { success: true, id: data.id };
 }

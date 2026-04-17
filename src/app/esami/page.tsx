@@ -78,10 +78,12 @@ export default function EsamiPage() {
       supabase.from('clienti')
         .select('*, patenti(tipo), sessioni_esame(nome, data), istruttori(id, nome, cognome, colore)')
         .eq('pronto_esame', true)
+        .eq('archiviato', false)
         .order('data_pronto_esame', { ascending: false }),
       supabase.from('clienti')
         .select('*, patenti(tipo)')
         .eq('pronto_esame', false)
+        .eq('archiviato', false)
         .order('cognome', { ascending: true }),
       supabase.from('sessioni_esame')
         .select('*, clienti(count)')

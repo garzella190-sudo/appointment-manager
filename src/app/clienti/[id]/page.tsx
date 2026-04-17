@@ -2,14 +2,15 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Cliente, Patente, Istruttore, AppuntamentoConDettagli } from '@/lib/database.types';
 import { StoricoPagamentiTable } from '@/components/StoricoPagamentiTable';
-import {
-  ArrowLeft, Phone, Mail, BadgeCheck, School, Loader2,
-  Pencil, CheckCheck, History, Car,
-} from 'lucide-react';
+import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
+import { ArrowLeft, Phone, Mail, BadgeCheck, School, Loader2, Pencil, CheckCheck, History, Car, GraduationCap, Calendar, Archive, RotateCcw } from 'lucide-react';
+import { archiveClienteAction } from '@/actions/clienti';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
 import Select from '@/components/forms/Select';
@@ -23,6 +24,7 @@ type PageData = {
   patenti: Patente[];
   istruttoriFiltrati: Istruttore[];
   storico: AppuntamentoConDettagli[];
+  sessione_esame: any | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -146,6 +148,9 @@ export default function SchedaClientePage() {
       patenti,
       istruttoriFiltrati: istrRes.data ?? [],
       storico,
+      sessione_esame: cliente.sessione_esame_id 
+        ? (await supabase.from('sessioni_esame').select('*').eq('id', cliente.sessione_esame_id).single()).data
+        : null
     });
     setFormState({
       nome: cliente.nome,
@@ -440,6 +445,77 @@ export default function SchedaClientePage() {
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* Sezione Esame prenotato */}
+                  {pageData.sessione_esame && (
+                    <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+                      <p className={LABEL_CLS}>
+                        <GraduationCap size={13} strokeWidth={2.5} />
+                        Seduta d'Esame Prenotata
+                      </p>
+                      <div className="bg-sky-50 dark:bg-sky-500/10 border border-sky-100 dark:border-sky-800/20 p-5 rounded-[24px] flex items-center justify-between group transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-zinc-900 text-white flex flex-col items-center justify-center shadow-lg shadow-zinc-900/20">
+                            <span className="text-[8px] font-black uppercase opacity-60 leading-none">
+                              {format(new Date(pageData.sessione_esame.data), 'MMM', { locale: it })}
+                            </span>
+                            <span className="text-lg font-black leading-none">
+                              {format(new Date(pageData.sessione_esame.data), 'dd')}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">
+                              {pageData.sessione_esame.nome || 'Seduta d\'Esame'}
+                            </p>
+                            <p className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1.5 mt-0.5">
+                              <Calendar size={10} /> {format(new Date(pageData.sessione_esame.data), 'dd MMMM yyyy', { locale: it })}
+                            </p>
+                          </div>
+                        </div>
+                        <Link href="/esami" className="p-3 bg-white dark:bg-zinc-800 text-sky-500 rounded-xl shadow-sm border border-sky-100 dark:border-sky-800/30 hover:scale-105 active:scale-95 transition-all">
+                          <ArrowLeft size={16} className="rotate-180" />
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sezione Archiviazione */}
+                  <div className="mt-12 pt-8 border-t border-zinc-100 dark:border-zinc-800">
+                    <div className="bg-zinc-50 dark:bg-zinc-900/50 p-6 rounded-[24px] border border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                      <div>
+                        <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                          {cliente.archiviato ? 'Ripristina Cliente' : 'Archivia Cliente'}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1 max-w-[280px]">
+                          {cliente.archiviato 
+                            ? 'L\'allievo tornerà visibile nelle liste attive e nelle prenotazioni.'
+                            : 'L\'allievo non apparirà più nelle liste attive e nelle prenotazioni, ma i suoi dati rimarranno salvati.'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setSaving(true);
+                          const res = await archiveClienteAction(cliente.id, !cliente.archiviato);
+                          if (res.success) {
+                            await fetchData();
+                          } else {
+                            alert(res.error || "Errore durante l'azione.");
+                          }
+                          setSaving(false);
+                        }}
+                        disabled={saving}
+                        className={cn(
+                          "px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm border",
+                          cliente.archiviato 
+                            ? "bg-white dark:bg-zinc-800 text-emerald-600 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50" 
+                            : "bg-white dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100"
+                        )}
+                      >
+                        {saving ? <Loader2 className="animate-spin" size={14} /> : (cliente.archiviato ? <RotateCcw size={14} /> : <Archive size={14} />)}
+                        {cliente.archiviato ? 'Ripristina' : 'Archivia'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

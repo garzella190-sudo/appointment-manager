@@ -8,7 +8,8 @@ import { Cliente, Patente } from '@/lib/database.types';
 import { Modal } from '@/components/Modal';
 import { SchedaClienteForm } from '@/components/forms/SchedaClienteForm';
 import { deleteClienteAction } from '@/actions/clienti';
-import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2, Trash2 } from 'lucide-react';
+import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2, Trash2, Archive, Users } from 'lucide-react';
+import { isAfter, isBefore, isSameDay, startOfDay, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
@@ -21,11 +22,16 @@ export default function ClientiPage() {
   const [patenti, setPatenti] = useState<Patente[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'attivi' | 'archivio'>('attivi');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [cRes, pRes] = await Promise.all([
-      supabase.from('clienti').select('*').neq('nome', 'UFFICIO').order('cognome').order('nome'),
+      supabase.from('clienti')
+        .select('*, sessioni_esame(data)')
+        .neq('nome', 'UFFICIO')
+        .order('cognome')
+        .order('nome'),
       supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
     ]);
     setClienti(cRes.data ?? []);
@@ -39,12 +45,21 @@ export default function ClientiPage() {
 
   const filtered = clienti.filter(c => {
     const q = search.toLowerCase();
-    return (
+    const isSearchMatch = (
       c.nome.toLowerCase().includes(q) ||
       c.cognome.toLowerCase().includes(q) ||
       (c.telefono ?? '').includes(q) ||
       (c.email ?? '').toLowerCase().includes(q)
     );
+    if (!isSearchMatch) return false;
+
+    // Automatic archiving logic
+    const today = startOfDay(new Date());
+    const examDate = (c as any).sessioni_esame?.data ? startOfDay(parseISO((c as any).sessioni_esame.data)) : null;
+    const isPastExam = examDate && (isBefore(examDate, today));
+    const isArchived = c.archiviato || isPastExam;
+
+    return activeTab === 'attivi' ? !isArchived : isArchived;
   });
 
   const patenteLabel = (id: string | null) =>
@@ -86,6 +101,40 @@ export default function ClientiPage() {
             placeholder="Cerca per nome, telefono, email…"
             className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-4 focus:ring-pink-500/10 focus:border-pink-500 transition-all shadow-sm text-sm"
           />
+        </div>
+
+        {/* Tabs switcher */}
+        <div className="flex bg-zinc-100 dark:bg-zinc-900 p-1 rounded-2xl mt-4 w-full sm:w-fit border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+          <button
+            onClick={() => setActiveTab('attivi')}
+            className={cn(
+              "flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              activeTab === 'attivi' ? "bg-white text-pink-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+            )}
+          >
+            <Users size={14} />
+            Attivi ({clienti.filter(c => {
+                const today = startOfDay(new Date());
+                const ed = (c as any).sessioni_esame?.data ? startOfDay(parseISO((c as any).sessioni_esame.data)) : null;
+                const isPast = ed && isBefore(ed, today);
+                return !c.archiviato && !isPast;
+            }).length})
+          </button>
+          <button
+            onClick={() => setActiveTab('archivio')}
+            className={cn(
+              "flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              activeTab === 'archivio' ? "bg-white text-pink-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+            )}
+          >
+            <Archive size={14} />
+            Archivio ({clienti.filter(c => {
+                const today = startOfDay(new Date());
+                const ed = (c as any).sessioni_esame?.data ? startOfDay(parseISO((c as any).sessioni_esame.data)) : null;
+                const isPast = ed && isBefore(ed, today);
+                return c.archiviato || isPast;
+            }).length})
+          </button>
         </div>
       </div>
 
