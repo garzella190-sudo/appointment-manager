@@ -59,6 +59,19 @@ const Select = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      // Small timeout to ensure DOM is updated and rendered
+      setTimeout(() => {
+        if (!containerRef.current) return;
+        const selectedEl = containerRef.current.querySelector('[data-selected="true"]');
+        if (selectedEl) {
+          selectedEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+        }
+      }, 10);
+    }
+  }, [isOpen]);
+
   const handleSelect = (val: string) => {
     onChange(val);
     setIsOpen(false);
@@ -124,6 +137,7 @@ const Select = ({
                 <button
                   key={opt.id}
                   type="button"
+                  data-selected={value === opt.id}
                   onClick={() => handleSelect(opt.id)}
                   className={cn(
                     "w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between group",

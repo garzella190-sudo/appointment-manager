@@ -949,7 +949,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
         {/* DATA E ORARI */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-end">
-          <div className="space-y-2 w-full sm:w-[150px] shrink-0">
+          <div className="space-y-2 w-full sm:w-[170px] shrink-0">
             <label className={LABEL_CLS}>📅 DATA</label>
             {isView ? (
               <div className={VIEW_BLOCK_CLS}>{format(parseISO(form.data), 'dd MMM yyyy', { locale: it })}</div>
