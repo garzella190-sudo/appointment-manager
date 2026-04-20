@@ -104,6 +104,14 @@ const BottomNav = () => {
                     key={item.name}
                     href={item.href}
                     title={item.name}
+                    onClick={() => {
+                      if (item.name === 'Calendario') {
+                        localStorage.setItem('calendar_currentDate', new Date().toISOString());
+                        window.dispatchEvent(new CustomEvent('calendar-reset-today'));
+                      } else if (item.name === 'Home') {
+                        window.dispatchEvent(new CustomEvent('home-reset-today'));
+                      }
+                    }}
                     className={cn(
                       "flex flex-col items-center gap-0.5 transition-all duration-300 hover:scale-110 active:scale-95 px-1 sm:px-2",
                       isActive ? "text-sky-600 dark:text-sky-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"

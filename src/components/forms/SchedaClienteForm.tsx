@@ -219,7 +219,7 @@ export const SchedaClienteForm = ({
       {/* Notification Preferences */}
       <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-700/50 space-y-3">
         <p className={LABEL_CLS}>Preferenze Notifiche</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-4">
           <label className="flex items-center gap-3 cursor-pointer group">
             <input
               type="checkbox"
@@ -227,7 +227,7 @@ export const SchedaClienteForm = ({
               onChange={(e) => setForm(prev => ({ ...prev, riceve_email: e.target.checked }))}
               className="w-5 h-5 rounded-lg border-zinc-300 text-blue-600 focus:ring-blue-500/20"
             />
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 transition-colors">Riceve Email</span>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 transition-all">Riceve Email Automatiche</span>
           </label>
           <label className="flex items-center gap-3 cursor-pointer group">
             <input
@@ -236,7 +236,7 @@ export const SchedaClienteForm = ({
               onChange={(e) => setForm(prev => ({ ...prev, riceve_whatsapp: e.target.checked }))}
               className="w-5 h-5 rounded-lg border-zinc-300 text-green-600 focus:ring-green-500/20"
             />
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-green-600 transition-colors">Riceve WhatsApp</span>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-green-600 transition-all">Riceve WhatsApp (Promemoria Manuali)</span>
           </label>
         </div>
       </div>

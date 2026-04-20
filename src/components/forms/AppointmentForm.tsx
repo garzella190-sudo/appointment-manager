@@ -83,7 +83,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   });
   
   const [sendEmail, setSendEmail] = useState(true);
-  const [sendWhatsApp, setSendWhatsApp] = useState(true);
+  const [sendWhatsApp, setSendWhatsApp] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedIstruttore, setSelectedIstruttore] = useState<Istruttore | null>(null);
   const [selectedVeicolo, setSelectedVeicolo] = useState<Veicolo | null>(null);
@@ -1293,7 +1293,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               type="button"
               onClick={() => setSendWhatsApp(!sendWhatsApp)}
               className={cn(
-                "w-full flex items-center justify-between p-4 rounded-2xl border transition-all mt-3",
+                "hidden w-full items-center justify-between p-4 rounded-2xl border transition-all mt-3",
                 sendWhatsApp 
                   ? "bg-emerald-50/50 border-emerald-100 text-emerald-700" 
                   : "bg-zinc-50 border-zinc-100 text-zinc-400"

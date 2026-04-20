@@ -124,8 +124,16 @@ export default function Home() {
       fetchAppointments();
     };
 
+    const handleResetToday = () => {
+      setCurrentDate(new Date());
+    };
+
     window.addEventListener('appointments-updated', handleUpdate);
-    return () => window.removeEventListener('appointments-updated', handleUpdate);
+    window.addEventListener('home-reset-today', handleResetToday);
+    return () => {
+      window.removeEventListener('appointments-updated', handleUpdate);
+      window.removeEventListener('home-reset-today', handleResetToday);
+    };
   }, [fetchAppointments]);
 
   // Reset auto-scroll flag when date changes
@@ -292,8 +300,8 @@ export default function Home() {
         </header>
 
         <div className={cn(
-          "transition-all duration-300 ease-in-out overflow-hidden origin-top",
-          (showSearch || showFilter) ? "max-h-[200px] opacity-100 mb-3" : "max-h-0 opacity-0 mb-0"
+          "transition-all duration-300 ease-in-out origin-top",
+          (showSearch || showFilter) ? "max-h-[400px] opacity-100 mb-3 overflow-visible" : "max-h-0 opacity-0 mb-0 overflow-hidden"
         )}>
           {showSearch && (
             <div className="relative group w-full">
@@ -394,22 +402,31 @@ export default function Home() {
                       onClick={() => {
                         setSelectedAppointment(apt);
                       }}
-                      className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-14"
+                      className={cn(
+                        "relative border shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-14",
+                        apt.stato === 'annullato' ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60 grayscale" : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
+                      )}
                     >
                       <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
                         <div 
                           className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0 shadow-inner"
                           style={{ 
-                            backgroundColor: `${apt.istruttore?.color}20` || '#f1f5f9',
-                            color: apt.istruttore?.color || '#0ea5e9'
+                            backgroundColor: apt.stato === 'annullato' ? '#f4f4f5' : `${apt.istruttore?.color}20` || '#f1f5f9',
+                            color: apt.stato === 'annullato' ? '#a1a1aa' : apt.istruttore?.color || '#0ea5e9'
                           }}
                         >
                           {initials}
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-zinc-900 dark:text-white truncate flex items-center gap-2">
-                            <span className="text-sky-600 dark:text-sky-400 tabular-nums text-xs font-black">{apt.appointment_time}</span>
+                          <h4 className={cn(
+                            "font-bold truncate flex items-center gap-2",
+                            apt.stato === 'annullato' ? "text-zinc-500 dark:text-zinc-400 line-through" : "text-zinc-900 dark:text-white"
+                          )}>
+                            <span className={cn(
+                              "tabular-nums text-xs font-black",
+                              apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
+                            )}>{apt.appointment_time}</span>
                             {apt.client_name}
                             {apt.exam_status && apt.exam_status !== 'none' && (
                               <GraduationCap 

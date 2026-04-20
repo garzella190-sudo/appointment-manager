@@ -292,8 +292,16 @@ export default function CalendarPage() {
       fetchWeekAppointments();
     };
 
+    const handleResetToday = () => {
+      setCurrentDate(new Date());
+    };
+
     window.addEventListener('appointments-updated', handleUpdate);
-    return () => window.removeEventListener('appointments-updated', handleUpdate);
+    window.addEventListener('calendar-reset-today', handleResetToday);
+    return () => {
+      window.removeEventListener('appointments-updated', handleUpdate);
+      window.removeEventListener('calendar-reset-today', handleResetToday);
+    };
   }, [currentDate, effectiveViewDays, mounted, fetchWeekAppointments]);
 
   // Auto-scroll logic: go to current time if apps exist near, otherwise start at 09:00
@@ -558,8 +566,8 @@ export default function CalendarPage() {
             </div>
 
             <div className={cn(
-               "transition-all duration-300 ease-in-out overflow-hidden origin-top",
-               showFilter ? "max-h-[100px] opacity-100 mt-2" : "max-h-0 opacity-0 mt-0"
+               "transition-all duration-300 ease-in-out origin-top",
+               showFilter ? "max-h-[400px] opacity-100 mt-2 overflow-visible" : "max-h-0 opacity-0 mt-0 overflow-hidden"
             )}>
               <div className="flex justify-start lg:justify-end">
                 <div className="w-full sm:w-[250px]">
