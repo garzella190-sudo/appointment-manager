@@ -129,6 +129,19 @@ export interface ClienteDettagliato extends Cliente {
   patente_richiesta: Patente | null;
 }
 
+// ── Sessioni Esame ───────────────────────────────────────────
+export interface SessioneEsame {
+  id: string;                          // uuid
+  nome: string | null;
+  data: string;                        // ISO date
+  ora_inizio: string;
+  n_candidati: number;
+  istruttori_ids: string[];            // Array di UUID
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ── Impegni ──────────────────────────────────────────────────
 export interface TipoImpegno {
   id: string;
