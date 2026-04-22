@@ -6,6 +6,7 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 - `/src/app/page.tsx` -> **Agenda** (Home Page, scroll automatico a "Now").
 - `/src/app/calendar/page.tsx` -> **Calendario** (Griglia interattiva con granularità 15/30/60m).
 - `/src/app/clienti/page.tsx` -> Lista e gestione anagrafiche.
+- `/src/app/esami/page.tsx` -> **Esami** (Creazione sedute, assegnazione allievi pronti e istruttori).
 - `/src/app/gestione/page.tsx` -> Pannello Admin (Istruttori, Veicoli, Patenti).
 
 ## 🧩 Componenti Chiave

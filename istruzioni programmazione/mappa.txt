@@ -1,0 +1,103 @@
+Elenco del percorso delle cartelle
+Numero di serie del volume: F662-5564
+C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
++---actions
+|       appointments.ts
+|       appointment_actions.ts
+|       auth.ts
+|       clienti.ts
+|       impegni.ts
+|       istruttori.ts
+|       notifications.ts
+|       veicoli.ts
+|       
++---app
+|   |   apple-icon.png
+|   |   globals.css
+|   |   icon.png
+|   |   layout.tsx
+|   |   page.tsx
+|   |   
+|   +---api
+|   |   +---calendar
+|   |   |       route.ts
+|   |   |       
+|   |   \---cron
+|   |       \---reminders
+|   |               route.ts
+|   |               
+|   +---calendar
+|   |       page.tsx
+|   |       
+|   +---clienti
+|   |   |   page.tsx
+|   |   |   
+|   |   \---[id]
+|   |           page.tsx
+|   |           
+|   +---esami
+|   |       page.tsx
+|   |       
+|   +---gestione
+|   |       page.tsx
+|   |       
+|   +---login
+|   |       page.tsx
+|   |       
+|   \---management
++---components
+|   |   BottomNav.tsx
+|   |   Calendar.tsx
+|   |   ConfirmBubble.tsx
+|   |   DatePicker.tsx
+|   |   DraggableAppointment.tsx
+|   |   DroppableCell.tsx
+|   |   InstallPWA.tsx
+|   |   Modal.tsx
+|   |   PhoneActions.tsx
+|   |   RefreshButton.tsx
+|   |   StoricoPagamentiTable.tsx
+|   |   SWRegister.tsx
+|   |   Toast.tsx
+|   |   WhatsAppButton.tsx
+|   |   
+|   +---calendar
+|   +---forms
+|   |       AppointmentForm.tsx
+|   |       ClientAutocomplete.tsx
+|   |       ImpegnoForm.tsx
+|   |       IstruttoreForm.tsx
+|   |       PatenteForm.tsx
+|   |       SchedaClienteForm.tsx
+|   |       Select.tsx
+|   |       UserForm.tsx
+|   |       VeicoloForm.tsx
+|   |       
+|   \---modals
+|           AssignExamSessionModal.tsx
+|           DatePickerModal.tsx
+|           DetailsModal.tsx
+|           NewAppointmentModal.tsx
+|           
++---hooks
+|       useAuth.ts
+|       useRevisionReminder.ts
+|       useToast.tsx
+|       
++---lib
+|       database.types.ts
+|       supabase.ts
+|       utils.ts
+|       
++---types
+|       index.ts
+|       
+\---utils
+    |   holidays.ts
+    |   whatsapp.ts
+    |   
+    \---supabase
+            admin.ts
+            client.ts
+            server.ts
+            

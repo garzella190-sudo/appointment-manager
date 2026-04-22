@@ -10,7 +10,8 @@ Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco v
 - **Notifiche Smart**: Invio email di conferma tramite Resend con allegato calendario (ICS).
 - **Automazione Promemoria**: Cron job giornaliero che invia promemoria per le guide del giorno successivo.
 - **WhatsApp Integration**: Invio gratuito di conferme e promemoria con messaggi pre-compilati (Click-to-Chat).
-- **Automazione Esami**: Creazione sedute esame con generazione automatica di blocchi d'impegno e **indicatori visivi dinamici** sulle guide.
+- **Automazione Esami**: Creazione sedute esame con gestione istruttori (`istruttori_ids`), generazione automatica di blocchi d'impegno e indicatori visivi dinamici sulle guide.
+- **Identità Visiva**: PWA Icon personalizzata (volante/birillo rosso e arancio su sfondo agenda) ottimizzata per iOS e Android.
 
 ## 🎨 Design System
 - **Ultra-Compact UI**: Navigazione unificata in una singola barra inferiore (BottomNav) che integra il profilo utente e il logout.
