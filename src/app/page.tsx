@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { format, addDays, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
+import { ConflictsAlert } from '@/components/ConflictsAlert';
 
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';

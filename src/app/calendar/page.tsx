@@ -30,7 +30,7 @@ import DetailsModal from '@/components/modals/DetailsModal';
 import { Clock } from 'lucide-react';
 import DatePickerModal from '@/components/modals/DatePickerModal';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
-
+import { ConflictsAlert } from '@/components/ConflictsAlert';
 
 class SmartPointerSensor extends PointerSensor {
   static activators = [
@@ -589,6 +589,8 @@ export default function CalendarPage() {
               </div>
             </div>
           </header>
+
+          <ConflictsAlert />
 
           <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col">
             <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px]">

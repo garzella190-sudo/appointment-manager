@@ -13,6 +13,7 @@ import {
   updateClienteAction, 
   deleteClienteAction 
 } from '@/actions/clienti';
+import { addToOfflineQueue } from '@/lib/offlineSync';
 
 interface SchedaClienteFormProps {
   clienteId?: string;    // undefined → nuovo cliente
@@ -98,6 +99,16 @@ export const SchedaClienteForm = ({
       riceve_email:         form.riceve_email,
       riceve_whatsapp:      form.riceve_whatsapp,
     };
+
+    if (!navigator.onLine) {
+      await addToOfflineQueue('cliente', clienteId ? 'update' : 'create', {
+        ...(clienteId ? { id: clienteId, data: payload } : payload)
+      });
+      showToast('Sei offline. Le modifiche sono state salvate e verranno sincronizzate appena tornerà la connessione.', 'info');
+      setLoading(false);
+      onSuccess(clienteId || 'temp-id');
+      return;
+    }
 
     const result = clienteId
       ? await updateClienteAction(clienteId, payload)
@@ -267,6 +278,13 @@ export const SchedaClienteForm = ({
           confirmLabel="Elimina"
           onConfirm={async () => {
             setLoading(true);
+            if (!navigator.onLine) {
+              await addToOfflineQueue('cliente', 'delete', { id: clienteId });
+              showToast('Sei offline. Cliente eliminato in locale.', 'info');
+              setLoading(false);
+              onSuccess(clienteId!);
+              return;
+            }
             const result = await deleteClienteAction(clienteId!);
             setLoading(false);
             if (result.success) {

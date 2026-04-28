@@ -12,12 +12,13 @@ import { createAppointmentAction, updateAppointmentAction } from '@/actions/appo
 import { deleteAppointmentAction, cancelAppointmentAction, updateAppointmentNoteAction } from '@/actions/appointment_actions';
 import { toggleProntoEsameAction } from '@/actions/clienti';
 import { useAuth } from '@/hooks/useAuth';
-import { GraduationCap, CheckCircle2 } from 'lucide-react';
+import { GraduationCap, CheckCircle2, Search, Send, FileEdit, RefreshCw, XCircle } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
 import { ClientAutocomplete } from './ClientAutocomplete';
 import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
+import { addToOfflineQueue } from '@/lib/offlineSync';
 import { Modal } from '../Modal';
 import { SchedaClienteForm } from './SchedaClienteForm';
 import { AssignExamSessionModal } from '../modals/AssignExamSessionModal';
@@ -551,6 +552,19 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         send_whatsapp: !isImpegno,
         preferenza_cambio: isImpegno ? null : form.cambio,
       };
+
+      if (!navigator.onLine) {
+        // Modalità OFFLINE
+        await addToOfflineQueue('appuntamento', appointmentId ? 'update' : 'create', {
+          ...(appointmentId ? { id: appointmentId, data: payload } : payload)
+        });
+        
+        showToast('Sei offline. Le modifiche sono state salvate e verranno sincronizzate appena tornerà la connessione.', 'info');
+        setLoading(false);
+        onSuccess?.();
+        return;
+      }
+
       const result = appointmentId ? await updateAppointmentAction(appointmentId, payload) : await createAppointmentAction(payload);
       
       if (result && result.error) {
@@ -772,6 +786,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 confirmLabel="Annulla Guida"
                 onConfirm={async () => {
                   setLoading(true); 
+                  if (!navigator.onLine) {
+                    await addToOfflineQueue('appuntamento', 'cancel', { id: appointmentId });
+                    showToast('Sei offline. Appuntamento annullato in locale.', 'info');
+                    onSuccess();
+                    return;
+                  }
                   const result = await cancelAppointmentAction(appointmentId!); 
                   if (result.success) {
                     showToast('Appuntamento annullato', 'info');
@@ -800,6 +820,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 confirmLabel="Elimina"
                 onConfirm={async () => {
                   setLoading(true); 
+                  if (!navigator.onLine) {
+                    await addToOfflineQueue('appuntamento', 'delete', { id: appointmentId });
+                    showToast('Sei offline. Appuntamento eliminato in locale.', 'info');
+                    onSuccess();
+                    return;
+                  }
                   const result = await deleteAppointmentAction(appointmentId!); 
                   if (result.success) {
                     showToast('Appuntamento eliminato definitivamente', 'info');

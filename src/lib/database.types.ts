@@ -142,6 +142,27 @@ export interface SessioneEsame {
   updated_at: string;
 }
 
+// ── Notifiche Push ───────────────────────────────────────────
+export interface PushSubscription {
+  id: string;
+  user_id: string;
+  subscription: any;
+  created_at: string;
+}
+
+// ── Conflitti Offline ────────────────────────────────────────
+export interface SyncConflict {
+  id: string;
+  entity_type: string;
+  action: string;
+  payload: any;
+  conflict_reason: string;
+  resolved: boolean;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+}
+
 // ── Impegni ──────────────────────────────────────────────────
 export interface TipoImpegno {
   id: string;

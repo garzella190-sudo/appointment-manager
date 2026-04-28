@@ -1,0 +1,23 @@
+{
+  "name": "Agenda Guide",
+  "short_name": "AgendaGuide",
+  "description": "Gestione Appuntamenti Scuola Guida",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#18181b",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/app_icon_512_dark.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app_icon_512_dark.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

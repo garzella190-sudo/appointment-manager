@@ -6,8 +6,8 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 
-// Note: use onboarding@resend.dev until domain is verified
-const SENDER = 'Autoscuola Toscana Fauglia <onboarding@resend.dev>';
+// Note: use the verified domain email
+const SENDER = 'Autoscuola Toscana Fauglia <notifiche@mail.autoscuolatoscanasnc.it>';
 
 /**
  * Generates a premium HTML template for emails

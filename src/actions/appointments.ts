@@ -6,6 +6,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { sendConfirmationEmailAction } from './notifications';
+import { sendNotificationToInstructor } from '@/lib/pushHelper';
 
 // Initialized lazily inside the action
 
@@ -207,6 +208,29 @@ export async function createAppointmentAction(payload: {
     }
   }
 
+  // 4. Web Push Notification to Instructor
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+    
+    // Send if the person creating the appointment is NOT the assigned instructor
+    if (currentUserIstruttoreId !== payload.istruttore_id) {
+      const clientName = clientData.nome && clientData.nome !== 'UFFICIO' 
+        ? `${clientData.nome} ${clientData.cognome}` 
+        : (payload.nome_impegno || 'Impegno');
+        
+      const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
+      
+      await sendNotificationToInstructor(payload.istruttore_id, {
+        title: 'Nuova Guida Inserita',
+        body: `È stata inserita una guida per ${clientName} il ${timeStr}`,
+        url: '/'
+      });
+    }
+  } catch (err) {
+    console.error('Web Push Error:', err);
+  }
+
   revalidatePath('/calendar');
   revalidatePath('/gestione');
   revalidatePath('/');
@@ -356,6 +380,25 @@ export async function updateAppointmentAction(id: string, payload: any) {
       console.error('Notification Error:', e);
       emailError = e.message;
     }
+  }
+
+  // 4. Web Push Notification to Instructor
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+    
+    // Send if the person modifying the appointment is NOT the assigned instructor
+    if (currentUserIstruttoreId !== payload.istruttore_id) {
+      const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
+      
+      await sendNotificationToInstructor(payload.istruttore_id, {
+        title: 'Guida Modificata',
+        body: `Una guida è stata modificata: ora è prevista il ${timeStr}`,
+        url: '/'
+      });
+    }
+  } catch (err) {
+    console.error('Web Push Error:', err);
   }
 
   revalidatePath('/calendar');

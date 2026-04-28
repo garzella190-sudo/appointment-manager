@@ -5,6 +5,7 @@ import { ToastProvider } from "@/hooks/useToast";
 import BottomNav from "@/components/BottomNav";
 import { Analytics } from "@vercel/analytics/next";
 import SWRegister from "@/components/SWRegister";
+import { SyncManager } from "@/components/SyncManager";
 import { createClient } from "@/utils/supabase/server";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -12,7 +13,16 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Agenda Guide Manu",
   description: "Gestione guide e appuntamenti",
-  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: '/app_icon_512.png', media: '(prefers-color-scheme: light)' },
+      { url: '/app_icon_512_dark.png', media: '(prefers-color-scheme: dark)' }
+    ],
+    apple: [
+      { url: '/app_icon_512.png', media: '(prefers-color-scheme: light)' },
+      { url: '/app_icon_512_dark.png', media: '(prefers-color-scheme: dark)' }
+    ]
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -43,6 +53,20 @@ export default async function RootLayout({
   } : null;
   return (
     <html lang="it" className="h-full">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var link = document.createElement('link');
+                link.rel = 'manifest';
+                link.href = window.matchMedia('(prefers-color-scheme: dark)').matches ? '/manifest-dark.json' : '/manifest.json';
+                document.head.appendChild(link);
+              })();
+            `
+          }}
+        />
+      </head>
       <body className={`${inter.className} antialiased h-full overflow-hidden`}>
         <ToastProvider>
           <div className="flex flex-col h-full relative">
@@ -53,6 +77,7 @@ export default async function RootLayout({
           </div>
           <Analytics />
           <SWRegister />
+          <SyncManager />
           <div id="datepicker-portal" />
         </ToastProvider>
       </body>

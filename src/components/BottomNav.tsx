@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Modal } from './Modal';
 import { AppointmentForm } from './forms/AppointmentForm';
 import { ConfirmBubble } from './ConfirmBubble';
+import { PushSubscriptionButton } from './PushSubscriptionButton';
 import { signOutAction } from '@/actions/auth';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -226,6 +227,11 @@ const BottomNav = () => {
                 </div>
               ))}
             </div>
+          </div>
+          
+          <div className="space-y-3">
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Impostazioni Dispositivo</p>
+             <PushSubscriptionButton />
           </div>
 
           <div className="flex gap-4">
