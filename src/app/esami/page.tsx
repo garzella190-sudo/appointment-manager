@@ -22,7 +22,7 @@ export default function EsamiPage() {
   const { role, isAdmin, isSegreteria } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'pronti' | 'sedute'>('pronti');
+  const [activeTab, setActiveTab] = useState<'pronti' | 'sedute' | 'archivio'>('pronti');
   const [loading, setLoading] = useState(true);
   const [pronti, setPronti] = useState<any[]>([]);
   const [notPronti, setNotPronti] = useState<any[]>([]);
@@ -36,6 +36,7 @@ export default function EsamiPage() {
     data: format(new Date(), 'yyyy-MM-dd'), 
     n_candidati: 0, 
     note: '',
+    esaminatore: '',
     ora_inizio: '08:30',
     durata_blocco: 180,
     istruttori_ids: [] as string[]
@@ -113,7 +114,8 @@ export default function EsamiPage() {
       nome: formData.nome,
       data: formData.data,
       n_candidati: formData.n_candidati,
-      note: formData.note
+      note: formData.note,
+      esaminatore: formData.esaminatore || null
     };
 
     let error;
@@ -166,6 +168,7 @@ export default function EsamiPage() {
         data: format(new Date(), 'yyyy-MM-dd'), 
         n_candidati: 0, 
         note: '',
+        esaminatore: '',
         ora_inizio: '08:30',
         durata_blocco: 180,
         istruttori_ids: []
@@ -287,7 +290,7 @@ export default function EsamiPage() {
             )}
           >
             <Users size={16} />
-            Allievi Pronti
+            Pronti
           </button>
           <button 
             onClick={() => setActiveTab('sedute')}
@@ -297,7 +300,17 @@ export default function EsamiPage() {
             )}
           >
             <CalendarIcon size={16} />
-            Sedute d'Esame
+            Sedute
+          </button>
+          <button 
+            onClick={() => setActiveTab('archivio')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest transition-all",
+              activeTab === 'archivio' ? "bg-white dark:bg-zinc-800 text-amber-600 shadow-sm" : "text-zinc-400"
+            )}
+          >
+            <GraduationCap size={16} />
+            Archivio
           </button>
         </div>
       </div>
@@ -492,13 +505,16 @@ export default function EsamiPage() {
                  <span className="text-xs font-black uppercase tracking-widest">Scegli da Clienti</span>
                </button>
             </div>
-          ) : (
+          ) : activeTab === 'sedute' ? (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {sedute.length === 0 ? (
-                <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
-                  Nessuna seduta programmata
-                </div>
-              ) : sedute.map((s) => (
+              {(() => {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const future = sedute.filter(s => new Date(s.data) >= today);
+                return future.length === 0 ? (
+                  <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
+                    Nessuna seduta programmata
+                  </div>
+                ) : future.map((s) => (
                 <div 
                   key={s.id} 
                   onClick={() => openDetailModal(s)}
@@ -535,7 +551,9 @@ export default function EsamiPage() {
                             data: s.data || '',
                             n_candidati: s.n_candidati || 0,
                             note: s.note || '',
-                            ora_inizio: '08:30', // Default unless we store it later
+                            esaminatore: s.esaminatore || '',
+                            ora_inizio: '08:30',
+                            durata_blocco: 180,
                             istruttori_ids: []
                           });
                           setSelectedSeduta(s);
@@ -563,14 +581,102 @@ export default function EsamiPage() {
                     </div>
                   )}
                 </div>
-              ))}
+              ))
+              );
+              })()}
+            </div>
+          ) : (
+            // Archivio - sedute passate
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {(() => {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const past = sedute.filter(s => new Date(s.data) < today).sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+                return past.length === 0 ? (
+                  <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
+                    Nessun esame in archivio
+                  </div>
+                ) : past.map((s) => (
+                  <div 
+                    key={s.id} 
+                    onClick={() => openDetailModal(s)}
+                    className="bg-amber-50/50 dark:bg-amber-950/10 p-6 rounded-[28px] border border-amber-200/50 dark:border-amber-800/30 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-md transition-all active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-6">
+                      <div className="flex flex-col items-center justify-center w-16 h-16 rounded-[22px] bg-amber-800/80 dark:bg-amber-900 text-white shadow-lg">
+                        <span className="text-[10px] font-black uppercase tracking-tighter opacity-70">
+                          {format(new Date(s.data), 'MMM', { locale: it })}
+                        </span>
+                        <span className="text-2xl font-black leading-none">
+                          {format(new Date(s.data), 'dd')}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-sm font-black text-zinc-700 dark:text-zinc-300 uppercase tracking-tight">
+                            {s.nome || 'Seduta d\'Esame'}
+                          </h4>
+                          <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-full text-[10px] font-black uppercase">
+                            {s.clienti?.[0]?.count || 0} / {s.n_candidati} Candidati
+                          </span>
+                          {s.esaminatore && (
+                            <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded-full text-[10px] font-bold">
+                              {s.esaminatore}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-500 font-bold">{s.note || 'Nessuna nota'}</p>
+                      </div>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFormData({
+                              nome: s.nome || '',
+                              data: s.data || '',
+                              n_candidati: s.n_candidati || 0,
+                              note: s.note || '',
+                              esaminatore: s.esaminatore || '',
+                              ora_inizio: '08:30',
+                              durata_blocco: 180,
+                              istruttori_ids: []
+                            });
+                            setSelectedSeduta(s);
+                            setIsModalOpen(true);
+                          }}
+                          className="p-4 text-amber-600 bg-amber-50 dark:bg-amber-900/30 rounded-2xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all"
+                          title="Modifica seduta"
+                        >
+                          <Pencil size={20} />
+                        </button>
+                        <ConfirmBubble
+                          title="Elimina seduta"
+                          message="Sei sicuro di voler eliminare questa seduta d'esame dall'archivio?"
+                          confirmLabel="Elimina"
+                          onConfirm={() => handleDeleteSeduta(s.id)}
+                          trigger={
+                            <button 
+                              className="p-4 text-red-500 bg-red-50 dark:bg-red-950/30 rounded-2xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all"
+                              title="Elimina seduta"
+                            >
+                              <Trash2 size={20} />
+                            </button>
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))
+              );
+              })()}
             </div>
           )}
         </div>
       </div>
 
       {/* Modal Seduta */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nuova Seduta Esame">
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setSelectedSeduta(null); }} title={selectedSeduta ? 'Modifica Seduta Esame' : 'Nuova Seduta Esame'}>
         <form onSubmit={handleCreateSeduta} className="space-y-6 pt-4">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Nome Esame (es. Teoria, Guida B)</label>
@@ -668,11 +774,27 @@ export default function EsamiPage() {
             </div>
           )}
           <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Esaminatore (Opzionale)</label>
+            <input
+              type="text"
+              list="esaminatori-list"
+              placeholder="Es. Rossi Ing."
+              value={formData.esaminatore}
+              onChange={(e) => setFormData({ ...formData, esaminatore: e.target.value })}
+              className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all"
+            />
+            <datalist id="esaminatori-list">
+              {[...new Set(sedute.map(s => s.esaminatore).filter(Boolean))].sort().map(nome => (
+                <option key={nome} value={nome} />
+              ))}
+            </datalist>
+          </div>
+          <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Note (Opzionale)</label>
             <textarea 
               value={formData.note}
               onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-              className="w-full h-32 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all resize-none"
+              className="w-full h-28 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all resize-none"
               placeholder="Inserisci dettagli aggiuntivi..."
             />
           </div>
@@ -680,7 +802,7 @@ export default function EsamiPage() {
             type="submit"
             className="w-full py-4 bg-zinc-900 dark:bg-sky-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-zinc-900/20 active:scale-95 transition-all"
           >
-            Crea Seduta
+            {selectedSeduta ? 'Aggiorna Seduta' : 'Crea Seduta'}
           </button>
         </form>
       </Modal>
@@ -704,7 +826,9 @@ export default function EsamiPage() {
                             data: selectedSeduta.data || '',
                             n_candidati: selectedSeduta.n_candidati || 0,
                             note: selectedSeduta.note || '',
-                            ora_inizio: '08:30', // In upgrade we don't have it saved yet
+                            esaminatore: selectedSeduta.esaminatore || '',
+                            ora_inizio: '08:30',
+                            durata_blocco: 180,
                             istruttori_ids: []
                         });
                         setIsDetailModalOpen(false);
@@ -721,6 +845,11 @@ export default function EsamiPage() {
                 </div>
              </div>
              <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{selectedSeduta?.note || 'Nessuna nota'}</p>
+             {selectedSeduta?.esaminatore && (
+               <p className="text-xs text-zinc-500 mt-1 font-semibold flex items-center gap-1">
+                 <GraduationCap size={12} /> Esaminatore: <span className="font-black text-zinc-700 dark:text-zinc-300">{selectedSeduta.esaminatore}</span>
+               </p>
+             )}
              <p className="text-xs text-zinc-400 mt-2 font-semibold">
                Data: {selectedSeduta?.data && format(new Date(selectedSeduta.data), 'dd MMMM yyyy', { locale: it })}
              </p>
