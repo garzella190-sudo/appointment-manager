@@ -524,7 +524,26 @@ export default function EsamiPage() {
                     </div>
                   </div>
                   {isAdmin && (
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFormData({
+                            nome: s.nome || '',
+                            data: s.data || '',
+                            n_candidati: s.n_candidati || 0,
+                            note: s.note || '',
+                            ora_inizio: '08:30', // Default unless we store it later
+                            istruttori_ids: []
+                          });
+                          setSelectedSeduta(s);
+                          setIsModalOpen(true);
+                        }}
+                        className="p-4 text-sky-500 bg-sky-50 dark:bg-sky-900/30 rounded-2xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-sky-100 dark:hover:bg-sky-900/50"
+                        title="Modifica seduta"
+                      >
+                        <Pencil size={20} />
+                      </button>
                       <ConfirmBubble
                         title="Elimina seduta"
                         message="Sei sicuro di voler eliminare questa seduta d'esame?"
@@ -532,7 +551,8 @@ export default function EsamiPage() {
                         onConfirm={() => handleDeleteSeduta(s.id)}
                         trigger={
                           <button 
-                            className="p-4 text-red-500 bg-red-50 dark:bg-red-950/30 rounded-2xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all"
+                            className="p-4 text-red-500 bg-red-50 dark:bg-red-950/30 rounded-2xl opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-100 dark:hover:bg-red-900/50"
+                            title="Elimina seduta"
                           >
                             <Trash2 size={20} />
                           </button>
@@ -779,6 +799,27 @@ export default function EsamiPage() {
         <div className="space-y-4 pt-4 pb-4">
           <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Seleziona una seduta disponibile</p>
           <div className="grid gap-3">
+            {/* Opzione per Rimuovere Seduta */}
+            <button
+              onClick={() => {
+                if (selectedStudent) {
+                  handleRemovePronto(selectedStudent.id, true);
+                  setIsAssignModalOpen(false);
+                  setSelectedStudent(null);
+                  showToast('Assegnazione rimossa', 'success');
+                }
+              }}
+              className="w-full text-left p-4 rounded-[20px] border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-500/10 text-zinc-500 hover:text-red-500 transition-all flex items-center gap-4 group active:scale-[0.98]"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 group-hover:bg-red-500 group-hover:text-white flex items-center justify-center transition-colors">
+                <XCircle size={24} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-black uppercase tracking-tight">Nessuna Seduta</p>
+                <p className="text-[10px] font-bold uppercase mt-0.5 opacity-70">Rimuovi l'allievo da eventuali sedute</p>
+              </div>
+            </button>
+
             {sedute.length === 0 ? (
                <div className="py-20 text-center bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
                   <p className="text-xs font-bold text-zinc-400 uppercase">Nessuna seduta programmata</p>
