@@ -9,6 +9,14 @@ import { it } from 'date-fns/locale';
 // Note: use the verified domain email
 const SENDER = 'Autoscuola Toscana Fauglia <notifiche@guide.autoscuolatoscanasnc.it>';
 
+function getItalyTimeStr(dateString: string) {
+  return new Intl.DateTimeFormat('it-IT', {
+    timeZone: 'Europe/Rome',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(dateString));
+}
+
 /**
  * Generates a premium HTML template for emails
  */
@@ -75,7 +83,7 @@ const SENDER = 'Autoscuola Toscana Fauglia <notifiche@guide.autoscuolatoscanasnc
  * Generates ICS string content
  */
 function generateICS(apt: any) {
-  const startDate = parseISO(`${apt.data.split('T')[0]}T${format(new Date(apt.inizio), 'HH:mm')}`);
+  const startDate = parseISO(`${apt.data.split('T')[0]}T${getItalyTimeStr(apt.inizio)}`);
   const endDate = addMinutes(startDate, apt.durata || 60);
   const formatICS = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
   const address = "Via Le Vallicelle, 4, 56043 Fauglia (PI)";
@@ -121,7 +129,7 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
   const instructorName = istruttore ? `${istruttore.nome} ${istruttore.cognome}` : 'Non assegnato';
   const vehicleName = veicolo ? `${veicolo.nome} (${veicolo.targa})` : 'Non assegnato';
   const dateStr = apt.data.split('T')[0];
-  const timeStr = format(new Date(apt.inizio), 'HH:mm');
+  const timeStr = getItalyTimeStr(apt.inizio);
 
   const icsStr = generateICS(apt);
 
@@ -196,7 +204,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
   const instructorName = istruttore ? `${istruttore.nome} ${istruttore.cognome}` : 'Non assegnato';
   const vehicleName = veicolo ? `${veicolo.nome} (${veicolo.targa})` : 'Non assegnato';
   const dateStr = apt.data.split('T')[0];
-  const timeStr = format(new Date(apt.inizio), 'HH:mm');
+  const timeStr = getItalyTimeStr(apt.inizio);
 
   const icsStr = generateICS(apt);
 
