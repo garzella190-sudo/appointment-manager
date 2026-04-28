@@ -99,8 +99,8 @@ const TabVeicoli = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number,
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="pb-4 flex-shrink-0">
+    <div className="space-y-4">
+      <div className="pb-2">
         <div className="relative group">
           <Search
             className={cn(
@@ -122,7 +122,7 @@ const TabVeicoli = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number,
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-container pb-8">
+      <div>
         {loading ? (
           <div className="p-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
             <Loader2 className={cn("animate-spin", sectionColor === 'emerald' ? "text-emerald-500" : "text-sky-500")} size={40} />
@@ -263,8 +263,8 @@ const TabIstruttori = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: numb
   const onSuccess = () => { setModalOpen(false); fetch(); };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="pb-4 flex-shrink-0">
+    <div className="space-y-4">
+      <div className="pb-2">
         <div className="relative group">
           <Search
             className={cn(
@@ -286,7 +286,7 @@ const TabIstruttori = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: numb
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-container pb-8">
+      <div>
         {loading ? (
           <div className="py-20 flex items-center justify-center">
             <Loader2 className={cn("animate-spin", sectionColor === 'emerald' ? "text-emerald-500" : "text-sky-500")} size={36} />
@@ -524,8 +524,8 @@ const TabPatenti = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
   const patentiNascosteCount = patentiFiltrate.length - patentiVisibili.length;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 flex-shrink-0">
+    <div className="space-y-4">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 flex-shrink-0">
         <div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
             Configura le {CATEGORIE.length} categorie della normativa vigente.
@@ -542,7 +542,7 @@ const TabPatenti = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto scroll-container pb-8 -mx-1 px-1">
+      <div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {patentiFiltrate.filter(p => mostraNascoste || !p.nascosta).map((pat: Patente) => (
             <PatenteCard
@@ -634,8 +634,8 @@ const TabUtenti = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, 
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex-1 overflow-y-auto scroll-container pb-8 -mx-1 px-1">
+    <div className="space-y-4">
+      <div>
         {loading ? (
           <div className="py-20 flex items-center justify-center">
             <Loader2 className="animate-spin text-emerald-500" size={36} />
@@ -812,9 +812,9 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
   const onSuccess = () => { setModalOpen(false); fetch(); };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="space-y-4">
       {/* FILTRI - Fixed */}
-      <div className="pb-4 flex-shrink-0">
+      <div className="pb-2 flex-shrink-0">
         <div className="flex flex-col sm:flex-row gap-2 items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-2xl shadow-sm">
           <div className="flex bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl w-full sm:w-fit shadow-inner">
             <button 
@@ -873,7 +873,7 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-container pb-8">
+      <div>
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center font-bold text-zinc-400 gap-3">
             <Loader2 className="animate-spin text-sky-500" size={32} /> 
@@ -1126,11 +1126,11 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden min-h-0">
+    <div className="space-y-4">
       <PrintStyles />
       
       {/* FILTRI REPORT - Hidden on Print */}
-      <div className="pb-4 flex-shrink-0 print:hidden">
+      <div className="pb-2 print:hidden">
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[24px] shadow-sm overflow-hidden transition-all duration-300">
           <button 
             onClick={() => setIsFiltersOpen(!isFiltersOpen)}
@@ -1267,7 +1267,7 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
       </div>
 
       {/* RISULTATI REPORT */}
-      <div className="flex-1 overflow-y-auto scroll-container pb-20 print:p-0 no-scrollbar">
+      <div className="print:p-0">
         <div className="grid gap-6">
           
           {/* Header Stampa (Solo print) */}
@@ -1569,9 +1569,9 @@ export default function GestionePage() {
       </nav>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden px-4 md:px-8 relative">
-        <div className="max-w-5xl mx-auto h-full flex flex-col pt-2 pb-32 no-scrollbar">
-          <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300 overflow-hidden h-full">
+      <main className="flex-1 overflow-y-auto px-4 md:px-8 relative no-scrollbar scroll-container">
+        <div className="max-w-5xl mx-auto pt-2 pb-40">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
             {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
             {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
             {active === 'report' && <TabReport refreshKey={refreshKey} role={role || undefined} istruttoreId={istruttoreId || undefined} />}
