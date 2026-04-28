@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import DatePicker from '@/components/DatePicker';
 import { toggleProntoEsameAction } from '@/actions/clienti';
-import { createImpegnoAction, deleteImpegniBySessionAction } from '@/actions/impegni';
+import { createAppointmentAction } from '@/actions/appointments';
+import { deleteImpegniBySessionAction } from '@/actions/impegni';
 
 const supabase = createClient();
 
@@ -107,12 +108,19 @@ export default function EsamiPage() {
   const handleCreateSeduta = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const dbPayload = {
+      nome: formData.nome,
+      data: formData.data,
+      n_candidati: formData.n_candidati,
+      note: formData.note
+    };
+
     let error;
     if (selectedSeduta) {
-      const { error: err } = await supabase.from('sessioni_esame').update(formData).eq('id', selectedSeduta.id);
+      const { error: err } = await supabase.from('sessioni_esame').update(dbPayload).eq('id', selectedSeduta.id);
       error = err;
     } else {
-      const { error: err } = await supabase.from('sessioni_esame').insert([formData]);
+      const { error: err } = await supabase.from('sessioni_esame').insert([dbPayload]);
       error = err;
     }
     setLoading(false);
@@ -135,12 +143,15 @@ export default function EsamiPage() {
 
         if (newSession) {
           for (const instrId of formData.istruttori_ids) {
-            await createImpegnoAction({
+            await createAppointmentAction({
               istruttore_id: instrId,
-              tipo: 'Esame',
-              data: formData.data,
-              ora_inizio: formData.ora_inizio,
+              is_impegno: true,
+              nome_impegno: 'Esame',
+              data: `${formData.data}T${formData.ora_inizio}`,
               durata: 180, // 3 ore come richiesto
+              stato: 'programmato',
+              veicolo_id: null,
+              importo: null,
               note: `[SEDUTA_ID:${newSession.id}] Blocco automatico per esame ${formData.nome}`
             });
           }

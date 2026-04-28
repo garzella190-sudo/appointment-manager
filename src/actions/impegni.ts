@@ -114,7 +114,7 @@ export async function deleteImpegniBySessionAction(sessioneId: string) {
 
   // Cerchiamo impegni che contengono il riferimento [SEDUTA_ID:uuid] nelle note
   const { error } = await supabase
-    .from('impegni')
+    .from('appuntamenti')
     .delete()
     .ilike('note', `%[SEDUTA_ID:${sessioneId}]%`);
 
