@@ -581,8 +581,7 @@ export default function EsamiPage() {
                     </div>
                   )}
                 </div>
-              ))
-              );
+              ));
               })()}
             </div>
           ) : (
