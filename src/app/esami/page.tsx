@@ -256,12 +256,18 @@ export default function EsamiPage() {
     }
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const futureSedute = sedute.filter(s => new Date(s.data) >= today);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  
+  const futureSedute = sedute.filter(s => s.data >= todayStr);
   const pastSedute = sedute
-    .filter(s => new Date(s.data) < today)
-    .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    .filter(s => s.data < todayStr)
+    .sort((a, b) => b.data.localeCompare(a.data));
+
+  // Filtriamo gli allievi pronti: non mostriamo quelli che hanno una seduta già passata
+  const prontiFiltrati = pronti.filter(c => {
+    if (!c.sessione_esame_id || !c.sessioni_esame?.data) return true;
+    return c.sessioni_esame.data >= todayStr;
+  });
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] dark:bg-zinc-950 overflow-hidden">
@@ -326,12 +332,12 @@ export default function EsamiPage() {
         <div className="max-w-5xl mx-auto">
           {activeTab === 'pronti' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {pronti.length === 0 ? (
+              {prontiFiltrati.length === 0 ? (
                 <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
                   Nessun allievo pronto per esame
                 </div>
                ) : (
-                  Object.values(pronti.reduce<Record<string, {istruttore: any, clienti: any[]}>>((acc, c) => {
+                  Object.values(prontiFiltrati.reduce<Record<string, {istruttore: any, clienti: any[]}>>((acc, c) => {
                     const istrId = c.istruttore_pronto_id || 'unassigned';
                     if (!acc[istrId]) {
                       acc[istrId] = {
