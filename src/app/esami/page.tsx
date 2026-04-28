@@ -37,6 +37,7 @@ export default function EsamiPage() {
     n_candidati: 0, 
     note: '',
     ora_inizio: '08:30',
+    durata_blocco: 180,
     istruttori_ids: [] as string[]
   });
   
@@ -148,7 +149,7 @@ export default function EsamiPage() {
               is_impegno: true,
               nome_impegno: 'Esame',
               data: `${formData.data}T${formData.ora_inizio}`,
-              durata: 180, // 3 ore come richiesto
+              durata: formData.durata_blocco, // Use user selected duration
               stato: 'programmato',
               veicolo_id: null,
               importo: null,
@@ -166,6 +167,7 @@ export default function EsamiPage() {
         n_candidati: 0, 
         note: '',
         ora_inizio: '08:30',
+        durata_blocco: 180,
         istruttori_ids: []
       });
       if (!selectedSeduta) setActiveTab('sedute'); 
@@ -591,34 +593,53 @@ export default function EsamiPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Ora Inizio Blocco</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Inizio Blocco</label>
               <input 
                 required
                 type="time" 
                 value={formData.ora_inizio}
                 onChange={(e) => setFormData({ ...formData, ora_inizio: e.target.value })}
-                className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all"
+                className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all text-sm"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Candidati Max</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Durata (min)</label>
+              <input 
+                required
+                type="number" 
+                value={formData.durata_blocco}
+                onChange={(e) => setFormData({ ...formData, durata_blocco: parseInt(e.target.value) || 0 })}
+                className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Max Allievi</label>
               <input 
                 required
                 type="number" 
                 value={formData.n_candidati === 0 ? '' : formData.n_candidati}
                 onChange={(e) => setFormData({ ...formData, n_candidati: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
-                className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all"
+                className="w-full h-14 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 font-bold outline-none focus:border-zinc-900 dark:focus:border-sky-500 transition-all text-sm"
               />
             </div>
           </div>
 
           {!selectedSeduta && (
             <div className="space-y-3">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1 flex items-center gap-2">
-                <Users size={12} /> Istruttori Partecipanti (Blocco 3h)
-              </label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1 flex items-center gap-2">
+                  <Users size={12} /> Istruttori Partecipanti
+                </label>
+                <button 
+                  type="button"
+                  onClick={() => setFormData({ ...formData, istruttori_ids: [] })}
+                  className="text-[10px] font-black uppercase text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 px-2 py-1 rounded-lg transition-colors"
+                >
+                  Nessuno
+                </button>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto p-1 no-scrollbar">
                 {istruttori.map(istr => (
                   <button
