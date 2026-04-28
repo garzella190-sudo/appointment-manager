@@ -85,6 +85,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   
   const [sendEmail, setSendEmail] = useState(true);
   const [sendWhatsApp, setSendWhatsApp] = useState(false);
+  const [emailFallback, setEmailFallback] = useState('');
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedIstruttore, setSelectedIstruttore] = useState<Istruttore | null>(null);
   const [selectedVeicolo, setSelectedVeicolo] = useState<Veicolo | null>(null);
@@ -535,21 +536,24 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     setLoading(true);
     setServerError(null);
     try {
-      const startDateTime = new Date(`${form.data}T${form.ora}`).toISOString();
-      const payload = {
-        cliente_id: isImpegno ? undefined : form.cliente_id,
+      const startISO = new Date(`${form.data}T${form.ora}`).toISOString();
+      const finalClienteId = isImpegno ? null : form.cliente_id;
+      const payload: any = {
+        cliente_id: finalClienteId,
         is_impegno: isImpegno,
-        nome_impegno: isImpegno ? nomeImpegno : undefined,
+        nome_impegno: isImpegno ? nomeImpegno : null,
         istruttore_id: form.istruttore_id,
         veicolo_id: isImpegno ? null : (form.veicolo_id || null),
-        data: startDateTime,
+        data: startISO,
         data_solo: form.data,
         durata: form.durata,
         stato: form.stato,
         note: form.note || null,
+        patente_id: isImpegno ? null : (form.patente_id || null),
         importo: null,
         send_email: sendEmail && !isImpegno,
         send_whatsapp: !isImpegno,
+        email_fallback: emailFallback || null,
         preferenza_cambio: isImpegno ? null : form.cambio,
       };
 
@@ -1314,6 +1318,22 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 )} />
               </div>
             </button>
+
+            {sendEmail && selectedCliente && !selectedCliente.email && (
+              <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wide mb-2">
+                  ⚠️ Il cliente non ha un'email. Inseriscila per inviare:
+                </p>
+                <input
+                  type="email"
+                  required
+                  placeholder="Inserisci email cliente..."
+                  className="w-full bg-white border border-amber-200 rounded-xl px-4 h-11 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+                  value={emailFallback}
+                  onChange={(e) => setEmailFallback(e.target.value)}
+                />
+              </div>
+            )}
 
             <button
               type="button"

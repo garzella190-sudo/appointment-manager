@@ -7,7 +7,7 @@ import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 // Note: use the verified domain email
-const SENDER = 'Autoscuola Toscana Fauglia <notifiche@mail.autoscuolatoscanasnc.it>';
+const SENDER = 'Autoscuola Toscana Fauglia <notifiche@guide.autoscuolatoscanasnc.it>';
 
 /**
  * Generates a premium HTML template for emails
