@@ -256,6 +256,13 @@ export default function EsamiPage() {
     }
   };
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const futureSedute = sedute.filter(s => new Date(s.data) >= today);
+  const pastSedute = sedute
+    .filter(s => new Date(s.data) < today)
+    .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] dark:bg-zinc-950 overflow-hidden">
       {/* Header */}
@@ -507,14 +514,11 @@ export default function EsamiPage() {
             </div>
           ) : activeTab === 'sedute' ? (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {(() => {
-                const today = new Date(); today.setHours(0,0,0,0);
-                const future = sedute.filter(s => new Date(s.data) >= today);
-                return future.length === 0 ? (
-                  <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
-                    Nessuna seduta programmata
-                  </div>
-                ) : future.map((s) => (
+              {futureSedute.length === 0 ? (
+                <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
+                  Nessuna seduta programmata
+                </div>
+              ) : futureSedute.map((s) => (
                 <div 
                   key={s.id} 
                   onClick={() => openDetailModal(s)}
@@ -581,20 +585,16 @@ export default function EsamiPage() {
                     </div>
                   )}
                 </div>
-              ));
-              })()}
+              ))}
             </div>
           ) : (
             // Archivio - sedute passate
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {(() => {
-                const today = new Date(); today.setHours(0,0,0,0);
-                const past = sedute.filter(s => new Date(s.data) < today).sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-                return past.length === 0 ? (
-                  <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
-                    Nessun esame in archivio
-                  </div>
-                ) : past.map((s) => (
+              {pastSedute.length === 0 ? (
+                <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
+                  Nessun esame in archivio
+                </div>
+              ) : pastSedute.map((s) => (
                   <div 
                     key={s.id} 
                     onClick={() => openDetailModal(s)}
@@ -666,8 +666,7 @@ export default function EsamiPage() {
                       </div>
                     )}
                   </div>
-                ));
-              })()}
+              ))}
             </div>
           )}
         </div>
