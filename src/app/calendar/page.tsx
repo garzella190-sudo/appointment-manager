@@ -522,8 +522,9 @@ export default function CalendarPage() {
               </p>
             </div>
 
-            <div className="flex flex-row items-center justify-start gap-1.5 sm:gap-3 w-full lg:w-auto mt-2 lg:mt-0 pb-1 sm:pb-0">
-              {/* Vista Giorni: Dropdown su mobile, pulsanti su desktop */}
+            {/* Row 1: View mode + day selector */}
+            <div className="flex flex-row items-center gap-1.5 sm:gap-3 w-full lg:w-auto mt-2 lg:mt-0">
+              {/* Vista Giorni: Dropdown su mobile */}
               <div className="relative shrink-0 sm:hidden flex items-center h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
                 <select
                   value={viewDays}
@@ -537,28 +538,17 @@ export default function CalendarPage() {
                 </select>
               </div>
               
-              <div className="flex shrink-0 flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
+              <div className="flex shrink-0 items-center gap-1 sm:gap-2 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
                 <button
                   onClick={() => setViewMode('week')}
                   className={cn(
-                    "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
+                    "px-2.5 sm:px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
                     viewMode === 'week' 
                       ? "bg-blue-600 text-white border-blue-500 shadow-md" 
                       : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent"
                   )}
                 >
                   Settimana
-                </button>
-                <button
-                  onClick={() => setViewMode('resource')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
-                    viewMode === 'resource' 
-                      ? "bg-indigo-600 text-white border-indigo-500 shadow-md" 
-                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent"
-                  )}
-                >
-                  Istruttori
                 </button>
                 <div className="hidden sm:block w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
                 <div className="hidden sm:flex items-center gap-1">
@@ -581,34 +571,43 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div className="flex items-center shrink-0 gap-1.5 md:gap-2">
+              {/* Weekend + Istruttori toggle + Nav */}
+              <div className="flex items-center gap-1.5 ml-auto">
                 {viewDays !== 7 && (
                   <button
                     onClick={() => setShowWeekends(!showWeekends)}
                     title={!showWeekends ? "Mostra Weekend" : "Nascondi Weekend"}
                     className={cn(
-                      "h-10 px-3 md:px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap shadow-sm border",
+                      "h-10 px-2.5 sm:px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap shadow-sm border",
                       !showWeekends
                         ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800"
                         : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-red-500"
                     )}
                   >
-                    Weekend
+                    WE
                   </button>
                 )}
 
                 <button
-                  onClick={() => setShowFilter(!showFilter)}
-                  title="Filtra Istruttori"
+                  onClick={() => {
+                    if (viewMode === 'resource') {
+                      setViewMode('week');
+                    } else {
+                      setShowFilter(!showFilter);
+                    }
+                  }}
+                  title={viewMode === 'resource' ? "Torna a Settimana" : "Filtra / Vista Istruttori"}
                   className={cn("h-10 w-10 shrink-0 flex items-center justify-center rounded-xl transition-all shadow-sm border", 
-                    showFilter || selectedInstructorId 
-                      ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" 
-                      : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
+                    viewMode === 'resource'
+                      ? "bg-indigo-600 border-indigo-500 text-white shadow-md"
+                      : showFilter || selectedInstructorId 
+                        ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" 
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
                 >
                   <Users size={16} />
                 </button>
 
-                <div className="flex items-center shrink-0 h-10 gap-1 sm:gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+                <div className="flex items-center shrink-0 h-10 gap-0.5 sm:gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
                   <button
                     onClick={() => navigateWeek(-1)}
                     title="Settimana precedente"
@@ -619,9 +618,9 @@ export default function CalendarPage() {
                   <button
                     onClick={() => setCurrentDate(new Date())}
                     title="Vai a oggi"
-                    className="px-3 h-8 text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all flex items-center"
+                    className="px-1.5 sm:px-3 h-8 text-[10px] sm:text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all flex items-center"
                   >
-                    {displayDays.some(d => isToday(d)) ? 'Oggi' : format(currentDate, 'EEE d MMM', { locale: it })}
+                    {displayDays.some(d => isToday(d)) ? 'Oggi' : format(currentDate, 'd MMM', { locale: it })}
                   </button>
                   <button
                     onClick={() => navigateWeek(1)}
@@ -631,11 +630,11 @@ export default function CalendarPage() {
                     <ChevronRight size={18} />
                   </button>
                   
-                  <div className="w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
+                  <div className="hidden sm:block w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
                   
                   <button
                     onClick={() => setIsDatePickerOpen(true)}
-                    className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
+                    className="hidden sm:flex h-8 w-8 items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
                     title="Scegli una data"
                   >
                     <CalendarIcon size={18} />
@@ -648,7 +647,7 @@ export default function CalendarPage() {
                "transition-all duration-300 ease-in-out origin-top",
                showFilter ? "max-h-[400px] opacity-100 mt-2 overflow-visible" : "max-h-0 opacity-0 mt-0 overflow-hidden"
             )}>
-              <div className="flex justify-start lg:justify-end">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-start lg:justify-end">
                 <div className="w-full sm:w-[250px]">
                   <Select
                     options={[
@@ -665,6 +664,13 @@ export default function CalendarPage() {
                     searchable
                   />
                 </div>
+                <button
+                  onClick={() => { setViewMode('resource'); setShowFilter(false); }}
+                  className="h-10 px-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-md border border-indigo-500 active:scale-95 transition-all flex items-center gap-2 justify-center"
+                >
+                  <Users size={14} />
+                  Vista Istruttori
+                </button>
               </div>
             </div>
           </header>
