@@ -489,6 +489,11 @@ export default function CalendarPage() {
 
   const activeAppointment = appointments.find(a => a.id === activeId);
 
+  // Filtered instructors for resource view
+  const displayIstruttori = selectedInstructorIds.length > 0
+    ? istruttori.filter(i => selectedInstructorIds.includes(i.id))
+    : istruttori;
+
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newModalInitialData, setNewModalInitialData] = useState<{ date: string; time: string } | null>(null);
 
@@ -650,7 +655,7 @@ export default function CalendarPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-1.5">
                   <button
-                    onClick={() => setSelectedInstructorIds([])}
+                    onClick={() => { setSelectedInstructorIds([]); setViewMode('week'); }}
                     className={cn(
                       "px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
                       selectedInstructorIds.length === 0
@@ -667,15 +672,23 @@ export default function CalendarPage() {
                         key={i.id}
                         onClick={() => {
                           setSelectedInstructorIds(prev => {
+                            let next: string[];
                             if (prev.length === 0) {
-                              // From "all" → select only this one
-                              return [i.id];
+                              next = [i.id];
+                            } else if (prev.includes(i.id)) {
+                              next = prev.filter(id => id !== i.id);
+                              if (next.length === 0) next = [];
+                            } else {
+                              next = [...prev, i.id];
                             }
-                            if (prev.includes(i.id)) {
-                              const next = prev.filter(id => id !== i.id);
-                              return next.length === 0 ? [] : next; // If none left, show all
+                            // Auto-switch view mode
+                            if (next.length >= 2) {
+                              setViewMode('resource');
+                              setShowFilter(false);
+                            } else {
+                              setViewMode('week');
                             }
-                            return [...prev, i.id];
+                            return next;
                           });
                         }}
                         className={cn(
@@ -710,7 +723,7 @@ export default function CalendarPage() {
               <div className="w-full flex flex-col h-full">
               <div 
                 className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0"
-                style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(0, 1fr))` } as React.CSSProperties}
+                style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayIstruttori.length)}, minmax(0, 1fr))` } as React.CSSProperties}
               >
                 <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
                   <Clock size={16} className="text-zinc-400" />
@@ -752,7 +765,7 @@ export default function CalendarPage() {
                       )}
                     </div>
                   );
-                }) : istruttori.map((ist: any) => {
+                }) : displayIstruttori.map((ist: any) => {
                   const istColor = appointments.find(a => a.trainer_id === ist.id)?.istruttore?.color || '#3b82f6';
                   return (
                     <div key={ist.id} className="p-1 sm:p-2 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center">
@@ -799,7 +812,7 @@ export default function CalendarPage() {
                           isFullHour ? "border-zinc-200 dark:border-zinc-700 border-b" : "border-zinc-100/50 dark:border-zinc-800/30 border-b"
                         )}
                         style={{ 
-                          gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(0, 1fr))`,
+                          gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayIstruttori.length)}, minmax(0, 1fr))`,
                           zIndex: isCurrentSlot ? 40 : timeSlots.length - timeSlots.indexOf(slot),
                         } as React.CSSProperties}
                       >
@@ -872,7 +885,7 @@ export default function CalendarPage() {
                             </div>
                           </DroppableCell>
                         );
-                      }) : istruttori.map((ist: any) => {
+                      }) : displayIstruttori.map((ist: any) => {
                         const dateStr = format(currentDate, 'yyyy-MM-dd');
                         const cellId = `${dateStr}|${slot}|${ist.id}`;
                         
