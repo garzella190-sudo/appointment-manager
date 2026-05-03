@@ -522,9 +522,9 @@ export default function CalendarPage() {
               </p>
             </div>
 
-            <div className="flex flex-row items-center justify-start sm:justify-end gap-1.5 sm:gap-3 w-full lg:w-auto mt-2 lg:mt-0 overflow-x-auto scrollbar-hide pb-1 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex flex-row items-center justify-start gap-1.5 sm:gap-3 w-full lg:w-auto mt-2 lg:mt-0 pb-1 sm:pb-0">
               {/* Vista Giorni: Dropdown su mobile, pulsanti su desktop */}
-              <div className="relative shrink-0 sm:hidden flex items-center shrink-0 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+              <div className="relative shrink-0 sm:hidden flex items-center h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
                 <select
                   value={viewDays}
                   onChange={(e) => setViewDays(parseInt(e.target.value) as 1 | 3 | 5 | 7)}
@@ -560,23 +560,25 @@ export default function CalendarPage() {
                 >
                   Istruttori
                 </button>
-                <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
-                {[1, 3, 5, 7].map((days) => (
-                  <button
-                    key={days}
-                    disabled={viewMode === 'resource'}
-                    onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
-                      viewDays === days && viewMode === 'week'
-                        ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800 shadow-sm" 
-                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800",
-                      viewMode === 'resource' && "opacity-30 cursor-not-allowed"
-                    )}
-                  >
-                    {days} G
-                  </button>
-                ))}
+                <div className="hidden sm:block w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
+                <div className="hidden sm:flex items-center gap-1">
+                  {[1, 3, 5, 7].map((days) => (
+                    <button
+                      key={days}
+                      disabled={viewMode === 'resource'}
+                      onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
+                        viewDays === days && viewMode === 'week'
+                          ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800 shadow-sm" 
+                          : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800",
+                        viewMode === 'resource' && "opacity-30 cursor-not-allowed"
+                      )}
+                    >
+                      {days} G
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="flex items-center shrink-0 gap-1.5 md:gap-2">
@@ -670,11 +672,11 @@ export default function CalendarPage() {
           <ConflictsAlert />
 
           <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col">
-            <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-x-auto overflow-y-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px] scrollbar-hide">
-              <div className="min-w-max flex flex-col h-full">
+            <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px] scrollbar-hide">
+              <div className="w-full flex flex-col h-full">
               <div 
                 className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0"
-                style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(min(120px, 100vw/3), 1fr))` } as React.CSSProperties}
+                style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(0, 1fr))` } as React.CSSProperties}
               >
                 <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
                   <Clock size={16} className="text-zinc-400" />
@@ -763,7 +765,7 @@ export default function CalendarPage() {
                           isFullHour ? "border-zinc-200 dark:border-zinc-700 border-b" : "border-zinc-100/50 dark:border-zinc-800/30 border-b"
                         )}
                         style={{ 
-                          gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(min(120px, 100vw/3), 1fr))`,
+                          gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(0, 1fr))`,
                           zIndex: isCurrentSlot ? 40 : timeSlots.length - timeSlots.indexOf(slot),
                         } as React.CSSProperties}
                       >
