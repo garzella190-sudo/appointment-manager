@@ -77,16 +77,16 @@ const BottomNav = () => {
 
   return (
     <>
-      <nav className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-2xl z-50 flex justify-between items-end px-1 pointer-events-none print:hidden">
+      <nav className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-[96vw] md:max-w-2xl z-50 flex justify-center items-end pointer-events-none print:hidden">
         
         {/* Left Segment */}
-        <div className="flex-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2.5 px-3 sm:px-5 rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-2 pointer-events-auto transition-all">
+        <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2 px-2 sm:px-5 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-1 sm:mr-2 pointer-events-auto transition-all">
           <button 
             onClick={() => setIsPermissionsModalOpen(true)}
-            className="flex items-center gap-2 shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-1.5 rounded-[20px] transition-all active:scale-95 text-left border-none outline-none"
+            className="flex items-center gap-2 shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-1 sm:p-1.5 rounded-[16px] sm:rounded-[20px] transition-all active:scale-95 text-left border-none outline-none"
           >
             <div className={cn(
-              "w-8 h-8 rounded-[14px] flex items-center justify-center shrink-0 shadow-inner",
+              "w-8 h-8 sm:w-9 sm:h-9 rounded-[12px] sm:rounded-[14px] flex items-center justify-center shrink-0 shadow-inner",
               role === 'AdminDev' ? "bg-gradient-to-tr from-zinc-800 to-zinc-900 text-amber-400" :
               role === 'admin' ? "bg-gradient-to-tr from-amber-100 to-amber-200 text-amber-600" : 
               "bg-gradient-to-tr from-sky-100 to-sky-200 text-sky-600"
@@ -106,7 +106,7 @@ const BottomNav = () => {
             </div>
           </button>
           
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-4 overflow-hidden">
             {navLeft.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -124,12 +124,12 @@ const BottomNav = () => {
                     }
                   }}
                   className={cn(
-                    "relative flex flex-col items-center justify-center w-12 h-12 rounded-[20px] transition-all duration-300 active:scale-95 group",
+                    "relative flex flex-col items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0",
                     isActive ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                   )}
                 >
-                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={cn(
-                    "transition-transform duration-300",
+                  <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={cn(
+                    "transition-transform duration-300 sm:w-[20px] sm:h-[20px]",
                     isActive ? "scale-110" : "group-hover:scale-110"
                   )} />
                 </Link>
@@ -143,15 +143,15 @@ const BottomNav = () => {
           <div className="absolute inset-0 bg-gradient-to-tr from-sky-400 to-sky-600 rounded-[22px] blur-md opacity-40 dark:opacity-60 scale-90 translate-y-1"></div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="relative bg-gradient-to-tr from-sky-400 to-sky-600 text-white w-14 h-14 rounded-[22px] shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer outline-none ring-offset-2 dark:ring-offset-zinc-950 focus:ring-2 focus:ring-sky-500 flex items-center justify-center border border-white/20"
+            className="relative bg-gradient-to-tr from-sky-400 to-sky-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-[18px] sm:rounded-[22px] shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer outline-none ring-offset-2 dark:ring-offset-zinc-950 focus:ring-2 focus:ring-sky-500 flex items-center justify-center border border-white/20"
           >
-            <PlusCircle size={26} strokeWidth={2.5} />
+            <PlusCircle size={24} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
           </button>
         </div>
 
         {/* Right Segment */}
-        <div className="flex-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-end sm:justify-between py-2.5 px-3 sm:px-5 rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-2 pointer-events-auto transition-all">
-          <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2 px-2 sm:px-5 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-1 sm:ml-2 pointer-events-auto transition-all">
+          <div className="flex items-center gap-1 sm:gap-4 w-full justify-between sm:justify-end overflow-hidden">
             {navRight.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -161,12 +161,12 @@ const BottomNav = () => {
                   href={item.href}
                   title={item.name}
                   className={cn(
-                    "relative flex flex-col items-center justify-center w-12 h-12 rounded-[20px] transition-all duration-300 active:scale-95 group",
+                    "relative flex flex-col items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0",
                     isActive ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                   )}
                 >
-                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={cn(
-                    "transition-transform duration-300",
+                  <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={cn(
+                    "transition-transform duration-300 sm:w-[20px] sm:h-[20px]",
                     isActive ? "scale-110" : "group-hover:scale-110"
                   )} />
                 </Link>
