@@ -116,7 +116,7 @@ export default function CalendarPage() {
   const [viewDays, setViewDays] = useState<1 | 3 | 5 | 7>(7);
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
-  const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
+  const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
   const [granularity, setGranularity] = useState<15 | 30 | 60>(15);
@@ -131,7 +131,7 @@ export default function CalendarPage() {
     setIsMobile(window.innerWidth < 768);
     
     // Caricamento impostazioni da localStorage
-    const savedInstructorId = localStorage.getItem('calendar_selectedInstructorId');
+    const savedInstructorIds = localStorage.getItem('calendar_selectedInstructorIds');
     const savedViewDays = localStorage.getItem('calendar_viewDays');
     const savedShowWeekends = localStorage.getItem('calendar_showWeekends');
     const savedDate = localStorage.getItem('calendar_currentDate');
@@ -140,7 +140,7 @@ export default function CalendarPage() {
     const savedViewMode = localStorage.getItem('calendar_viewMode');
     const savedVisibleInstructors = localStorage.getItem('calendar_visibleInstructorIds');
 
-    if (savedInstructorId !== null) setSelectedInstructorId(savedInstructorId);
+    if (savedInstructorIds) try { setSelectedInstructorIds(JSON.parse(savedInstructorIds)); } catch {}
     if (savedViewDays !== null) setViewDays(parseInt(savedViewDays) as any);
     if (savedShowWeekends !== null) setShowWeekends(savedShowWeekends === 'true');
     if (savedGranularity !== null) setGranularity(parseInt(savedGranularity) as any);
@@ -181,13 +181,13 @@ export default function CalendarPage() {
   // Salvataggio impostazioni in localStorage
   useEffect(() => {
     if (!mounted) return;
-    localStorage.setItem('calendar_selectedInstructorId', selectedInstructorId);
+    localStorage.setItem('calendar_selectedInstructorIds', JSON.stringify(selectedInstructorIds));
     localStorage.setItem('calendar_viewDays', viewDays.toString());
     localStorage.setItem('calendar_showWeekends', showWeekends.toString());
     localStorage.setItem('calendar_currentDate', currentDate.toISOString());
     localStorage.setItem('calendar_granularity', granularity.toString());
     localStorage.setItem('calendar_viewMode', viewMode);
-  }, [selectedInstructorId, viewDays, showWeekends, currentDate, granularity, viewMode, mounted]);
+  }, [selectedInstructorIds, viewDays, showWeekends, currentDate, granularity, viewMode, mounted]);
 
   const getDayClass = (date: Date) => {
     if (isItalianHoliday(date) || isWeekend(date)) return "is-holiday";
@@ -600,7 +600,7 @@ export default function CalendarPage() {
                   className={cn("h-10 w-10 shrink-0 flex items-center justify-center rounded-xl transition-all shadow-sm border", 
                     viewMode === 'resource'
                       ? "bg-indigo-600 border-indigo-500 text-white shadow-md"
-                      : showFilter || selectedInstructorId 
+                      : showFilter || selectedInstructorIds.length > 0 
                         ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" 
                         : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
                 >
@@ -647,26 +647,54 @@ export default function CalendarPage() {
                "transition-all duration-300 ease-in-out origin-top",
                showFilter ? "max-h-[400px] opacity-100 mt-2 overflow-visible" : "max-h-0 opacity-0 mt-0 overflow-hidden"
             )}>
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-start lg:justify-end">
-                <div className="w-full sm:w-[250px]">
-                  <Select
-                    options={[
-                      { id: '', label: 'Tutti gli istruttori' },
-                      ...istruttori.map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}` }))
-                    ]}
-                    value={selectedInstructorId}
-                    onChange={(val) => {
-                      setSelectedInstructorId(val);
-                      setShowFilter(false); 
-                    }}
-                    icon={Users}
-                    placeholder="Filtra Istruttore"
-                    searchable
-                  />
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setSelectedInstructorIds([])}
+                    className={cn(
+                      "px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
+                      selectedInstructorIds.length === 0
+                        ? "bg-sky-500 text-white border-sky-400 shadow-md"
+                        : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
+                    )}
+                  >
+                    Tutti
+                  </button>
+                  {istruttori.map(i => {
+                    const isSelected = selectedInstructorIds.length === 0 || selectedInstructorIds.includes(i.id);
+                    return (
+                      <button
+                        key={i.id}
+                        onClick={() => {
+                          setSelectedInstructorIds(prev => {
+                            if (prev.length === 0) {
+                              // From "all" → select only this one
+                              return [i.id];
+                            }
+                            if (prev.includes(i.id)) {
+                              const next = prev.filter(id => id !== i.id);
+                              return next.length === 0 ? [] : next; // If none left, show all
+                            }
+                            return [...prev, i.id];
+                          });
+                        }}
+                        className={cn(
+                          "px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
+                          selectedInstructorIds.includes(i.id)
+                            ? "bg-sky-500 text-white border-sky-400 shadow-md"
+                            : selectedInstructorIds.length === 0
+                              ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-800"
+                              : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400"
+                        )}
+                      >
+                        {i.cognome}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
                   onClick={() => { setViewMode('resource'); setShowFilter(false); }}
-                  className="h-10 px-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-md border border-indigo-500 active:scale-95 transition-all flex items-center gap-2 justify-center"
+                  className="h-10 px-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-md border border-indigo-500 active:scale-95 transition-all flex items-center gap-2 justify-center w-full sm:w-auto"
                 >
                   <Users size={14} />
                   Vista Istruttori
@@ -809,7 +837,7 @@ export default function CalendarPage() {
                             return (
                               aptTime >= slotStartTime && 
                               aptTime < slotEndTime &&
-                              (!selectedInstructorId || apt.trainer_id === selectedInstructorId)
+                              (selectedInstructorIds.length === 0 || selectedInstructorIds.includes(apt.trainer_id))
                             );
                           })
                           .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
