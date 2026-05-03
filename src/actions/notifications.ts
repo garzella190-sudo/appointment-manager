@@ -7,7 +7,7 @@ import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 // Note: use the verified domain email
-const SENDER = 'Autoscuola Toscana Fauglia <notifiche@guide.autoscuolatoscanasnc.it>';
+const SENDER = 'Autoscuola Toscana <notifiche@guide.autoscuolatoscanasnc.it>';
 
 function getItalyTimeStr(dateString: string) {
   return new Intl.DateTimeFormat('it-IT', {
@@ -61,7 +61,7 @@ function getItalyTimeStr(dateString: string) {
       <div class="container">
         <div class="card">
           <div class="title">${title}</div>
-          <div class="subtitle">Ricorda la guida programmata per ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}</div>
+          <div class="subtitle">Ricorda la guida programmata per ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min</div>
 
           <div class="disclaimer">
             NB: le guide vanno disdette 24h prima, pena addebito dell'importo
@@ -83,8 +83,8 @@ function getItalyTimeStr(dateString: string) {
  * Generates ICS string content
  */
 function generateICS(apt: any) {
-  const startDate = parseISO(`${apt.data.split('T')[0]}T${getItalyTimeStr(apt.inizio)}`);
-  const endDate = addMinutes(startDate, apt.durata || 60);
+  const startDate = new Date(apt.inizio);
+  const endDate = new Date(startDate.getTime() + (apt.durata || 60) * 60000);
   const formatICS = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
   const address = "Via Le Vallicelle, 4, 56043 Fauglia (PI)";
 
@@ -155,7 +155,7 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
     const { data, error: resendError } = await resend.emails.send({
       from: SENDER,
       to: cliente.email,
-      subject: `Prenotazione effettuata - Conferma Guida: ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr}`,
+      subject: `Prenotazione effettuata - Conferma Guida: ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr} (${apt.durata} min)`,
       html,
       attachments: [
         {
@@ -230,7 +230,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
     const { data, error: resendError } = await resend.emails.send({
       from: SENDER,
       to: cliente.email,
-      subject: `Promemoria: Lezione di Guida - ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr}`,
+      subject: `Promemoria: Lezione di Guida - ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr} (${apt.durata} min)`,
       html,
       attachments: [
         {

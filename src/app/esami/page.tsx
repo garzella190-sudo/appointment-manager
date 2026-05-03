@@ -15,6 +15,7 @@ import DatePicker from '@/components/DatePicker';
 import { toggleProntoEsameAction } from '@/actions/clienti';
 import { createAppointmentAction } from '@/actions/appointments';
 import { deleteImpegniBySessionAction } from '@/actions/impegni';
+import ExamSessionModal from '@/components/modals/ExamSessionModal';
 
 const supabase = createClient();
 
@@ -115,7 +116,9 @@ export default function EsamiPage() {
       data: formData.data,
       n_candidati: formData.n_candidati,
       note: formData.note,
-      esaminatore: formData.esaminatore || null
+      esaminatore: formData.esaminatore || null,
+      ora_inizio: formData.ora_inizio,
+      istruttori_ids: formData.istruttori_ids
     };
 
     let error;
@@ -149,13 +152,14 @@ export default function EsamiPage() {
             await createAppointmentAction({
               istruttore_id: instrId,
               is_impegno: true,
-              nome_impegno: 'Esame',
+              nome_impegno: 'Esame di guida',
               data: `${formData.data}T${formData.ora_inizio}`,
               durata: formData.durata_blocco, // Use user selected duration
               stato: 'programmato',
               veicolo_id: null,
               importo: null,
-              note: `[SEDUTA_ID:${newSession.id}] Blocco automatico per esame ${formData.nome}`
+              note: '',
+              sessione_esame_id: newSession.id
             });
           }
         }
@@ -194,15 +198,9 @@ export default function EsamiPage() {
     }
   };
 
-  const openDetailModal = async (seduta: any) => {
+  const openDetailModal = (seduta: any) => {
     setSelectedSeduta(seduta);
     setIsDetailModalOpen(true);
-    // Fetch candidates for this session
-    const { data } = await supabase
-      .from('clienti')
-      .select('*, patenti(tipo)')
-      .eq('sessione_esame_id', seduta.id);
-    setSessionCandidates(data || []);
   };
 
   const handleAssignCandidate = async (clienteId: string, sessionId?: string) => {
@@ -245,6 +243,40 @@ export default function EsamiPage() {
       .update(updatePayload)
       .eq('id', id);
     if (!error) fetchData();
+  };
+
+  const handleRespinto = async (id: string) => {
+    const { error } = await supabase.from('clienti')
+      .update({ 
+        pronto_esame: true, // Torna nella sezione pronto
+        sessione_esame_id: null, 
+        bocciato: true // Mark rosso per bocciatura
+      })
+      .eq('id', id);
+    
+    if (!error) {
+      showToast('Allievo segnato come respinto. È di nuovo nella lista Pronti con un segnale rosso.', 'info');
+      // Update local state
+      setSessionCandidates(prev => prev.filter(sc => sc.id !== id));
+      fetchData();
+    }
+  };
+
+  const handlePromosso = async (id: string) => {
+    const { error } = await supabase.from('clienti')
+      .update({ 
+        archiviato: true,
+        pronto_esame: false,
+        sessione_esame_id: null,
+        bocciato: false // Rimuove il segnale rosso se passa
+      })
+      .eq('id', id);
+    
+    if (!error) {
+      showToast('Allievo promosso e archiviato!', 'success');
+      setSessionCandidates(prev => prev.filter(sc => sc.id !== id));
+      fetchData();
+    }
   };
 
   const handleAddPronto = async (clienteId: string) => {
@@ -392,8 +424,9 @@ export default function EsamiPage() {
                                         <GraduationCap size={24} />
                                       </div>
                                       <div>
-                                        <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase leading-tight truncate max-w-[140px]">
+                                        <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase leading-tight truncate max-w-[140px] flex items-center gap-2">
                                           {c.cognome} {c.nome}
+                                          {c.bocciato && <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse shrink-0" title="Bocciato precedentemente" />}
                                         </h3>
                                         {!isExpanded && (
                                            <div className="flex items-center gap-2 mt-0.5">
@@ -810,135 +843,18 @@ export default function EsamiPage() {
         </form>
       </Modal>
 
-      {/* Modal Dettaglio/Gestione Seduta */}
-      <Modal 
-        isOpen={isDetailModalOpen} 
-        onClose={() => setIsDetailModalOpen(false)} 
-        title={selectedSeduta?.nome || 'Dettaglio Seduta'}
-      >
-        <div className="space-y-8 pt-4 pb-4">
-          {/* Info Seduta */}
-          <div className="bg-zinc-50 dark:bg-zinc-900/50 p-6 rounded-[24px] border border-zinc-100 dark:border-zinc-800 relative group">
-             <div className="flex justify-between items-center mb-4">
-                <h4 className="text-[11px] font-black uppercase tracking-[0.1em] text-zinc-400">Info Seduta</h4>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => {
-                        setFormData({
-                            nome: selectedSeduta.nome || '',
-                            data: selectedSeduta.data || '',
-                            n_candidati: selectedSeduta.n_candidati || 0,
-                            note: selectedSeduta.note || '',
-                            esaminatore: selectedSeduta.esaminatore || '',
-                            ora_inizio: '08:30',
-                            durata_blocco: 180,
-                            istruttori_ids: []
-                        });
-                        setIsDetailModalOpen(false);
-                        setIsModalOpen(true);
-                    }}
-                    className="p-2 bg-white dark:bg-zinc-800 text-zinc-400 hover:text-blue-500 rounded-xl transition-all shadow-sm opacity-0 group-hover:opacity-100"
-                    title="Modifica seduta"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <div className="px-3 py-1 bg-sky-500 text-white rounded-full text-[10px] font-black uppercase">
-                     {sessionCandidates.length} / {selectedSeduta?.n_candidati} Candidati
-                  </div>
-                </div>
-             </div>
-             <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{selectedSeduta?.note || 'Nessuna nota'}</p>
-             {selectedSeduta?.esaminatore && (
-               <p className="text-xs text-zinc-500 mt-1 font-semibold flex items-center gap-1">
-                 <GraduationCap size={12} /> Esaminatore: <span className="font-black text-zinc-700 dark:text-zinc-300">{selectedSeduta.esaminatore}</span>
-               </p>
-             )}
-             <p className="text-xs text-zinc-400 mt-2 font-semibold">
-               Data: {selectedSeduta?.data && format(new Date(selectedSeduta.data), 'dd MMMM yyyy', { locale: it })}
-             </p>
-          </div>
-
-          {/* Lista Candidati */}
-          <div>
-            <div className="flex justify-between items-center mb-4 ml-1">
-              <h4 className="text-[11px] font-black uppercase tracking-[0.1em] text-zinc-400 flex items-center gap-2">
-                <Users size={12} /> Candidati Assegnati
-              </h4>
-            </div>
-            
-            <div className="space-y-3">
-              {sessionCandidates.length === 0 ? (
-                <div className="py-8 text-center bg-white dark:bg-zinc-900/30 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                  Nessun candidato assegnato
-                </div>
-              ) : sessionCandidates.map((c) => (
-                <div key={c.id} className="flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center">
-                      <GraduationCap size={16} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase">{c.cognome} {c.nome}</p>
-                      <p className="text-[9px] font-bold text-zinc-400 uppercase">Patente {c.patenti?.tipo}</p>
-                    </div>
-                  </div>
-                  <ConfirmBubble
-                    title="Rimuovi candidato"
-                    message="Sei sicuro di voler rimuovere questo allievo dalla seduta?"
-                    confirmLabel="Rimuovi"
-                    onConfirm={() => handleRemovePronto(c.id, true).then(() => {
-                        // Refresh local candidates
-                        const filtered = sessionCandidates.filter(sc => sc.id !== c.id);
-                        setSessionCandidates(filtered);
-                    })}
-                    trigger={
-                      <button className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all">
-                        <Trash2 size={16} />
-                      </button>
-                    }
-                  />
-                </div>
-              ))}
-
-              {/* Tasto + per Aggiungere Candidato */}
-              {sessionCandidates.length < (selectedSeduta?.n_candidati || 0) && (
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowAddCandidate(!showAddCandidate)}
-                    className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-400 hover:text-sky-500 hover:border-sky-500/50 hover:bg-sky-50/50 transition-all group"
-                  >
-                    <Plus size={20} className="group-hover:rotate-90 transition-transform" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Aggiungi Candidato</span>
-                  </button>
-
-                  {showAddCandidate && (
-                    <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 p-2 max-h-[250px] overflow-y-auto animate-in fade-in slide-in-from-top-2">
-                       {pronti.filter(p => !p.sessione_esame_id).length === 0 ? (
-                         <div className="p-4 text-center text-[10px] font-bold text-zinc-400 uppercase">Nessun allievo pronto disponibile</div>
-                       ) : pronti.filter(p => !p.sessione_esame_id).map(p => (
-                         <button
-                           key={p.id}
-                           onClick={() => {
-                             handleAssignCandidate(p.id);
-                             setShowAddCandidate(false);
-                           }}
-                           className="w-full text-left p-3 hover:bg-sky-50 dark:hover:bg-sky-500/10 rounded-xl transition-all flex items-center justify-between group"
-                         >
-                            <div>
-                               <p className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase">{p.cognome} {p.nome}</p>
-                               <p className="text-[9px] font-bold text-zinc-400 uppercase">Patente {p.patenti?.tipo}</p>
-                            </div>
-                            <Plus size={14} className="text-zinc-300 group-hover:text-sky-500" />
-                         </button>
-                       ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </Modal>
+      {/* Modale Dettaglio Seduta (Nuovo Gestore Esami) */}
+      {selectedSeduta && (
+        <ExamSessionModal
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          onSuccess={() => {
+            fetchData();
+            router.refresh();
+          }}
+          sessionId={selectedSeduta.id}
+        />
+      )}
 
       {/* Modal Selettore Seduta */}
       <Modal

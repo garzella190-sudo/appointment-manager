@@ -26,6 +26,7 @@ export async function createAppointmentAction(payload: {
   send_whatsapp?: boolean;
   email_fallback?: string | null;
   preferenza_cambio?: string | null;
+  sessione_esame_id?: string | null;
 }) {
   const supabase = await createClient();
   const resendApiKey = process.env.RESEND_API_KEY;

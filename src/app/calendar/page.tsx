@@ -3,7 +3,22 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, ChevronDown, Loader2, User, Users, Calendar as CalendarIcon, StickyNote } from 'lucide-react';
+import { 
+  Calendar as CalendarIcon, 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  Users, 
+  Clock, 
+  Loader2, 
+  Search,
+  Filter,
+  MoreVertical,
+  Check,
+  User,
+  ChevronDown,
+  StickyNote
+} from 'lucide-react';
 import Select from '@/components/forms/Select';
 import {
   DndContext,
@@ -16,7 +31,7 @@ import {
   DragOverlay
 } from '@dnd-kit/core';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
-import { startOfWeek, addDays, format, isSameDay, parseISO, addMinutes } from 'date-fns';
+import { startOfWeek, addDays, format, isSameDay, parseISO, addMinutes, isToday } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
@@ -27,7 +42,8 @@ import { cn } from '@/lib/utils';
 import { Toast } from '@/components/Toast';
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
-import { Clock } from 'lucide-react';
+import ExamSessionModal from '@/components/modals/ExamSessionModal';
+
 import DatePickerModal from '@/components/modals/DatePickerModal';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 import { ConflictsAlert } from '@/components/ConflictsAlert';
@@ -104,6 +120,7 @@ export default function CalendarPage() {
   const [showFilter, setShowFilter] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
   const [granularity, setGranularity] = useState<15 | 30 | 60>(15);
+  const [viewMode, setViewMode] = useState<'week' | 'resource'>('week');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -120,10 +137,14 @@ export default function CalendarPage() {
     const savedDate = localStorage.getItem('calendar_currentDate');
     const savedGranularity = localStorage.getItem('calendar_granularity');
 
+    const savedViewMode = localStorage.getItem('calendar_viewMode');
+    const savedVisibleInstructors = localStorage.getItem('calendar_visibleInstructorIds');
+
     if (savedInstructorId !== null) setSelectedInstructorId(savedInstructorId);
     if (savedViewDays !== null) setViewDays(parseInt(savedViewDays) as any);
     if (savedShowWeekends !== null) setShowWeekends(savedShowWeekends === 'true');
     if (savedGranularity !== null) setGranularity(parseInt(savedGranularity) as any);
+    if (savedViewMode !== null) setViewMode(savedViewMode as any);
     if (savedDate !== null) {
       try {
         setCurrentDate(new Date(savedDate));
@@ -133,14 +154,20 @@ export default function CalendarPage() {
     }
 
     const handleResize = () => {
-      if (!savedViewDays) {
-        if (window.innerWidth < 768) {
-          setViewDays(3);
-        } else {
-          setViewDays(7);
-        }
+      const width = window.innerWidth;
+      let newViewDays: 1 | 3 | 5 | 7 = 7;
+      
+      if (width < 640) { // Mobile
+        newViewDays = savedViewDays === '1' ? 1 : 3;
+      } else if (width < 1024) { // Tablet
+        newViewDays = (savedViewDays === '1' || savedViewDays === '3') ? parseInt(savedViewDays) as 1 | 3 : 5;
+      } else { // Desktop
+        newViewDays = savedViewDays ? parseInt(savedViewDays) as 1 | 3 | 5 | 7 : 7;
       }
+      
+      setViewDays(newViewDays);
     };
+
     handleResize(); // Chiamata iniziale
     const handleMobileCheck = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
@@ -159,7 +186,8 @@ export default function CalendarPage() {
     localStorage.setItem('calendar_showWeekends', showWeekends.toString());
     localStorage.setItem('calendar_currentDate', currentDate.toISOString());
     localStorage.setItem('calendar_granularity', granularity.toString());
-  }, [selectedInstructorId, viewDays, showWeekends, currentDate, granularity, mounted]);
+    localStorage.setItem('calendar_viewMode', viewMode);
+  }, [selectedInstructorId, viewDays, showWeekends, currentDate, granularity, viewMode, mounted]);
 
   const getDayClass = (date: Date) => {
     if (isItalianHoliday(date) || isWeekend(date)) return "is-holiday";
@@ -248,12 +276,21 @@ export default function CalendarPage() {
         
         const isUfficio = row.clienti?.nome === 'UFFICIO';
         const tipoImpegno = isUfficio ? (row.clienti?.cognome || '') : null;
+        let finalClientName = row.clienti ? `${row.clienti.cognome} ${row.clienti.nome}` : 'Sconosciuto';
+        if (isUfficio) {
+          if (tipoImpegno?.toUpperCase().includes('ESAME')) {
+            finalClientName = 'Esame di Guida';
+          } else {
+            finalClientName = tipoImpegno || 'Impegno';
+          }
+        }
+
         return {
           id: row.id,
           cliente_id: row.clienti?.id || '',
           appointment_date: dateStr,
           appointment_time: format(rowDate, 'HH:mm'),
-          client_name: row.clienti ? `${row.clienti.cognome} ${row.clienti.nome}` : 'Sconosciuto',
+          client_name: finalClientName,
           phone: row.clienti?.telefono || '',
           trainer_id: row.istruttore_id,
           vehicle_id: row.veicoli ? `${row.veicoli.nome} (${row.veicoli.targa})` : 'Nessuno',
@@ -380,7 +417,11 @@ export default function CalendarPage() {
     setOverId(null);
 
     if (over && active.id !== over.id) {
-      const [dateStr, timeStr] = (over.id as string).split('|');
+      const parts = (over.id as string).split('|');
+      const dateStr = parts[0];
+      const timeStr = parts[1];
+      const newInstructorId = parts[2] || null; // Optional instructor ID from cell
+      
       const formattedDate = format(parseISO(dateStr), 'dd/MM/yyyy');
 
       setToast({
@@ -390,7 +431,12 @@ export default function CalendarPage() {
 
       setAppointments(prev => prev.map(apt => {
         if (apt.id === active.id) {
-          return { ...apt, appointment_date: dateStr, appointment_time: timeStr };
+          return { 
+            ...apt, 
+            appointment_date: dateStr, 
+            appointment_time: timeStr,
+            trainer_id: newInstructorId || apt.trainer_id 
+          };
         }
         return apt;
       }));
@@ -407,17 +453,20 @@ export default function CalendarPage() {
       const startISO = startDateTime.toISOString();
       const endISO = endDateTime.toISOString();
 
-      // Direct minimal Supabase update — only date/time fields change on drag.
-      // Using updateAppointmentAction would fail silently because the client-side
-      // Appointment object uses 'duration' but the server action expects 'durata'.
+      const updatePayload: any = {
+        data: startISO,
+        inizio: startISO,
+        fine: endISO,
+        data_solo: dateStr,
+      };
+
+      if (newInstructorId) {
+        updatePayload.istruttore_id = newInstructorId;
+      }
+
       const { error: dragError } = await supabase
         .from('appuntamenti')
-        .update({
-          data: startISO,
-          inizio: startISO,
-          fine: endISO,
-          data_solo: dateStr,
-        })
+        .update(updatePayload)
         .eq('id', active.id as string);
 
       if (dragError) {
@@ -426,7 +475,6 @@ export default function CalendarPage() {
           message: 'Errore durante il salvataggio dello spostamento. Riprova.',
           type: 'error'
         });
-        // Revert optimistic update
         if (mounted) fetchWeekAppointments();
       }
     }
@@ -434,7 +482,8 @@ export default function CalendarPage() {
 
   const navigateWeek = (direction: number) => {
     const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + (direction * (effectiveViewDays === 7 ? 7 : effectiveViewDays)));
+    const step = viewMode === 'resource' ? 1 : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
+    newDate.setDate(newDate.getDate() + (direction * step));
     setCurrentDate(newDate);
   };
 
@@ -466,7 +515,10 @@ export default function CalendarPage() {
               <RefreshButton onRefresh={fetchWeekAppointments} className="h-8 w-8 p-0" />
             </div>
               <p className="text-zinc-500 dark:text-zinc-400 mt-0.5 capitalize text-xs font-medium">
-                {format(weekStart, 'MMMM yyyy', { locale: it })}
+                {viewMode === 'resource' 
+                  ? format(currentDate, 'EEEE d MMMM yyyy', { locale: it })
+                  : format(weekStart, 'MMMM yyyy', { locale: it })
+                }
               </p>
             </div>
 
@@ -485,16 +537,41 @@ export default function CalendarPage() {
                 </select>
               </div>
               
-              <div className="hidden sm:flex shrink-0 flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
+              <div className="flex shrink-0 flex-1 sm:flex-none justify-between sm:justify-start items-center gap-1 sm:gap-2 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
+                <button
+                  onClick={() => setViewMode('week')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
+                    viewMode === 'week' 
+                      ? "bg-blue-600 text-white border-blue-500 shadow-md" 
+                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent"
+                  )}
+                >
+                  Settimana
+                </button>
+                <button
+                  onClick={() => setViewMode('resource')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
+                    viewMode === 'resource' 
+                      ? "bg-indigo-600 text-white border-indigo-500 shadow-md" 
+                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent"
+                  )}
+                >
+                  Istruttori
+                </button>
+                <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
                 {[1, 3, 5, 7].map((days) => (
                   <button
                     key={days}
+                    disabled={viewMode === 'resource'}
                     onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
                     className={cn(
                       "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
-                      viewDays === days 
+                      viewDays === days && viewMode === 'week'
                         ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800 shadow-sm" 
-                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800"
+                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800",
+                      viewMode === 'resource' && "opacity-30 cursor-not-allowed"
                     )}
                   >
                     {days} G
@@ -542,7 +619,7 @@ export default function CalendarPage() {
                     title="Vai a oggi"
                     className="px-3 h-8 text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all flex items-center"
                   >
-                    Oggi
+                    {displayDays.some(d => isToday(d)) ? 'Oggi' : format(currentDate, 'EEE d MMM', { locale: it })}
                   </button>
                   <button
                     onClick={() => navigateWeek(1)}
@@ -593,20 +670,19 @@ export default function CalendarPage() {
           <ConflictsAlert />
 
           <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col">
-            <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px]">
-              {/* Intestazione Giorni Fissa */}
+            <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-x-auto overflow-y-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px] scrollbar-hide">
+              <div className="min-w-max flex flex-col h-full">
               <div 
                 className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0"
-                style={{ gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))` } as React.CSSProperties}
+                style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(min(120px, 100vw/3), 1fr))` } as React.CSSProperties}
               >
                 <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
                   <Clock size={16} className="text-zinc-400" />
                 </div>
-                {displayDays.map((day: Date) => {
+                {viewMode === 'week' ? displayDays.map((day: Date) => {
                   const isHoliday = isItalianHoliday(day) || isWeekend(day);
                   const isToday = isSameDay(day, new Date());
                   const dayStr = format(day, 'yyyy-MM-dd');
-                  // Check for exam-type impegni on this day
                   const hasEsame = appointments.some(a =>
                     a.appointment_date === dayStr &&
                     a.is_impegno &&
@@ -640,6 +716,18 @@ export default function CalendarPage() {
                       )}
                     </div>
                   );
+                }) : istruttori.map((ist: any) => {
+                  const istColor = appointments.find(a => a.trainer_id === ist.id)?.istruttore?.color || '#3b82f6';
+                  return (
+                    <div key={ist.id} className="p-1 sm:p-2 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md mb-1" style={{ backgroundColor: istColor }}>
+                        {ist.cognome?.[0] || '?'}{ist.nome?.[0] || ''}
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 truncate w-full px-1">
+                        {ist.cognome}
+                      </span>
+                    </div>
+                  );
                 })}
               </div>
 
@@ -667,18 +755,18 @@ export default function CalendarPage() {
                   const hasToday = displayDays.some(d => isSameDay(d, nowLine));
 
                   return (
-                    <div 
-                      key={slot} 
-                      id={`slot-${slot}`}
-                      className={cn(
-                        "grid min-h-[40px] transition-colors relative",
-                        isFullHour ? "border-zinc-200 dark:border-zinc-700 border-b" : "border-zinc-100/50 dark:border-zinc-800/30 border-b"
-                      )}
-                      style={{ 
-                        gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))`,
-                        zIndex: isCurrentSlot ? 40 : timeSlots.length - timeSlots.indexOf(slot),
-                      } as React.CSSProperties}
-                    >
+                      <div 
+                        key={slot} 
+                        id={`slot-${slot}`}
+                        className={cn(
+                          "grid min-h-[40px] transition-colors relative",
+                          isFullHour ? "border-zinc-200 dark:border-zinc-700 border-b" : "border-zinc-100/50 dark:border-zinc-800/30 border-b"
+                        )}
+                        style={{ 
+                          gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, istruttori.length)}, minmax(min(120px, 100vw/3), 1fr))`,
+                          zIndex: isCurrentSlot ? 40 : timeSlots.length - timeSlots.indexOf(slot),
+                        } as React.CSSProperties}
+                      >
                       {isCurrentSlot && hasToday && (
                         <div 
                           className="absolute left-0 right-0 z-50 flex items-center pointer-events-none"
@@ -699,7 +787,7 @@ export default function CalendarPage() {
                       )}>
                         {isFullHour ? slot : slot.split(':')[1]}
                       </div>
-                      {displayDays.map((day: Date) => {
+                      {viewMode === 'week' ? displayDays.map((day: Date) => {
                         const dateStr = format(day, 'yyyy-MM-dd');
                         const cellId = `${dateStr}|${slot}`;
                         
@@ -748,13 +836,63 @@ export default function CalendarPage() {
                             </div>
                           </DroppableCell>
                         );
+                      }) : istruttori.map((ist: any) => {
+                        const dateStr = format(currentDate, 'yyyy-MM-dd');
+                        const cellId = `${dateStr}|${slot}|${ist.id}`;
+                        
+                        const dayAppointments = appointments.filter(a => a.appointment_date === dateStr);
+                        const slotStartTime = slot;
+                        const slotEndTime = format(addMinutes(parseISO(`2000-01-01T${slot}`), granularity), "HH:mm");
+                        
+                        const cellAppointments = dayAppointments
+                          .filter(apt => {
+                            const aptTime = apt.appointment_time.slice(0, 5);
+                            return (
+                              aptTime >= slotStartTime && 
+                              aptTime < slotEndTime &&
+                              apt.trainer_id === ist.id
+                            );
+                          })
+                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+
+                        return (
+                          <DroppableCell key={cellId} id={cellId}>
+                            <div 
+                              className="w-full flex flex-col gap-0 relative cursor-pointer min-h-[40px]"
+                              onClick={() => handleCellClick(dateStr, slot)}
+                            >
+                              {cellAppointments
+                                .map((apt, idx) => {
+                                const activeInCellCount = cellAppointments.filter(a => a.stato !== 'annullato').length;
+                                const hasConflict = apt.stato !== 'annullato' && activeInCellCount > 1; 
+                                
+                                return (
+                                  <div
+                                    key={apt.id}
+                                    className="relative w-full"
+                                  >
+                                    <DraggableAppointment
+                                      appointment={apt}
+                                      isOverlapping={hasConflict}
+                                      onClick={setSelectedAppointment}
+                                      isStacked={cellAppointments.length > 1}
+                                      granularity={15}
+                                      isFirst={idx === 0}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </DroppableCell>
+                        );
                       })}
                     </div>
                   );
                 })}
             </div>
           </div>
-          <DragOverlay adjustScale={false} zIndex={100}>
+        </div>
+        <DragOverlay adjustScale={false} zIndex={100}>
             {activeId && activeAppointment ? (
               <div className="relative pointer-events-none">
                 <div
@@ -813,17 +951,31 @@ export default function CalendarPage() {
       />
 
       {selectedAppointment && (
-        <DetailsModal
-          isOpen={true}
-          onClose={() => setSelectedAppointment(null)}
-          onSuccess={async () => {
-            setSelectedAppointment(null);
-            router.refresh();
-            await new Promise(r => setTimeout(r, 300));
-            await fetchWeekAppointments();
-          }}
-          appointmentId={selectedAppointment.id}
-        />
+        selectedAppointment.sessione_esame_id ? (
+          <ExamSessionModal
+            isOpen={true}
+            onClose={() => setSelectedAppointment(null)}
+            onSuccess={async () => {
+              setSelectedAppointment(null);
+              router.refresh();
+              await new Promise(r => setTimeout(r, 300));
+              await fetchWeekAppointments();
+            }}
+            sessionId={selectedAppointment.sessione_esame_id}
+          />
+        ) : (
+          <DetailsModal
+            isOpen={true}
+            onClose={() => setSelectedAppointment(null)}
+            onSuccess={async () => {
+              setSelectedAppointment(null);
+              router.refresh();
+              await new Promise(r => setTimeout(r, 300));
+              await fetchWeekAppointments();
+            }}
+            appointmentId={selectedAppointment.id}
+          />
+        )
       )}
 
       {toast && (

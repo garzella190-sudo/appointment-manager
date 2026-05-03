@@ -50,6 +50,7 @@ export interface Cliente {
   sessione_esame_id?: string | null;   // FK
   istruttore_pronto_id?: string | null; // FK -> istruttori.id
   archiviato?: boolean;
+  bocciato?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -100,6 +101,7 @@ export interface AppuntamentoConDettagli {
   importo: number | null;
   note: string | null;
   annullato: boolean;
+  sessione_esame_id: string | null; // Link alla seduta d'esame
   istruttore: {
     id: string;
     nome: string;
@@ -136,7 +138,10 @@ export interface SessioneEsame {
   data: string;                        // ISO date
   ora_inizio: string;
   n_candidati: number;
-  istruttori_ids: string[];            // Array di UUID
+  istruttori_ids: string[];            // Array di UUID istruttori
+  veicoli_ids: string[];              // Array di UUID veicoli
+  esaminatore: string | null;
+  durata: number | null;
   note: string | null;
   created_at: string;
   updated_at: string;

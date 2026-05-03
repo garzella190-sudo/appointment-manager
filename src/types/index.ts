@@ -18,6 +18,7 @@ export interface Appointment {
   appointment_time: string;
   duration: number;
   notes?: string;
+  sessione_esame_id?: string | null;
   status: string;
   stato: string;
   cost: number;

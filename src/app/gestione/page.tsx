@@ -669,6 +669,7 @@ const TabUtenti = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, 
                   <div className="flex items-center gap-4 min-w-0">
                     <div className={cn(
                       "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 font-bold text-lg text-white shadow-lg font-display",
+                      role === 'AdminDev' ? "bg-zinc-900 shadow-zinc-500/50" :
                       role === 'admin' ? "bg-gradient-to-br from-purple-400 to-purple-600 shadow-purple-500/20" :
                         role === 'istruttore' ? "bg-gradient-to-br from-blue-400 to-blue-600 shadow-blue-500/20" :
                           "bg-gradient-to-br from-zinc-400 to-zinc-600 shadow-zinc-500/20"
@@ -680,11 +681,12 @@ const TabUtenti = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, 
                         <h4 className="font-bold text-zinc-900 dark:text-white truncate">{fullName}</h4>
                         <span className={cn(
                           "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
+                          role === 'AdminDev' ? "bg-zinc-900 text-amber-400 border border-amber-400/20" :
                           role === 'admin' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" :
                             role === 'istruttore' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
                               "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
                         )}>
-                          {role === 'admin' ? 'Admin' : role}
+                          {role === 'AdminDev' ? 'Admin Dev' : role === 'admin' ? 'Admin' : role}
                         </span>
                       </div>
                       <p className="text-[11px] text-zinc-400 truncate font-mono mt-0.5">{user.email}</p>
@@ -1216,38 +1218,40 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
                 </div>
               </div>
 
-              {/* Multiselect Istruttori */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Istruttori</label>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    onClick={() => setSelectedIstruttori([])}
-                    className={cn(
-                      "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all",
-                      selectedIstruttori.length === 0 
-                      ? "bg-zinc-900 text-white border-zinc-900 shadow-lg" 
-                      : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400"
-                    )}
-                  >
-                    Tutti
-                  </button>
-                  {istruttori.map(ist => (
+              {/* Multiselect Istruttori - Solo per Admin */}
+              {(role === 'admin' || role === 'AdminDev') && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Istruttori</label>
+                  <div className="flex flex-wrap gap-1.5">
                     <button
-                      key={ist.id}
-                      onClick={() => toggleIstruttore(ist.id)}
+                      onClick={() => setSelectedIstruttori([])}
                       className={cn(
-                        "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all flex items-center gap-1.5",
-                        selectedIstruttori.includes(ist.id)
-                        ? "bg-sky-50 text-sky-600 border-sky-200 shadow-sm"
-                        : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-sky-200"
+                        "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all",
+                        selectedIstruttori.length === 0 
+                        ? "bg-zinc-900 text-white border-zinc-900 shadow-lg" 
+                        : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400"
                       )}
                     >
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ist.colore }} />
-                      {ist.cognome} {ist.nome}
+                      Tutti
                     </button>
-                  ))}
+                    {istruttori.map(ist => (
+                      <button
+                        key={ist.id}
+                        onClick={() => toggleIstruttore(ist.id)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all flex items-center gap-1.5",
+                          selectedIstruttori.includes(ist.id)
+                          ? "bg-sky-50 text-sky-600 border-sky-200 shadow-sm"
+                          : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-sky-200"
+                        )}
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ist.colore }} />
+                        {ist.cognome} {ist.nome}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="pt-2 flex flex-col items-end gap-2">
                 <button
@@ -1422,7 +1426,7 @@ const TabImpostazioni = () => {
 };
 
 export default function GestionePage() {
-  const { role, isAdmin, isSegreteria, isIstruttore, istruttoreId } = useAuth();
+  const { role, isAdmin, isSegreteria, isIstruttore, istruttoreId, permissions } = useAuth();
   const [active, setActive] = useState<GestioneTab>('report'); // Default to report for better safety
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1440,22 +1444,30 @@ export default function GestionePage() {
   const filteredTabs = TABS.filter(tab => {
     if (isAdmin) return true;
     
-    // Logic for others
-    const isRestrictedByAdmin = hideGestione && (isIstruttore || isSegreteria);
-    
-    if (isRestrictedByAdmin) {
-      return tab.id === 'report' || tab.id === 'impegni';
+    // Se l'utente ha permessi specifici definiti, usiamoli
+    if (permissions && Object.keys(permissions).length > 0) {
+      if (tab.id === 'report') return !!permissions.view_reports;
+      if (tab.id === 'impegni') return true; // Sempre visibile come base
+      if (tab.id === 'veicoli') return !!permissions.manage_staff;
+      if (tab.id === 'istruttori') return !!permissions.manage_staff;
+      if (tab.id === 'patenti') return !!permissions.manage_staff;
+      if (tab.id === 'utenti') return !!permissions.manage_users;
+      if (tab.id === 'impostazioni') return !!permissions.manage_users;
+      if (tab.id === 'mobile') return true;
+    }
+
+    // Fallback ai ruoli se non ci sono permessi granulari
+    if (isSegreteria) {
+      if (tab.id === 'report') return false;
+      if (hideGestione) return tab.id === 'impegni';
+      return ['veicoli', 'patenti', 'impegni'].includes(tab.id);
     }
 
     if (isIstruttore) {
       return tab.id === 'report' || tab.id === 'impegni';
     }
 
-    if (isSegreteria) {
-      return ['veicoli', 'patenti', 'impegni', 'report'].includes(tab.id);
-    }
-
-    return tab.id === 'report'; // Safety fallback
+    return false;
   });
 
   // Ensure active tab is within filtered tabs

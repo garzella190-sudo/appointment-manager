@@ -442,15 +442,22 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     setForm(prev => ({ ...prev, istruttore_id: instrId }));
   };
 
-  // Logic Check: Filter vehicles based on instructor or client needs
+  const currentPatenteTipo = useMemo(() => {
+    const p = patenti.find(p => p.id === form.patente_id);
+    return p ? p.tipo : 'B';
+  }, [form.patente_id, patenti]);
+
+  const isMoto = useMemo(() => {
+    return ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+  }, [currentPatenteTipo]);
+
   const availableVeicoli = useMemo(() => {
     // Filter by slots first
     const slotAvailable = veicoli.filter(v => availableSlots.vehicle_ids.includes(v.id));
     
     // Filter by Patente compatibility
-    const currentPatenteTipo = patenti.find(p => p.id === form.patente_id)?.tipo || 'B';
-    const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
-    const compatibleWithPatente = slotAvailable.filter(v => isMoto ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) : v.tipo_patente === currentPatenteTipo);
+    const isVehMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
+    const compatibleWithPatente = slotAvailable.filter(v => isVehMoto ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) : v.tipo_patente === currentPatenteTipo);
 
     if (!selectedIstruttore) return compatibleWithPatente;
     
@@ -462,7 +469,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       if (b.id === instrDefaultId) return 1;
       return 0;
     });
-  }, [veicoli, selectedIstruttore, availableSlots.vehicle_ids, form.patente_id, patenti]);
+  }, [veicoli, selectedIstruttore, availableSlots.vehicle_ids, currentPatenteTipo]);
 
   const oraFine = useMemo(() => {
     if (!form.ora || isNaN(form.durata)) return '--:--';
@@ -1157,67 +1164,55 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           </div>
         )}
 
-        {/* PATENTE E CAMBIO (Solo per Guida Cliente) */}
+        {/* PATENTE (Solo per Guida Cliente) */}
         {!isImpegno && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-              <label className={LABEL_CLS}><ShieldCheck size={13} /> PATENTE</label>
-              {isView ? (
-                <div className={VIEW_BLOCK_CLS}>{patenti.find(p => p.id === form.patente_id)?.tipo || 'B'}</div>
-              ) : (
-                <Select
-                  options={patenti.map(p => ({ id: p.id, label: p.tipo }))}
-                  value={form.patente_id}
-                  onChange={(val: string) => setForm(prev => ({ ...prev, patente_id: val }))}
-                  placeholder="Seleziona Patente"
-                />
-              )}
-            </div>
-            
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-              <label className={LABEL_CLS}>⚙️ TIPO CAMBIO</label>
-              <div className="flex bg-zinc-100 border border-zinc-100 p-1 rounded-2xl h-12 items-center shadow-sm">
-                {(['manuale', 'automatico'] as const).map(opt => (
-                  <button key={opt} disabled={isView} type="button" onClick={() => setForm(prev => ({ ...prev, cambio: opt }))} className={cn("flex-1 h-10 rounded-xl text-[10px] font-black transition-all", form.cambio === opt ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400 uppercase")}>
-                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+            <label className={LABEL_CLS}><ShieldCheck size={13} /> PATENTE</label>
+            {isView ? (
+              <div className={VIEW_BLOCK_CLS}>{patenti.find(p => p.id === form.patente_id)?.tipo || 'B'}</div>
+            ) : (
+              <Select
+                options={patenti.map(p => ({ id: p.id, label: p.tipo }))}
+                value={form.patente_id}
+                onChange={(val: string) => setForm(prev => ({ ...prev, patente_id: val }))}
+                placeholder="Seleziona Patente"
+              />
+            )}
           </div>
         )}
 
-        {/* ISTRUTTORE & VEICOLO (or ISTRUTTORE if impegno) */}
-        {!isImpegno ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className={LABEL_CLS}>👤 ISTRUTTORE</label>
-              {isView ? (
-                 <div className={VIEW_BLOCK_CLS}>
-                  <div className="w-2.5 h-2.5 rounded-full mr-3 shrink-0" style={{ backgroundColor: selectedIstruttore?.colore || '#3b82f6' }} />
-                  <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
-                </div>
-              ) : (
-                <Select
-                  options={istruttori.map(i => {
-                    const isBusy = !availableSlots.instructor_ids.includes(i.id);
-                    return {
-                      id: i.id,
-                      nome: i.nome,
-                      cognome: i.cognome,
-                      info: isBusy ? '(Occupato)' : '',
-                      disabled: isBusy,
-                      color: i.colore
-                    };
-                  })}
-                  value={form.istruttore_id}
-                  onChange={handleIstruttoreChange}
-                  placeholder="Seleziona istruttore..."
-                  searchable
-                />
-              )}
+        {/* ISTRUTTORE */}
+        <div className="space-y-2">
+          <label className={LABEL_CLS}>👤 ISTRUTTORE</label>
+          {isView ? (
+              <div className={VIEW_BLOCK_CLS}>
+              <div className="w-2.5 h-2.5 rounded-full mr-3 shrink-0" style={{ backgroundColor: selectedIstruttore?.colore || '#3b82f6' }} />
+              <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
             </div>
-            
+          ) : (
+            <Select
+              options={istruttori.map(i => {
+                const isBusy = !availableSlots.instructor_ids.includes(i.id);
+                return {
+                  id: i.id,
+                  nome: i.nome,
+                  cognome: i.cognome,
+                  info: isBusy ? '(Occupato)' : '',
+                  disabled: isBusy,
+                  color: i.colore
+                };
+              })}
+              value={form.istruttore_id}
+              onChange={handleIstruttoreChange}
+              placeholder="Seleziona istruttore..."
+              searchable
+            />
+          )}
+        </div>
+
+        {/* VEICOLO E CAMBIO (Solo per Guida Cliente) */}
+        {!isImpegno && (
+          <div className={cn("grid gap-4 items-end", isMoto ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
               <label className={LABEL_CLS}><Car size={13} /> VEICOLO</label>
               {isView ? (
@@ -1248,36 +1243,19 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               />
               )}
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-             <div className="space-y-2">
-              <label className={LABEL_CLS}>👤 ISTRUTTORE</label>
-              {isView ? (
-                 <div className={VIEW_BLOCK_CLS}>
-                  <div className="w-2.5 h-2.5 rounded-full mr-3 shrink-0" style={{ backgroundColor: selectedIstruttore?.colore || '#3b82f6' }} />
-                  <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
+
+            {isMoto && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <label className={LABEL_CLS}>⚙️ TIPO CAMBIO</label>
+                <div className="flex bg-zinc-100 border border-zinc-100 p-1 rounded-2xl h-12 items-center shadow-sm">
+                  {(['manuale', 'automatico'] as const).map(opt => (
+                    <button key={opt} disabled={isView} type="button" onClick={() => setForm(prev => ({ ...prev, cambio: opt }))} className={cn("flex-1 h-10 rounded-xl text-[10px] font-black transition-all", form.cambio === opt ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400 uppercase")}>
+                      {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <Select
-                  options={istruttori.map(i => {
-                    const isBusy = !availableSlots.instructor_ids.includes(i.id);
-                    return {
-                      id: i.id,
-                      nome: i.nome,
-                      cognome: i.cognome,
-                      info: isBusy ? '(Occupato)' : '',
-                      disabled: isBusy,
-                      color: i.colore
-                    };
-                  })}
-                  value={form.istruttore_id}
-                  onChange={handleIstruttoreChange}
-                  placeholder="Seleziona istruttore..."
-                  searchable
-                />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 

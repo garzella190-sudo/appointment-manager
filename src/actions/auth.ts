@@ -10,6 +10,7 @@ export async function createUserAction(formData: {
   password: string;
   full_name: string;
   role: 'admin' | 'istruttore' | 'segreteria';
+  permissions?: Record<string, boolean>;
 }) {
   try {
     const supabase = createAdminClient();
@@ -21,6 +22,7 @@ export async function createUserAction(formData: {
       user_metadata: {
         role: formData.role,
         full_name: formData.full_name,
+        permissions: formData.permissions || {},
       },
     });
 
@@ -55,6 +57,7 @@ export async function updateUserAction(userId: string, data: {
   full_name?: string;
   role?: string;
   istruttore_id?: string | null;
+  permissions?: Record<string, boolean>;
 }) {
   const supabase = createAdminClient();
   
@@ -74,6 +77,10 @@ export async function updateUserAction(userId: string, data: {
 
   if (data.istruttore_id !== undefined) {
     updatePayload.user_metadata.istruttore_id = data.istruttore_id;
+  }
+
+  if (data.permissions !== undefined) {
+    updatePayload.user_metadata.permissions = data.permissions;
   }
 
   const { data: updated, error } = await supabase.auth.admin.updateUserById(userId, updatePayload);

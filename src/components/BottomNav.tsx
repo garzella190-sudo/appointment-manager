@@ -35,6 +35,14 @@ const BottomNav = () => {
   };
 
   const getPermissions = () => {
+    if (role === 'AdminDev') return [
+      'Accesso Totale al Sistema (Dev)',
+      'Manutenzione Database & Logs',
+      'Gestione Staff e Veicoli',
+      'Configurazione Patenti',
+      'Report Finanziari e Plus',
+      'Gestione Utenti e Permessi'
+    ];
     if (role === 'admin') return [
       'Accesso Totale al Sistema',
       'Gestione Staff e Veicoli',
@@ -69,113 +77,104 @@ const BottomNav = () => {
 
   return (
     <>
-      <nav className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[98%] max-w-2xl z-50 animate-in fade-in slide-in-from-bottom-4 duration-500 print:hidden">
-        <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl grid grid-cols-[1fr_auto_1fr] items-center py-2 px-4 sm:px-6 rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-zinc-200/50 dark:border-zinc-800/50">
-          
-          {/* Left: Profile + NavLeft */}
-          <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
-            <button 
-              onClick={() => setIsPermissionsModalOpen(true)}
-              className="flex items-center gap-2 shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-1 rounded-2xl transition-all active:scale-95 text-left border-none outline-none"
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-inner",
-                role === 'admin' ? "bg-amber-100 text-amber-600" : "bg-sky-100 text-sky-600"
-              )}>
-                {role === 'admin' ? <ShieldCheck size={16} strokeWidth={2.5} /> : <User size={16} strokeWidth={2.5} />}
-              </div>
-              <div className="hidden lg:flex flex-col min-w-0">
-                <span className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                  {user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Utente'}
+      <nav className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-2xl z-50 flex justify-between items-end px-1 pointer-events-none print:hidden">
+        
+        {/* Left Segment */}
+        <div className="flex-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2.5 px-3 sm:px-5 rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-2 pointer-events-auto transition-all">
+          <button 
+            onClick={() => setIsPermissionsModalOpen(true)}
+            className="flex items-center gap-2 shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-1.5 rounded-[20px] transition-all active:scale-95 text-left border-none outline-none"
+          >
+            <div className={cn(
+              "w-8 h-8 rounded-[14px] flex items-center justify-center shrink-0 shadow-inner",
+              role === 'AdminDev' ? "bg-gradient-to-tr from-zinc-800 to-zinc-900 text-amber-400" :
+              role === 'admin' ? "bg-gradient-to-tr from-amber-100 to-amber-200 text-amber-600" : 
+              "bg-gradient-to-tr from-sky-100 to-sky-200 text-sky-600"
+            )}>
+              {role === 'AdminDev' ? <ShieldCheck size={16} strokeWidth={2.5} /> :
+               role === 'admin' ? <ShieldCheck size={16} strokeWidth={2.5} /> : <User size={16} strokeWidth={2.5} />}
+            </div>
+            <div className="hidden lg:flex flex-col min-w-0">
+              <span className="text-[10px] font-black text-zinc-900 dark:text-zinc-100 truncate">
+                {user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Utente'}
+              </span>
+              {role && (
+                <span className="text-[8px] font-black tracking-widest text-zinc-400 leading-none uppercase">
+                  {role}
                 </span>
-                {role && (
-                  <span className="text-[8px] font-black uppercase tracking-tighter text-zinc-400 leading-none uppercase">
-                    {role}
-                  </span>
-                )}
-              </div>
-            </button>
-            
-            <div className="flex items-center gap-3 sm:gap-5">
-              {navLeft.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    title={item.name}
-                    onClick={() => {
-                      if (item.name === 'Calendario') {
-                        localStorage.setItem('calendar_currentDate', new Date().toISOString());
-                        window.dispatchEvent(new CustomEvent('calendar-reset-today'));
-                      } else if (item.name === 'Home') {
-                        window.dispatchEvent(new CustomEvent('home-reset-today'));
-                      }
-                    }}
-                    className={cn(
-                      "flex flex-col items-center gap-0.5 transition-all duration-300 hover:scale-110 active:scale-95 px-1 sm:px-2",
-                      isActive ? "text-sky-600 dark:text-sky-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-                    )}
-                  >
-                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={cn(
-                      "transition-all duration-300",
-                      isActive ? "scale-110" : "group-hover:scale-110"
-                    )} />
-                    <span className={cn(
-                      "text-[9px] sm:text-[10px] font-bold tracking-tight transition-all",
-                      isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100"
-                    )}>
-                      {item.name}
-                    </span>
-                  </Link>
-                );
-              })}
+              )}
             </div>
-          </div>
-
-          {/* Center: Main Plus Button */}
-          <div className="flex justify-center px-2">
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-sky-500 hover:bg-sky-400 text-white p-3.5 sm:p-4 rounded-2xl -mt-10 sm:-mt-12 shadow-lg shadow-sky-500/40 transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer outline-none ring-offset-2 focus:ring-2 focus:ring-sky-500 flex items-center justify-center"
-            >
-              <PlusCircle size={24} strokeWidth={2.5} />
-            </button>
-          </div>
-
-          {/* Right: NavRight */}
-          <div className="flex items-center justify-end gap-3 sm:gap-5 overflow-hidden">
-            <div className="flex items-center gap-3 sm:gap-5">
-              {navRight.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    title={item.name}
-                    className={cn(
-                      "flex flex-col items-center gap-0.5 transition-all duration-300 hover:scale-110 active:scale-95 px-1 sm:px-2",
-                      isActive ? "text-sky-600 dark:text-sky-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-                    )}
-                  >
-                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={cn(
-                      "transition-all duration-300",
-                      isActive ? "scale-110" : "group-hover:scale-110"
-                    )} />
-                    <span className={cn(
-                      "text-[9px] sm:text-[10px] font-bold tracking-tight transition-all",
-                      isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100"
-                    )}>
-                      {item.name}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
+          </button>
+          
+          <div className="flex items-center gap-2 sm:gap-4">
+            {navLeft.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  title={item.name}
+                  onClick={() => {
+                    if (item.name === 'Calendario') {
+                      localStorage.setItem('calendar_currentDate', new Date().toISOString());
+                      window.dispatchEvent(new CustomEvent('calendar-reset-today'));
+                    } else if (item.name === 'Home') {
+                      window.dispatchEvent(new CustomEvent('home-reset-today'));
+                    }
+                  }}
+                  className={cn(
+                    "relative flex flex-col items-center justify-center w-12 h-12 rounded-[20px] transition-all duration-300 active:scale-95 group",
+                    isActive ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  )}
+                >
+                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={cn(
+                    "transition-transform duration-300",
+                    isActive ? "scale-110" : "group-hover:scale-110"
+                  )} />
+                </Link>
+              );
+            })}
           </div>
         </div>
+
+        {/* Center Indented Button */}
+        <div className="shrink-0 pointer-events-auto relative z-10 flex items-center justify-center mb-1">
+          <div className="absolute inset-0 bg-gradient-to-tr from-sky-400 to-sky-600 rounded-[22px] blur-md opacity-40 dark:opacity-60 scale-90 translate-y-1"></div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="relative bg-gradient-to-tr from-sky-400 to-sky-600 text-white w-14 h-14 rounded-[22px] shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer outline-none ring-offset-2 dark:ring-offset-zinc-950 focus:ring-2 focus:ring-sky-500 flex items-center justify-center border border-white/20"
+          >
+            <PlusCircle size={26} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* Right Segment */}
+        <div className="flex-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-end sm:justify-between py-2.5 px-3 sm:px-5 rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-2 pointer-events-auto transition-all">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {navRight.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  title={item.name}
+                  className={cn(
+                    "relative flex flex-col items-center justify-center w-12 h-12 rounded-[20px] transition-all duration-300 active:scale-95 group",
+                    isActive ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400" : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  )}
+                >
+                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={cn(
+                    "transition-transform duration-300",
+                    isActive ? "scale-110" : "group-hover:scale-110"
+                  )} />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
       </nav>
 
       <Modal 
@@ -203,9 +202,11 @@ const BottomNav = () => {
           <div className="flex items-center gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-[24px] border border-zinc-100 dark:border-zinc-800">
             <div className={cn(
               "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg",
+              role === 'AdminDev' ? "bg-zinc-900 text-white" :
               role === 'admin' ? "bg-amber-100 text-amber-600" : "bg-sky-100 text-sky-600"
             )}>
-               {role === 'admin' ? <ShieldCheck size={28} /> : <User size={28} />}
+               {role === 'AdminDev' ? <ShieldCheck size={28} className="text-amber-400" /> :
+                role === 'admin' ? <ShieldCheck size={28} /> : <User size={28} />}
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Ruolo Attuale</p>

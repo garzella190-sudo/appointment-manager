@@ -4,7 +4,7 @@ import { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const supabase = createClient();
 
-export type UserRole = 'admin' | 'istruttore' | 'segreteria';
+export type UserRole = 'admin' | 'AdminDev' | 'istruttore' | 'segreteria';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -47,7 +47,8 @@ export function useAuth() {
     user, 
     role, 
     istruttoreId, 
-    isAdmin: role === 'admin',
+    permissions: user?.user_metadata?.permissions || {},
+    isAdmin: role === 'admin' || role === 'AdminDev',
     isSegreteria: role === 'segreteria',
     isIstruttore: role === 'istruttore',
     loading 
