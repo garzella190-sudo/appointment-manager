@@ -371,7 +371,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
   let emailError = null;
   if (data && payload.send_email) {
     try {
-      const emailRes = await sendConfirmationEmailAction(data.id);
+      const emailRes = await sendConfirmationEmailAction(data.id, true);
       if (emailRes.success) {
         notificationSent = true;
       } else {

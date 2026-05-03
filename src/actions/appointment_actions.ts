@@ -3,13 +3,18 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { StatoAppuntamento } from '@/lib/database.types';
+import { sendConfirmationEmailAction, sendCancellationEmailAction } from './notifications';
 import { sendNotificationToInstructor } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 export async function deleteAppointmentAction(id: string) {
   const supabase = await createClient();
-  const { data: aptToDelete } = await supabase.from('appuntamenti').select('istruttore_id, data, clienti(nome, cognome)').eq('id', id).single();
+  const { data: aptToDelete } = await supabase
+    .from('appuntamenti')
+    .select('istruttore_id, data, durata, clienti(nome, cognome, email)')
+    .eq('id', id)
+    .single();
 
   const { error } = await supabase
     .from('appuntamenti')
@@ -33,6 +38,11 @@ export async function deleteAppointmentAction(id: string) {
           body: `L'appuntamento per ${clientName} del ${timeStr} è stato eliminato.`,
           url: '/'
         });
+      }
+      
+      // Email to client
+      if (aptToDelete.clienti) {
+        await sendCancellationEmailAction(aptToDelete);
       }
     }
   } catch (e) {

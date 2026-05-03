@@ -28,7 +28,9 @@ function getItalyTimeStr(dateString: string) {
   duration,
   instructor,
   vehicle,
-  isReminder = false
+  isReminder = false,
+  isCancellation = false,
+  isModification = false
 }: {
   title: string;
   name: string;
@@ -38,8 +40,14 @@ function getItalyTimeStr(dateString: string) {
   instructor: string;
   vehicle: string;
   isReminder?: boolean;
+  isCancellation?: boolean;
+  isModification?: boolean;
 }) {
-  const accentColor = isReminder ? '#3b82f6' : '#10b981';
+  let accentColor = '#3b82f6'; // Blue
+  if (isReminder) accentColor = '#3b82f6';
+  else if (isCancellation) accentColor = '#ef4444'; // Red
+  else if (isModification) accentColor = '#f59e0b'; // Amber
+  else accentColor = '#10b981'; // Green
   
   return `
     <!DOCTYPE html>
@@ -60,8 +68,15 @@ function getItalyTimeStr(dateString: string) {
     <body>
       <div class="container">
         <div class="card">
-          <div class="title">${title}</div>
-          <div class="subtitle">Ricorda la guida programmata per ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min</div>
+          <div class="title" style="color: ${accentColor}">${title}</div>
+          <div class="subtitle">
+            ${isCancellation 
+              ? `La tua guida del ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })} è stata ELIMINATA`
+              : isModification
+                ? `La tua guida è stata MODIFICATA per il ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min`
+                : `Ricorda la guida programmata per ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min`
+            }
+          </div>
 
           <div class="disclaimer">
             NB: le guide vanno disdette 24h prima, pena addebito dell'importo
@@ -103,7 +118,7 @@ function generateICS(apt: any) {
   ].join('\r\n');
 }
 
-export async function sendConfirmationEmailAction(appointmentId: string) {
+export async function sendConfirmationEmailAction(appointmentId: string, isModification = false) {
   const supabase = createAdminClient();
 
   const { data: apt, error } = await supabase
@@ -135,14 +150,15 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
 
   try {
     const html = getEmailTemplate({
-      title: 'Prenotazione effettuata',
+      title: isModification ? 'La tua guida è stata modificata' : 'Prenotazione effettuata',
       name: clientName,
       date: dateStr,
       time: timeStr,
       duration: apt.durata,
       instructor: instructorName,
       vehicle: vehicleName,
-      isReminder: false
+      isReminder: false,
+      isModification: isModification
     });
 
     const resendApiKey = process.env.RESEND_API_KEY;
@@ -155,7 +171,7 @@ export async function sendConfirmationEmailAction(appointmentId: string) {
     const { data, error: resendError } = await resend.emails.send({
       from: SENDER,
       to: cliente.email,
-      subject: `Prenotazione effettuata - Conferma Guida: ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr} (${apt.durata} min)`,
+      subject: `${isModification ? 'Guida Modificata' : 'Prenotazione effettuata'} - ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr}`,
       html,
       attachments: [
         {
@@ -250,5 +266,42 @@ export async function sendReminderEmailAction(appointmentId: string) {
   } catch (error) {
     console.error('Errore imprevisto invio promemoria:', error);
     return { success: false, error: 'Errore imprevisto durante l\'invio del promemoria' };
+  }
+}
+
+export async function sendCancellationEmailAction(appointmentData: any) {
+  // appointmentData is the object before deletion
+  if (!appointmentData?.clienti?.email) return { success: false };
+
+  try {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) return { success: false };
+
+    const dateStr = appointmentData.data.split('T')[0];
+    const timeStr = getItalyTimeStr(appointmentData.data);
+
+    const html = getEmailTemplate({
+      title: 'Guida Eliminata',
+      name: appointmentData.clienti.nome,
+      date: dateStr,
+      time: timeStr,
+      duration: appointmentData.durata,
+      instructor: '',
+      vehicle: '',
+      isCancellation: true
+    });
+
+    const resend = new Resend(resendApiKey);
+    await resend.emails.send({
+      from: SENDER,
+      to: appointmentData.clienti.email,
+      subject: `ELIMINATA: Guida del ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr}`,
+      html
+    });
+
+    return { success: true };
+  } catch (e) {
+    console.error('Cancellation Email Error:', e);
+    return { success: false };
   }
 }
