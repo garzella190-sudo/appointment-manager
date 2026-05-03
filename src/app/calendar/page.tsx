@@ -665,45 +665,57 @@ export default function CalendarPage() {
                   >
                     Tutti
                   </button>
-                  {istruttori.map(i => {
-                    const isSelected = selectedInstructorIds.length === 0 || selectedInstructorIds.includes(i.id);
-                    return (
-                      <button
-                        key={i.id}
-                        onClick={() => {
-                          setSelectedInstructorIds(prev => {
-                            let next: string[];
-                            if (prev.length === 0) {
-                              next = [i.id];
-                            } else if (prev.includes(i.id)) {
-                              next = prev.filter(id => id !== i.id);
-                              if (next.length === 0) next = [];
-                            } else {
-                              next = [...prev, i.id];
-                            }
-                            // Auto-switch view mode
-                            if (next.length >= 2) {
-                              setViewMode('resource');
-                              setShowFilter(false);
-                            } else {
-                              setViewMode('week');
-                            }
-                            return next;
-                          });
-                        }}
-                        className={cn(
-                          "px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
-                          selectedInstructorIds.includes(i.id)
-                            ? "bg-sky-500 text-white border-sky-400 shadow-md"
-                            : selectedInstructorIds.length === 0
-                              ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-800"
-                              : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400"
-                        )}
-                      >
-                        {i.cognome}
-                      </button>
-                    );
-                  })}
+                  {[...istruttori]
+                    .sort((a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`))
+                    .map(i => {
+                      const isSelected = selectedInstructorIds.length === 0 || selectedInstructorIds.includes(i.id);
+                      const initials = `${i.cognome?.[0] || ''}${i.nome?.[0] || ''}`.toUpperCase();
+                      
+                      return (
+                        <button
+                          key={i.id}
+                          onClick={() => {
+                            setSelectedInstructorIds(prev => {
+                              let next: string[];
+                              if (prev.length === 0) {
+                                next = [i.id];
+                              } else if (prev.includes(i.id)) {
+                                next = prev.filter(id => id !== i.id);
+                                if (next.length === 0) next = [];
+                              } else {
+                                next = [...prev, i.id];
+                              }
+                              // Auto-switch view mode
+                              if (next.length >= 2) {
+                                setViewMode('resource');
+                                setShowFilter(false);
+                              } else {
+                                setViewMode('week');
+                              }
+                              return next;
+                            });
+                          }}
+                          className={cn(
+                            "px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center gap-1.5",
+                            selectedInstructorIds.includes(i.id)
+                              ? "bg-sky-500 text-white border-sky-400 shadow-md"
+                              : selectedInstructorIds.length === 0
+                                ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-800"
+                                : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400"
+                          )}
+                        >
+                          <span className={cn(
+                            "w-5 h-5 flex items-center justify-center rounded-lg text-[8px]",
+                            selectedInstructorIds.includes(i.id) 
+                              ? "bg-white/20 text-white" 
+                              : "bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400"
+                          )}>
+                            {initials}
+                          </span>
+                          {i.cognome}
+                        </button>
+                      );
+                    })}
                 </div>
                 <button
                   onClick={() => { setViewMode('resource'); setShowFilter(false); }}
