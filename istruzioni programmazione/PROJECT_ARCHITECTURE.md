@@ -64,6 +64,18 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 - **Assegnazione Allievi**: Gli allievi pronti per l'esame possono essere assegnati a una seduta specifica e archiviati (`archiviato = true`) a fine percorso.
 - **Indicatori Visivi**: Le schede delle guide in Agenda e Calendario mostrano un'icona `GraduationCap` dinamica: **Verde** per chi ha l'esame fissato, **Grigio Chiaro** per chi è solo segnato come "Pronto".
 
+### 👤 Filtro Istruttori & Multi-selezione
+- **Logica**: L'agenda permette di filtrare gli istruttori tramite pulsanti toggle nel pannello "People".
+- **Auto-Switch Vista**: 
+  - Se vengono selezionati **2 o più** istruttori, il sistema passa automaticamente alla **vista in colonna** (Resource View).
+  - Con **0 o 1** istruttore selezionato, il sistema torna alla **vista settimana**.
+- **Persistenza**: Le preferenze di selezione vengono salvate nel `localStorage`.
+
+### 📧 Onboarding Staff (Welcome Email)
+- **Logica**: Il sistema prevede un invio massivo di email di benvenuto (`/api/cron/welcome`) per configurare lo staff al primo accesso.
+- **Contenuto**: Include credenziali predefinite, link di accesso diretto e istruzioni per l'installazione della PWA su iOS e Android.
+- **Reportistica**: Al termine del ciclo di invio, il sistema invia un report dettagliato di esecuzione all'amministratore.
+
 ### ⏰ Automazione Promemoria (Cron)
 - **Logica**: Il cron job giornaliero (`/api/cron/reminders`) invia promemoria per le guide del **giorno successivo** (Domani), garantendo un preavviso adeguato.
 - **Schedule**: Eseguito ogni mattina alle 05:30 UTC tramite Vercel Cron.

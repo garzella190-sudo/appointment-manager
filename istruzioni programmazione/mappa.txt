@@ -1,20 +1,22 @@
 Elenco del percorso delle cartelle
 Numero di serie del volume: F662-5564
 C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
+|   middleware.ts
+|   
 +---actions
 |       appointments.ts
 |       appointment_actions.ts
 |       auth.ts
 |       clienti.ts
+|       conflitti.ts
 |       impegni.ts
 |       istruttori.ts
 |       notifications.ts
+|       sync.ts
 |       veicoli.ts
 |       
 +---app
-|   |   apple-icon.png
 |   |   globals.css
-|   |   icon.png
 |   |   layout.tsx
 |   |   page.tsx
 |   |   
@@ -22,8 +24,15 @@ C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
 |   |   +---calendar
 |   |   |       route.ts
 |   |   |       
-|   |   \---cron
-|   |       \---reminders
+|   |   +---cron
+|   |   |   +---reminders
+|   |   |   |       route.ts
+|   |   |   |       
+|   |   |   \---welcome
+|   |   |           route.ts
+|   |   |           
+|   |   \---push
+|   |       \---subscribe
 |   |               route.ts
 |   |               
 |   +---calendar
@@ -39,8 +48,12 @@ C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
 |   |       page.tsx
 |   |       
 |   +---gestione
-|   |       page.tsx
-|   |       
+|   |   |   page.tsx
+|   |   |   
+|   |   \---conflitti
+|   |           ConflictRow.tsx
+|   |           page.tsx
+|   |           
 |   +---login
 |   |       page.tsx
 |   |       
@@ -49,15 +62,18 @@ C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
 |   |   BottomNav.tsx
 |   |   Calendar.tsx
 |   |   ConfirmBubble.tsx
+|   |   ConflictsAlert.tsx
 |   |   DatePicker.tsx
 |   |   DraggableAppointment.tsx
 |   |   DroppableCell.tsx
 |   |   InstallPWA.tsx
 |   |   Modal.tsx
 |   |   PhoneActions.tsx
+|   |   PushSubscriptionButton.tsx
 |   |   RefreshButton.tsx
 |   |   StoricoPagamentiTable.tsx
 |   |   SWRegister.tsx
+|   |   SyncManager.tsx
 |   |   Toast.tsx
 |   |   WhatsAppButton.tsx
 |   |   
@@ -77,6 +93,7 @@ C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
 |           AssignExamSessionModal.tsx
 |           DatePickerModal.tsx
 |           DetailsModal.tsx
+|           ExamSessionModal.tsx
 |           NewAppointmentModal.tsx
 |           
 +---hooks
@@ -86,6 +103,8 @@ C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
 |       
 +---lib
 |       database.types.ts
+|       offlineSync.ts
+|       pushHelper.ts
 |       supabase.ts
 |       utils.ts
 |       
@@ -99,5 +118,5 @@ C:\USERS\GARZE\.GEMINI\ANTIGRAVITY\SCRATCH\APPOINTMENT-MANAGER\SRC
     \---supabase
             admin.ts
             client.ts
+            middleware.ts
             server.ts
-            

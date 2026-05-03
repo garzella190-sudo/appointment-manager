@@ -15,6 +15,7 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 - `/src/components/modals/NewAppointmentModal.tsx` -> Master per la creazione guide.
 - `/src/components/forms/AppointmentForm.tsx` -> Logica di business per calcolo orari e compatibilità.
 - `/src/app/api/cron/reminders/route.ts` -> **Cron Reminders**: Gestione automatizzata invio promemoria (Domani).
+- `/src/app/api/cron/welcome/route.ts` -> **Cron Welcome**: Invio una tantum dei dati di accesso allo staff con report finale.
 - `/src/actions/notifications.ts` -> **Notification Hub**: Logica centralizzata Resend e template email.
 
 ## 🎨 Token di Stile
