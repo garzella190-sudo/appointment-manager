@@ -110,14 +110,7 @@ export default function Home() {
   }, [currentDate]);
 
   useEffect(() => {
-    console.log("Agenda V7 - Initialized");
-    if (typeof window !== 'undefined' && !window.location.search.includes('no-alert')) {
-      const alerted = localStorage.getItem('v7_alert_shown');
-      if (!alerted) {
-        alert("Agenda V7 Caricata - Se vedi questo, il codice è quello nuovo.");
-        localStorage.setItem('v7_alert_shown', 'true');
-      }
-    }
+    console.log("Agenda V10 - Initialized");
     fetchAppointments();
 
     const handleUpdate = () => {
@@ -223,7 +216,7 @@ export default function Home() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-none">Agenda</h1>
-              <span className="text-[10px] font-black bg-sky-100 dark:bg-sky-900 text-sky-600 px-1.5 py-0.5 rounded-md tracking-tighter">V7</span>
+              <span className="text-[10px] font-black bg-sky-100 dark:bg-sky-900 text-sky-600 px-1.5 py-0.5 rounded-md tracking-tighter">V10</span>
               <RefreshButton onRefresh={fetchAppointments} className="h-8 w-8 p-0" />
             </div>
             <div className="flex items-center gap-3 mt-0">
