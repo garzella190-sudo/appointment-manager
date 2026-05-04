@@ -1,22 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Download, Smartphone, Laptop, Apple, Chrome, Share, PlusSquare, X, Check } from 'lucide-react';
+import { Download, Smartphone, Laptop, Apple, Chrome, Share, PlusSquare, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const InstallPWA = ({ onDismiss }: { onDismiss?: () => void }) => {
   const [platform, setPlatform] = useState<'ios' | 'android' | 'desktop'>('desktop');
+  const [activeTab, setActiveTab] = useState<'ios' | 'android' | 'desktop'>('desktop');
+  const [isExpanded, setIsExpanded] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
   useEffect(() => {
     const userAgent = window.navigator.userAgent.toLowerCase();
+    let detected: 'ios' | 'android' | 'desktop' = 'desktop';
     if (/iphone|ipad|ipod/.test(userAgent)) {
-      setPlatform('ios');
+      detected = 'ios';
     } else if (/android/.test(userAgent)) {
-      setPlatform('android');
-    } else {
-      setPlatform('desktop');
+      detected = 'android';
     }
+    setPlatform(detected);
+    setActiveTab(detected);
   }, []);
 
   const handleDontShowAgain = () => {
@@ -37,7 +40,7 @@ export const InstallPWA = ({ onDismiss }: { onDismiss?: () => void }) => {
             <Download size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter">Installa l'App</h2>
+            <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter leading-tight">Installa l'App</h2>
             <p className="text-sm text-zinc-500 font-medium">L'agenda sempre a portata di mano</p>
           </div>
         </div>
@@ -48,77 +51,135 @@ export const InstallPWA = ({ onDismiss }: { onDismiss?: () => void }) => {
         )}
       </div>
 
-      <div className="space-y-8">
-        {platform === 'ios' ? (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">Apri in Safari</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">Assicurati di usare Safari. Tocca l'icona <span className="inline-flex items-center px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded mx-0.5 text-blue-500"><Share size={12} /> Condividi</span> (il quadrato con la freccia in su).</p>
+      <div className="space-y-6">
+        {/* Tab Selector */}
+        <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl gap-1">
+          {[
+            { id: 'ios', icon: Apple, label: 'iOS' },
+            { id: 'android', icon: Smartphone, label: 'Android' },
+            { id: 'desktop', icon: Laptop, label: 'Computer' }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setIsExpanded(true);
+                }}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  isActive 
+                    ? "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm" 
+                    : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                )}
+              >
+                <Icon size={14} />
+                <span className="hidden xs:inline">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Dynamic Content */}
+        <div className={cn(
+          "overflow-hidden transition-all duration-500",
+          isExpanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+        )}>
+          <div className="p-6 bg-zinc-50 dark:bg-zinc-800/20 rounded-[24px] border border-zinc-100 dark:border-zinc-800 space-y-6">
+            {activeTab === 'ios' && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-left-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 shadow-sm flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Usa Safari</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">Apri l'agenda in Safari e tocca l'icona <span className="inline-flex items-center px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded mx-0.5 text-blue-500"><Share size={12} /> Condividi</span> (quadrato con freccia).</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 shadow-sm flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Aggiungi alla Home</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">Scorri il menu e tocca <span className="font-bold text-zinc-700 dark:text-zinc-300">"Aggiungi alla schermata Home"</span>.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 shadow-sm flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Conferma</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">Tocca <span className="font-bold text-zinc-700 dark:text-zinc-300">"Aggiungi"</span> in alto a destra.</p>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">Aggiungi alla Home</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">Scorri verso il basso nel menu che appare e tocca <span className="font-bold text-zinc-700 dark:text-zinc-300">"Aggiungi alla schermata Home"</span>.</p>
+            )}
+
+            {activeTab === 'android' && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-left-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 shadow-sm flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Menu Chrome</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">Tocca i <span className="font-bold text-zinc-700 dark:text-zinc-300">tre puntini</span> (⋮) in alto a destra nel browser.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 shadow-sm flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Installa App</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">Tocca <span className="font-bold text-zinc-700 dark:text-zinc-300">"Installa app"</span> o "Aggiungi a schermata Home".</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 shadow-sm flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Conferma</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">Clicca su <span className="font-bold text-zinc-700 dark:text-zinc-300">"Installa"</span> nel popup finale.</p>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">Conferma</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">Tocca <span className="font-bold text-zinc-700 dark:text-zinc-300">"Aggiungi"</span> nell'angolo in alto a destra per completare l'installazione.</p>
+            )}
+
+            {activeTab === 'desktop' && (
+              <div className="flex items-center gap-5 animate-in fade-in slide-in-from-left-4">
+                <div className="w-12 h-12 rounded-2xl bg-white dark:bg-zinc-800 shadow-sm flex items-center justify-center shrink-0">
+                  <PlusSquare className="text-blue-500" size={24} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-zinc-900 dark:text-white">Installazione Rapida</p>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    Clicca l'icona di installazione nella barra degli indirizzi di Chrome o Edge (a destra dell'URL).
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        ) : platform === 'android' ? (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">Menu Browser</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">Tocca i <span className="font-bold text-zinc-700 dark:text-zinc-300">tre puntini</span> (⋮) in alto a destra o in basso nel tuo browser (Chrome).</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">Installa App</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">Tocca la voce <span className="font-bold text-zinc-700 dark:text-zinc-300">"Installa app"</span> o "Aggiungi a schermata Home".</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">Conferma</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">Conferma cliccando su <span className="font-bold text-zinc-700 dark:text-zinc-300">"Installa"</span> nel popup che appare.</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-            <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-[24px] border border-zinc-100 dark:border-zinc-800 flex items-center gap-5">
-              <Laptop className="text-blue-500 shrink-0" size={32} />
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-zinc-900 dark:text-white">Installazione su Computer</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  Clicca sull'icona di installazione (piccolo computer con freccia) nella barra degli indirizzi di Chrome o Edge.
-                </p>
-              </div>
-            </div>
-          </div>
+        </div>
+
+        {/* Toggle Button for Desktop (initially collapsed) */}
+        {!isExpanded && (
+          <button 
+            onClick={() => setIsExpanded(true)}
+            className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-blue-500 hover:border-blue-500/30 transition-all group"
+          >
+            Vedi Guida Installazione <ChevronDown size={14} className="group-hover:translate-y-0.5 transition-transform" />
+          </button>
+        )}
+
+        {isExpanded && (
+           <button 
+             onClick={() => setIsExpanded(false)}
+             className="w-full text-center text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors py-2"
+           >
+             Chiudi Guida
+           </button>
         )}
 
         <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-              <Apple size={14} className="text-zinc-300" /> iOS
-            </div>
-            <div className="flex items-center gap-2 text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-              <Smartphone size={14} className="text-zinc-300" /> Android
-            </div>
+          <div className="flex items-center gap-4 text-[9px] font-black text-zinc-300 uppercase tracking-widest">
+            {platform === 'ios' && <span className="text-blue-500">Stai usando un iPhone/iPad</span>}
+            {platform === 'android' && <span className="text-blue-500">Stai usando Android</span>}
+            {platform === 'desktop' && <span>Stai usando un Computer</span>}
           </div>
 
           {onDismiss && (
