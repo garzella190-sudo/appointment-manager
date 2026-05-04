@@ -20,9 +20,11 @@ export function useRevisionReminder(dataRevisione: string | null) {
   const isNearExpiry = !isExpired && daysLeft <= 30;
 
   // Genera URL Google Calendar per aggiungere reminder
-  const startDate = dataRevisione.replace(/-/g, '');          // YYYYMMDD
-  const endDate   = dataRevisione.replace(/-/g, '');          // same day event
-  const calendarUrl = `https://calendar.google.com/calendar/r/eventedit?text=Scadenza+Revisione+Veicolo&dates=${startDate}/${endDate}&details=Ricorda+di+prenotare+la+revisione+ministeriale&trp=false`;
+  const startDate = expiry.toISOString().split('T')[0].replace(/-/g, '');
+  const nextDay = new Date(expiry);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const endDate = nextDay.toISOString().split('T')[0].replace(/-/g, '');
+  const calendarUrl = `https://calendar.google.com/calendar/r/eventedit?text=Scadenza+Revisione+Veicolo&dates=${startDate}/${endDate}&details=Ricorda+di+prenotare+la+revisione+ministeriale&sf=true&output=xml`;
 
   return { isExpired, isNearExpiry, daysLeft, calendarUrl };
 }

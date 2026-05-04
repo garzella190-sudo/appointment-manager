@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `UID:${apt.id}@autoscuola.toscana`,
+    `UID:apt-${apt.id}-${startDate.getTime()}@autoscuola.toscana`,
     `DTSTAMP:${formatICS(new Date())}`,
     `DTSTART:${formatICS(startDate)}`,
     `DTEND:${formatICS(endDate)}`,

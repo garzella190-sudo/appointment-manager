@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
-import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil, X, Plus, ChevronDown, Check } from 'lucide-react';
+import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil, X, Plus, ChevronDown, Check, CalendarPlus } from 'lucide-react';
 import { format, addMinutes, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Cliente, Istruttore, Veicolo, Patente, StatoAppuntamento } from '@/lib/database.types';
@@ -856,6 +856,17 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   </button>
                 }
               />
+
+              {/* AGGIUNGI AL CALENDARIO */}
+              <a
+                href={`/api/calendar?id=${appointmentId}`}
+                className="w-10 h-10 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 rounded-xl flex items-center justify-center hover:bg-violet-100 transition-all active:scale-95 shadow-sm border border-violet-100/50 dark:border-violet-900/30"
+                title="Aggiungi al calendario"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <CalendarPlus size={18} />
+              </a>
             </div>
           )}
 

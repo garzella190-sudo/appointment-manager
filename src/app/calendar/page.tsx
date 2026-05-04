@@ -102,7 +102,10 @@ export interface AppointmentRow {
 
 let datePickerCloseTime = 0;
 
+import { useAuth } from '@/hooks/useAuth';
+
 export default function CalendarPage() {
+  const { role, isSegreteria, isAdmin } = useAuth();
   const supabase = supabaseClient;
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -127,6 +130,16 @@ export default function CalendarPage() {
   // Usa l'hook per gestire responsive in modo solido dopo l'idratazione
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    if (!mounted) return;
+    
+    // Default view mode for staff if no saved preference
+    const savedViewMode = localStorage.getItem('calendar_viewMode');
+    if (savedViewMode === null && (role === 'segreteria' || isAdmin)) {
+      setViewMode('resource');
+    }
+  }, [mounted, role, isAdmin]);
+
+  useEffect(() => {
     setMounted(true);
     setIsMobile(window.innerWidth < 768);
     
@@ -136,9 +149,7 @@ export default function CalendarPage() {
     const savedShowWeekends = localStorage.getItem('calendar_showWeekends');
     const savedDate = localStorage.getItem('calendar_currentDate');
     const savedGranularity = localStorage.getItem('calendar_granularity');
-
     const savedViewMode = localStorage.getItem('calendar_viewMode');
-    const savedVisibleInstructors = localStorage.getItem('calendar_visibleInstructorIds');
 
     if (savedInstructorIds) try { setSelectedInstructorIds(JSON.parse(savedInstructorIds)); } catch {}
     if (savedViewDays !== null) setViewDays(parseInt(savedViewDays) as any);
@@ -675,25 +686,23 @@ export default function CalendarPage() {
                         <button
                           key={i.id}
                           onClick={() => {
-                            setSelectedInstructorIds(prev => {
-                              let next: string[];
-                              if (prev.length === 0) {
-                                next = [i.id];
-                              } else if (prev.includes(i.id)) {
-                                next = prev.filter(id => id !== i.id);
-                                if (next.length === 0) next = [];
-                              } else {
-                                next = [...prev, i.id];
-                              }
-                              // Auto-switch view mode
-                              if (next.length >= 2) {
-                                setViewMode('resource');
-                                setShowFilter(false);
-                              } else {
-                                setViewMode('week');
-                              }
-                              return next;
-                            });
+                              setSelectedInstructorIds(prev => {
+                                let next: string[];
+                                if (prev.length === 0) {
+                                  next = [i.id];
+                                } else if (prev.includes(i.id)) {
+                                  next = prev.filter(id => id !== i.id);
+                                  if (next.length === 0) next = [];
+                                } else {
+                                  next = [...prev, i.id];
+                                }
+                                
+                                // Auto-switch view mode only if going from 1 to 2+
+                                if (next.length >= 2 && viewMode === 'week') {
+                                  setViewMode('resource');
+                                }
+                                return next;
+                              });
                           }}
                           className={cn(
                             "px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center gap-1.5",
@@ -712,7 +721,7 @@ export default function CalendarPage() {
                           )}>
                             {initials}
                           </span>
-                          {i.cognome}
+                          {i.nome} {i.cognome}
                         </button>
                       );
                     })}
@@ -875,8 +884,13 @@ export default function CalendarPage() {
                             >
                               {cellAppointments
                                 .map((apt, idx) => {
-                                const activeInCellCount = cellAppointments.filter(a => a.stato !== 'annullato').length;
-                                const hasConflict = apt.stato !== 'annullato' && activeInCellCount > 1; 
+                                const activeAppointments = cellAppointments.filter(a => a.stato !== 'annullato');
+                                const hasConflict = apt.stato !== 'annullato' && activeAppointments.some(other => 
+                                  other.id !== apt.id && 
+                                  (other.trainer_id === apt.trainer_id || 
+                                   other.vehicle_id_uuid === apt.vehicle_id_uuid || 
+                                   other.cliente_id === apt.cliente_id)
+                                );
                                 
                                 return (
                                   <div
@@ -924,8 +938,13 @@ export default function CalendarPage() {
                             >
                               {cellAppointments
                                 .map((apt, idx) => {
-                                const activeInCellCount = cellAppointments.filter(a => a.stato !== 'annullato').length;
-                                const hasConflict = apt.stato !== 'annullato' && activeInCellCount > 1; 
+                                const activeAppointments = cellAppointments.filter(a => a.stato !== 'annullato');
+                                const hasConflict = apt.stato !== 'annullato' && activeAppointments.some(other => 
+                                  other.id !== apt.id && 
+                                  (other.trainer_id === apt.trainer_id || 
+                                   other.vehicle_id_uuid === apt.vehicle_id_uuid || 
+                                   other.cliente_id === apt.cliente_id)
+                                );
                                 
                                 return (
                                   <div

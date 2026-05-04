@@ -1377,11 +1377,31 @@ const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: st
 const TabImpostazioni = () => {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState({ hide_gestione_for_others: false });
+  
+  // Local Settings (from localStorage)
+  const [localSettings, setLocalSettings] = useState({
+    viewMode: 'week',
+    granularity: 15,
+    showWeekends: true
+  });
 
   useEffect(() => {
     async function load() {
+      // Global Config
       const { data } = await supabase.from('impostazioni_sistema').select('*').eq('id', 'config_globale').single();
       if (data) setConfig(data);
+      
+      // Local Config
+      const savedViewMode = localStorage.getItem('calendar_viewMode') || 'week';
+      const savedGranularity = localStorage.getItem('calendar_granularity') || '15';
+      const savedShowWeekends = localStorage.getItem('calendar_showWeekends') !== 'false';
+      
+      setLocalSettings({
+        viewMode: savedViewMode,
+        granularity: parseInt(savedGranularity),
+        showWeekends: savedShowWeekends
+      });
+      
       setLoading(false);
     }
     load();
@@ -1393,19 +1413,103 @@ const TabImpostazioni = () => {
     if (!error) setConfig({ ...config, hide_gestione_for_others: newValue });
   };
 
+  const updateLocalSetting = (key: string, value: any) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+    const storageKey = key === 'viewMode' ? 'calendar_viewMode' : 
+                       key === 'granularity' ? 'calendar_granularity' : 
+                       'calendar_showWeekends';
+    localStorage.setItem(storageKey, value.toString());
+  };
+
   if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-amber-500" /></div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-[32px] border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter mb-4 flex items-center gap-2">
-          <ShieldCheck className="text-amber-500" />
-          Restrizioni Accesso
-        </h3>
-        <div className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+      
+      {/* SEZIONE: PREFERENZE CALENDARIO */}
+      <div className="bg-white dark:bg-zinc-900 p-8 rounded-[32px] border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+            <Clock size={24} />
+          </div>
           <div>
-            <p className="font-bold text-zinc-900 dark:text-white">Nascondi Gestione</p>
-            <p className="text-xs text-zinc-500">Nasconde le schede tecniche a Istruttori e Ufficio (mostra solo Report e Impegni).</p>
+            <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter">Visualizzazione Calendario</h3>
+            <p className="text-xs text-zinc-500">Personalizza come l'agenda appare su questo dispositivo.</p>
+          </div>
+        </div>
+
+        <div className="grid gap-6">
+          {/* Granularità */}
+          <div className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Intervallo di Tempo (Slot)</p>
+              <p className="text-xs text-zinc-500">Definisce la precisione della griglia oraria.</p>
+            </div>
+            <select 
+              value={localSettings.granularity}
+              onChange={(e) => updateLocalSetting('granularity', parseInt(e.target.value))}
+              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none"
+            >
+              <option value={15}>15 minuti</option>
+              <option value={30}>30 minuti</option>
+              <option value={60}>60 minuti</option>
+            </select>
+          </div>
+
+          {/* Vista Iniziale */}
+          <div className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Vista Predefinita</p>
+              <p className="text-xs text-zinc-500">La vista caricata all'apertura del calendario.</p>
+            </div>
+            <select 
+              value={localSettings.viewMode}
+              onChange={(e) => updateLocalSetting('viewMode', e.target.value)}
+              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none"
+            >
+              <option value="week">Settimanale (7 Giorni)</option>
+              <option value="resource">Istruttori (Side-by-side)</option>
+            </select>
+          </div>
+
+          {/* Mostra Weekend */}
+          <div className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Mostra Fine Settimana</p>
+              <p className="text-xs text-zinc-500">Visualizza Sabato e Domenica nella griglia.</p>
+            </div>
+            <button 
+              onClick={() => updateLocalSetting('showWeekends', !localSettings.showWeekends)}
+              className={cn(
+                "w-12 h-6 rounded-full transition-all relative",
+                localSettings.showWeekends ? "bg-sky-500" : "bg-zinc-300 dark:bg-zinc-700"
+              )}
+            >
+              <div className={cn(
+                "w-4 h-4 bg-white rounded-full absolute top-1 transition-all",
+                localSettings.showWeekends ? "right-1" : "left-1"
+              )} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SEZIONE: SICUREZZA (Global) */}
+      <div className="bg-white dark:bg-zinc-900 p-8 rounded-[32px] border border-zinc-200 dark:border-zinc-800 shadow-sm mt-8">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <ShieldCheck size={24} />
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter">Restrizioni Amministrative</h3>
+            <p className="text-xs text-zinc-500">Impostazioni globali che influenzano tutti gli utenti.</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+          <div>
+            <p className="font-bold text-zinc-900 dark:text-white">Nascondi Schede Tecniche</p>
+            <p className="text-xs text-zinc-500">Limita la visibilità delle schede "Gestione" per istruttori e segreteria.</p>
           </div>
           <button 
             onClick={toggleHide}
@@ -1420,6 +1524,20 @@ const TabImpostazioni = () => {
             )} />
           </button>
         </div>
+      </div>
+
+      {/* SEZIONE: INSTALLAZIONE */}
+      <div className="bg-zinc-900 text-white p-8 rounded-[32px] border border-zinc-800 shadow-2xl mt-8">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+            <Smartphone className="text-sky-400" size={24} />
+          </div>
+          <div>
+            <h3 className="text-xl font-black uppercase tracking-tighter">App sul Telefono</h3>
+            <p className="text-xs text-zinc-400">Come installare l'agenda sulla schermata Home.</p>
+          </div>
+        </div>
+        <InstallPWA />
       </div>
     </div>
   );

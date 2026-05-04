@@ -102,17 +102,24 @@ function generateICS(apt: any) {
   const endDate = new Date(startDate.getTime() + (apt.durata || 60) * 60000);
   const formatICS = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
   const address = "Via Le Vallicelle, 4, 56043 Fauglia (PI)";
+  const now = new Date();
 
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Autoscuola Toscana Fauglia//IT',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
     'BEGIN:VEVENT',
+    `UID:apt-${apt.id}-${startDate.getTime()}@autoscuola.toscana`,
+    `DTSTAMP:${formatICS(now)}`,
     `DTSTART:${formatICS(startDate)}`,
     `DTEND:${formatICS(endDate)}`,
     `SUMMARY:Lezione di Guida`,
     `DESCRIPTION:Sede: Autoscuola Toscana Fauglia\\nIndirizzo: ${address}`,
     'LOCATION:Autoscuola Toscana Fauglia',
+    'STATUS:CONFIRMED',
+    'SEQUENCE:0',
     'END:VEVENT',
     'END:VCALENDAR'
   ].join('\r\n');
@@ -177,6 +184,7 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
         {
           filename: 'guida.ics',
           content: Buffer.from(icsStr).toString('base64'),
+          contentType: 'text/calendar'
         }
       ]
     });
