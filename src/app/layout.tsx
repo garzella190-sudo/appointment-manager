@@ -12,7 +12,16 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Agenda Guide Manu",
-  description: "Gestione guide e appuntamenti",
+  description: "Gestione avanzata guide e appuntamenti autoscuola",
+  applicationName: "Agenda Manu",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Agenda Manu",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [
       { url: '/app_icon_512.png', media: '(prefers-color-scheme: light)' },
@@ -23,15 +32,13 @@ export const metadata: Metadata = {
       { url: '/app_icon_512_dark.png', media: '(prefers-color-scheme: dark)' }
     ]
   },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Agenda Guide Manu",
-  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#3B82F6",
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
