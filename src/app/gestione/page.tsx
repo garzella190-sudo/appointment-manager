@@ -1360,7 +1360,7 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
 };
 
 // ── Page principale ───────────────────────────────────────────
-type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti' | 'impegni' | 'report' | 'mobile' | 'impostazioni';
+type GestioneTab = 'veicoli' | 'istruttori' | 'patenti' | 'utenti' | 'impegni' | 'report' | 'impostazioni';
 
 const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'veicoli', label: 'Veicoli', icon: Car, color: 'emerald' },
@@ -1370,7 +1370,6 @@ const TABS: { id: GestioneTab; label: string; icon: React.ElementType; color: st
   { id: 'patenti', label: 'Patenti', icon: BadgeCheck, color: 'purple' },
   { id: 'utenti', label: 'Utenti', icon: ShieldCheck, color: 'indigo' },
   { id: 'impostazioni', label: 'Impostazioni', icon: Key, color: 'amber' },
-  { id: 'mobile', label: 'App Mobile', icon: Smartphone, color: 'blue' },
 ];
 
 // ── Tab: Impostazioni ─────────────────────────────────────────
@@ -1533,11 +1532,10 @@ const TabImpostazioni = () => {
             <Smartphone className="text-sky-400" size={24} />
           </div>
           <div>
-            <h3 className="text-xl font-black uppercase tracking-tighter">App sul Telefono</h3>
-            <p className="text-xs text-zinc-400">Come installare l'agenda sulla schermata Home.</p>
+            <h3 className="text-xl font-black uppercase tracking-tighter">Versione Sistema</h3>
+            <p className="text-xs text-zinc-400">L'agenda è aggiornata alla V10.</p>
           </div>
         </div>
-        <InstallPWA />
       </div>
     </div>
   );
@@ -1571,7 +1569,6 @@ export default function GestionePage() {
       if (tab.id === 'patenti') return !!permissions.manage_staff;
       if (tab.id === 'utenti') return !!permissions.manage_users;
       if (tab.id === 'impostazioni') return !!permissions.manage_users;
-      if (tab.id === 'mobile') return true;
     }
 
     // Fallback ai ruoli se non ci sono permessi granulari
@@ -1708,7 +1705,6 @@ export default function GestionePage() {
             {active === 'patenti' && <TabPatenti refreshKey={refreshKey} sectionColor={sectionColor} />}
             {active === 'utenti' && <TabUtenti refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
             {active === 'impostazioni' && <TabImpostazioni />}
-            {active === 'mobile' && <InstallPWA />}
             {active === 'impegni' && <TabImpegni refreshKey={refreshKey} sectionColor={sectionColor} />}
           </div>
         </div>

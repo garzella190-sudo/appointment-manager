@@ -39,6 +39,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+import { InstallPrompt } from "@/components/InstallPrompt";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -78,6 +80,7 @@ export default async function RootLayout({
           <Analytics />
           <SWRegister />
           <SyncManager />
+          <InstallPrompt />
           <div id="datepicker-portal" />
         </ToastProvider>
       </body>
