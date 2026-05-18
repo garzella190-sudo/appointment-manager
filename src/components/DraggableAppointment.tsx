@@ -62,6 +62,9 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
           onClick(appointment);
         }
       }}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
       className={cn(
         "relative w-full mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] flex flex-col justify-between border",
         totalColumns > 1 ? "p-1.5" : "p-2",
