@@ -72,7 +72,7 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
       )}
       style={{ 
         ...style,
-        height: isStacked ? 'auto' : `${(appointment.duration / 15) * 40 - 2}px`,
+        height: isStacked ? 'auto' : `${((appointment.visualDuration ?? appointment.duration) / 15) * 40 - 2}px`,
         minHeight: isStacked ? '36px' : undefined,
         marginTop: (isStacked && !isFirst) ? '-4px' : undefined,
         backgroundColor: appointment.stato === 'annullato' ? '#f4f4f5' : hexToRgba(instructorColor, 0.15),

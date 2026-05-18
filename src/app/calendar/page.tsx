@@ -954,8 +954,53 @@ export default function CalendarPage() {
                         const slotStartTime = slot; // "HH:mm"
                         const slotEndTime = format(addMinutes(parseISO(`2000-01-01T${slot}`), granularity), "HH:mm");
                         
-                        const cellAppointments = dayAppointments
+                        const processedDayAppointments = dayAppointments.map(apt => {
+                          if (apt.stato !== 'annullato') {
+                            return { ...apt, isVisible: true, visualDuration: apt.duration };
+                          }
+                          
+                          const aptStart = new Date(`${apt.appointment_date}T${apt.appointment_time}`).getTime();
+                          const aptEnd = aptStart + apt.duration * 60000;
+                          
+                          const overlappingActive = dayAppointments
+                            .filter(other => 
+                              other.stato !== 'annullato' &&
+                              other.trainer_id === apt.trainer_id
+                            )
+                            .map(other => {
+                              const start = new Date(`${other.appointment_date}T${other.appointment_time}`).getTime();
+                              const end = start + other.duration * 60000;
+                              return { start, end };
+                            })
+                            .filter(other => other.start < aptEnd && other.end > aptStart);
+                            
+                          if (overlappingActive.length === 0) {
+                            return { ...apt, isVisible: true, visualDuration: apt.duration };
+                          }
+                          
+                          const hasImmediateOverlap = overlappingActive.some(other => other.start <= aptStart);
+                          if (hasImmediateOverlap) {
+                            return { ...apt, isVisible: false };
+                          }
+                          
+                          const nextStarts = overlappingActive
+                            .filter(other => other.start > aptStart)
+                            .map(other => other.start);
+                            
+                          if (nextStarts.length > 0) {
+                            const nextStart = Math.min(...nextStarts);
+                            const emptySpaceDuration = (nextStart - aptStart) / 60000;
+                            if (emptySpaceDuration > 0) {
+                              return { ...apt, isVisible: true, visualDuration: emptySpaceDuration };
+                            }
+                          }
+                          
+                          return { ...apt, isVisible: false };
+                        });
+
+                        const cellAppointments = processedDayAppointments
                           .filter(apt => {
+                            if (!apt.isVisible) return false;
                             const aptTime = apt.appointment_time.slice(0, 5);
                             return (
                               aptTime >= slotStartTime && 
@@ -963,20 +1008,7 @@ export default function CalendarPage() {
                               (selectedInstructorIds.length === 0 || selectedInstructorIds.includes(apt.trainer_id))
                             );
                           })
-                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
-                          .filter(apt => {
-                            if (apt.stato !== 'annullato') return true;
-                            // Se è annullato, mostra solo se non ci sono appuntamenti attivi che si sovrappongono nello stesso orario per lo stesso istruttore
-                            const hasOverlappingActive = dayAppointments.some(other => {
-                              if (other.stato === 'annullato' || other.trainer_id !== apt.trainer_id) return false;
-                              const otherStart = new Date(`${other.appointment_date}T${other.appointment_time}`).getTime();
-                              const otherEnd = otherStart + other.duration * 60000;
-                              const aptStart = new Date(`${apt.appointment_date}T${apt.appointment_time}`).getTime();
-                              const aptEnd = aptStart + apt.duration * 60000;
-                              return otherStart < aptEnd && otherEnd > aptStart;
-                            });
-                            return !hasOverlappingActive;
-                          });
+                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
 
                         // Raggruppa gli appuntamenti della cella per l'ora esatta di inizio
                         const appointmentsByTime: { [time: string]: typeof cellAppointments } = {};
@@ -1039,8 +1071,53 @@ export default function CalendarPage() {
                         const slotStartTime = slot;
                         const slotEndTime = format(addMinutes(parseISO(`2000-01-01T${slot}`), granularity), "HH:mm");
                         
-                        const cellAppointments = dayAppointments
+                        const processedDayAppointments = dayAppointments.map(apt => {
+                          if (apt.stato !== 'annullato') {
+                            return { ...apt, isVisible: true, visualDuration: apt.duration };
+                          }
+                          
+                          const aptStart = new Date(`${apt.appointment_date}T${apt.appointment_time}`).getTime();
+                          const aptEnd = aptStart + apt.duration * 60000;
+                          
+                          const overlappingActive = dayAppointments
+                            .filter(other => 
+                              other.stato !== 'annullato' &&
+                              other.trainer_id === apt.trainer_id
+                            )
+                            .map(other => {
+                              const start = new Date(`${other.appointment_date}T${other.appointment_time}`).getTime();
+                              const end = start + other.duration * 60000;
+                              return { start, end };
+                            })
+                            .filter(other => other.start < aptEnd && other.end > aptStart);
+                            
+                          if (overlappingActive.length === 0) {
+                            return { ...apt, isVisible: true, visualDuration: apt.duration };
+                          }
+                          
+                          const hasImmediateOverlap = overlappingActive.some(other => other.start <= aptStart);
+                          if (hasImmediateOverlap) {
+                            return { ...apt, isVisible: false };
+                          }
+                          
+                          const nextStarts = overlappingActive
+                            .filter(other => 		other.start > aptStart)
+                            .map(other => other.start);
+                            
+                          if (nextStarts.length > 0) {
+                            const nextStart = Math.min(...nextStarts);
+                            const emptySpaceDuration = (nextStart - aptStart) / 60000;
+                            if (emptySpaceDuration > 0) {
+                              return { ...apt, isVisible: true, visualDuration: emptySpaceDuration };
+                            }
+                          }
+                          
+                          return { ...apt, isVisible: false };
+                        });
+
+                        const cellAppointments = processedDayAppointments
                           .filter(apt => {
+                            if (!apt.isVisible) return false;
                             const aptTime = apt.appointment_time.slice(0, 5);
                             return (
                               aptTime >= slotStartTime && 
@@ -1048,20 +1125,7 @@ export default function CalendarPage() {
                               apt.trainer_id === ist.id
                             );
                           })
-                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
-                          .filter(apt => {
-                            if (apt.stato !== 'annullato') return true;
-                            // Se è annullato, mostra solo se non ci sono appuntamenti attivi che si sovrappongono nello stesso orario per lo stesso istruttore
-                            const hasOverlappingActive = dayAppointments.some(other => {
-                              if (other.stato === 'annullato' || other.trainer_id !== apt.trainer_id) return false;
-                              const otherStart = new Date(`${other.appointment_date}T${other.appointment_time}`).getTime();
-                              const otherEnd = otherStart + other.duration * 60000;
-                              const aptStart = new Date(`${apt.appointment_date}T${apt.appointment_time}`).getTime();
-                              const aptEnd = aptStart + apt.duration * 60000;
-                              return otherStart < aptEnd && otherEnd > aptStart;
-                            });
-                            return !hasOverlappingActive;
-                          });
+                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
 
                         // Raggruppa gli appuntamenti della cella per l'ora esatta di inizio
                         const appointmentsByTime: { [time: string]: typeof cellAppointments } = {};
