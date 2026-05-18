@@ -72,9 +72,17 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 ### 👤 Filtro Istruttori & Multi-selezione
 - **Logica**: L'agenda permette di filtrare gli istruttori tramite pulsanti toggle nel pannello "People".
 - **Auto-Switch Vista**: 
-  - Se vengono selezionati **2 o più** istruttori, il sistema passa automaticamente alla **vista in colonna** (Resource View).
-  - Con **0 o 1** istruttore selezionato, il sistema torna alla **vista settimana**.
+  - Se vengono selezionati **2 o più** istruttori o viene premuto il pulsante **"Tutti"**, il sistema passa automaticamente alla **vista in colonna** (Resource View) per prevenire qualsiasi sovrapposizione.
+  - Con **esattamente 1** istruttore selezionato, il sistema passa automaticamente alla **vista settimana**.
+- **Affiancamento Orizzontale Overlap**: Se appuntamenti sovrapposti condividono lo **stesso identico orario di inizio**, il sistema li affianca orizzontalmente in colonne adiacenti della stessa larghezza (`flex-1 min-w-0`), ridimensionando automaticamente i caratteri ed i paddings delle schede in modo compatto per salvaguardare la leggibilità.
+- **Auto-Filtro Intelligente & Matching**: Al primo accesso (caricamento del calendario), se l'utente è un amministratore o segretario privo di `istruttore_id` esplicito nei metadati, il sistema esegue un tracciamento predittivo per Nome/Cognome/Email trovando la corrispondenza con la lista istruttori (es. Manuele Garzella) e imposta automaticamente il filtro su di esso per evitare il disordine iniziale della griglia cumulativa.
+- **Azione Pulsante People ("Torna a Settimana")**: Cliccando su "Torna a Settimana" dalla vista risorse, il calendario rileva l'istruttore loggato tramite auto-filtro, seleziona esclusivamente quell'utente e passa alla vista settimana priva di disordine.
 - **Persistenza**: Le preferenze di selezione vengono salvate nel `localStorage`.
+
+### 🔒 Sicurezza & Sessioni (Forzatura Logout)
+- **Massima Durata Sessione (3h 30m)**: Il sistema limita la sessione dell'utente a 3 ore e 30 minuti totali per forzare il reinserimento della password e assicurare un hard refresh costante del codice JavaScript lato client.
+- **Polling di Monitoraggio**: Un timer attivo in background effettua un controllo ogni 60 secondi confrontando il timestamp di login salvato in locale con il tempo attuale.
+- **Espulsione & Hard Reload**: Superato il tempo massimo, il sistema cancella le credenziali locali, effettua il `signOut` su Supabase e forza il reindirizzamento tramite `window.location.href = '/login'`, eliminando ogni traccia di vecchi pacchetti JS e costringendo a caricare la versione più aggiornata.
 
 ### 📧 Onboarding Staff (Welcome Email)
 - **Logica**: Il sistema prevede un invio massivo di email di benvenuto (`/api/cron/welcome`) per configurare lo staff al primo accesso.
