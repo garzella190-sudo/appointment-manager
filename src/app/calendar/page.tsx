@@ -1004,7 +1004,7 @@ export default function CalendarPage() {
                                             appointment={apt}
                                             isOverlapping={hasConflict}
                                             onClick={setSelectedAppointment}
-                                            isStacked={true}
+                                            isStacked={false}
                                             granularity={15}
                                             isFirst={idx === 0}
                                             totalColumns={group.length}
@@ -1076,7 +1076,7 @@ export default function CalendarPage() {
                                             appointment={apt}
                                             isOverlapping={hasConflict}
                                             onClick={setSelectedAppointment}
-                                            isStacked={true}
+                                            isStacked={false}
                                             granularity={15}
                                             isFirst={idx === 0}
                                             totalColumns={group.length}
