@@ -55,8 +55,15 @@ class SmartPointerSensor extends PointerSensor {
     {
       eventName: 'onPointerDown' as const,
       handler: ({ nativeEvent: event }: { nativeEvent: PointerEvent }) => {
-        if (typeof window !== 'undefined' && window.innerWidth < 768) {
-          return false; // Disable dragging on mobile
+        // Disattiva il drag & drop su tutti i touch screen (smartphone, tablet, iPad, laptop touch)
+        const isTouch = event.pointerType === 'touch' || 
+                        (typeof window !== 'undefined' && (
+                          ('ontouchstart' in window) ||
+                          (navigator.maxTouchPoints > 0) ||
+                          window.matchMedia('(pointer: coarse)').matches
+                        ));
+        if (isTouch) {
+          return false; 
         }
         if (!event.isPrimary || event.button !== 0) {
           return false;
