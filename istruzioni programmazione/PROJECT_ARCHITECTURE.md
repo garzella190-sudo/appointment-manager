@@ -61,8 +61,13 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 ### 🎓 Gestione Esami & Sedute
 - **Automazione Impegni**: La creazione di una "Seduta d'Esame" permette di selezionare gli istruttori partecipanti (`istruttori_ids`) e un orario di inizio. Il sistema crea automaticamente un blocco di **3 ore** (Impegno di tipo 'Esame') per ogni istruttore coinvolto.
 - **Sincronizzazione**: La cancellazione di una seduta d'esame comporta la rimozione automatica di tutti i blocchi d'impegno associati nei calendari degli istruttori.
-- **Assegnazione Allievi**: Gli allievi pronti per l'esame possono essere assegnati a una seduta specifica e archiviati (`archiviato = true`) a fine percorso.
+- **Assegnazione Allievi & Tendina Alfabetica**: Gli allievi pronti per l'esame possono essere cercati tramite un menu a tendina filtrabile che si apre all'istante all'attivazione del campo di ricerca, visualizzando i candidati ordinati alfabeticamente. La sezione **Candidati** è posizionata in alto (subito dopo le Info Generali) per favorire la leggibilità e lo spazio della tendina. Al click su un allievo, questo viene aggiunto ed il menu si chiude in automatico.
+- **Automazione Veicoli Impegnati**: 
+  - **Auto**: All'aggiunta di un istruttore alla seduta, il sistema assegna automaticamente il suo veicolo predefinito (colonna `veicolo_id` della tabella `istruttori`) al database e lo associa all'impegno di guida a calendario.
+  - **Moto**: All'aggiunta di un candidato con patente moto ('AM', 'A1', 'A2', 'A'), il sistema assegna automaticamente una moto idonea leggendo i veicoli abilitati per quella patente (`patenti.veicoli_abilitati`) con fallback su una moto generica se non specificato.
 - **Indicatori Visivi**: Le schede delle guide in Agenda e Calendario mostrano un'icona `GraduationCap` dinamica: **Verde** per chi ha l'esame fissato, **Grigio Chiaro** per chi è solo segnato come "Pronto".
+- **Integrazione Viste**: Sia la vista **Calendario** sia la vista **Agenda** (home page) intercettano correttamente gli appuntamenti associati a una seduta d'esame (`sessione_esame_id`) aprendo direttamente il modale di gestione dell'esame (`ExamSessionModal`) anziché i dettagli generali dell'appuntamento.
+- **Layout Modale**: Il tasto "Modifica Dettagli Seduta" è collocato in basso a tutto come azione principale di chiusura.
 
 ### 👤 Filtro Istruttori & Multi-selezione
 - **Logica**: L'agenda permette di filtrare gli istruttori tramite pulsanti toggle nel pannello "People".

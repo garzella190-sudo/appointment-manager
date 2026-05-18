@@ -32,4 +32,5 @@ export interface Appointment {
   };
   vehicle_color?: string;
   exam_status?: 'scheduled' | 'ready' | 'none';
+  candidates?: { id: string; nome: string; cognome: string }[];
 }

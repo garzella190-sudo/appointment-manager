@@ -17,21 +17,6 @@ if (vapidPublicKey && vapidPrivateKey) {
 export async function sendNotificationToInstructor(instructorId: string, payload: { title: string, body: string, url?: string }) {
   if (!vapidPublicKey || !vapidPrivateKey) return;
 
-  const supabase = await createClient();
-
-  // First, we need to find the user_id corresponding to this istruttore_id.
-  // We assume that the user's metadata contains istruttore_id.
-  // The 'push_subscriptions' table is linked to auth.users.
-  // Unfortunately, we can't easily query auth.users by metadata from the client library without service role.
-  // However, we can use the service role client.
-  
-  const adminSupabase = await createClient(); // We need a way to query profiles or auth users.
-  // In a real app, there's usually a `profili` or `users` public table.
-  // Let's check if the current instructor has an associated user ID by querying push_subscriptions directly?
-  // No, push_subscriptions only has user_id. We must find who the instructor is.
-  
-  // Wait, if we don't have a direct link from istruttori to users in a public table, we might need a workaround.
-  // Let's create a server-side Supabase client with SERVICE_ROLE to query auth.users
   const { createClient: createAdminClient } = await import('@supabase/supabase-js');
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) return;
@@ -59,10 +44,47 @@ export async function sendNotificationToInstructor(instructorId: string, payload
       await webpush.sendNotification(sub.subscription, JSON.stringify(payload));
     } catch (error: any) {
       if (error.statusCode === 410 || error.statusCode === 404) {
-        // Subscription has expired or is no longer valid, delete it
         await adminDb.from('push_subscriptions').delete().eq('id', sub.id);
       } else {
         console.error('Error sending push notification:', error);
+      }
+    }
+  });
+
+  await Promise.all(promises);
+}
+
+/**
+ * Broadcasts a push notification to ALL subscribed users,
+ * excluding the user who performed the action (to avoid self-notifications).
+ * This ensures admin, segreteria, and all instructors get notified on every change.
+ */
+export async function sendNotificationToAllUsers(excludeUserId: string | null, payload: { title: string, body: string, url?: string }) {
+  if (!vapidPublicKey || !vapidPrivateKey) return;
+
+  const { createClient: createAdminClient } = await import('@supabase/supabase-js');
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) return;
+
+  const adminDb = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
+
+  // Fetch all subscriptions except the one belonging to the current user
+  let query = adminDb.from('push_subscriptions').select('subscription, id, user_id');
+  if (excludeUserId) {
+    query = (query as any).neq('user_id', excludeUserId);
+  }
+  const { data: subscriptions } = await query;
+
+  if (!subscriptions || subscriptions.length === 0) return;
+
+  const promises = subscriptions.map(async (sub: any) => {
+    try {
+      await webpush.sendNotification(sub.subscription, JSON.stringify(payload));
+    } catch (error: any) {
+      if (error.statusCode === 410 || error.statusCode === 404) {
+        await adminDb.from('push_subscriptions').delete().eq('id', sub.id);
+      } else {
+        console.error('Error sending broadcast push:', error);
       }
     }
   });

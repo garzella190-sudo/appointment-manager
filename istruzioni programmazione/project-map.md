@@ -13,6 +13,7 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 - `/src/components/BottomNav.tsx` -> **Master Nav**: Gestisce Profilo Utente, Navigazione e Logout.
 - `/src/app/layout.tsx` -> **Shell Globale**: Gestisce il recupero sessione utente e lo scroll-lock dello sfondo.
 - `/src/components/modals/NewAppointmentModal.tsx` -> Master per la creazione guide.
+- `/src/components/modals/ExamSessionModal.tsx` -> Gestore sedute d'esame (candidati, istruttori, veicoli impegnati).
 - `/src/components/forms/AppointmentForm.tsx` -> Logica di business per calcolo orari e compatibilità.
 - `/src/app/api/cron/reminders/route.ts` -> **Cron Reminders**: Gestione automatizzata invio promemoria (Domani).
 - `/src/app/api/cron/welcome/route.ts` -> **Cron Welcome**: Invio una tantum dei dati di accesso allo staff con report finale.

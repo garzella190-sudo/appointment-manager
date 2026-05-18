@@ -24,7 +24,8 @@ import {
   X,
   Calendar,
   ChevronDown,
-  Layout
+  Layout,
+  UserMinus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/useToast';
@@ -32,6 +33,7 @@ import { Cliente, Istruttore, Veicolo, SessioneEsame } from '@/lib/database.type
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { createAppointmentAction } from '@/actions/appointments';
 import { deleteAppointmentAction } from '@/actions/appointment_actions';
+import { registraEsitoEsameAction } from '@/actions/clienti';
 
 const supabase = createClient();
 
@@ -77,7 +79,7 @@ export default function ExamSessionModal({
     try {
       const [sRes, cRes, iRes, vRes] = await Promise.all([
         supabase.from('sessioni_esame').select('*').eq('id', sessionId).single(),
-        supabase.from('clienti').select('*, patenti(tipo)').eq('sessione_esame_id', sessionId),
+        supabase.from('clienti').select('*, patenti(tipo, veicoli_abilitati)').eq('sessione_esame_id', sessionId),
         supabase.from('istruttori').select('*').order('cognome'),
         supabase.from('veicoli').select('*').order('nome')
       ]);
@@ -119,7 +121,7 @@ export default function ExamSessionModal({
       const fetchPronti = async () => {
         const { data } = await supabase
           .from('clienti')
-          .select('*, patenti(tipo)')
+          .select('*, patenti(tipo, veicoli_abilitati)')
           .eq('pronto_esame', true)
           .is('sessione_esame_id', null)
           .eq('archiviato', false)
@@ -150,9 +152,11 @@ export default function ExamSessionModal({
       
       if (apts && apts.length > 0) {
         for (const apt of apts) {
+          const startDate = new Date(`${editForm.data}T${editForm.ora_inizio}`);
+          const endDate = new Date(startDate.getTime() + editForm.durata * 60000);
           await supabase.from('appuntamenti').update({
-            inizio: `${editForm.data}T${editForm.ora_inizio}`,
-            fine: format(new Date(new Date(`${editForm.data}T${editForm.ora_inizio}`).getTime() + editForm.durata * 60000), "yyyy-MM-dd'T'HH:mm:ss"),
+            inizio: startDate.toISOString(),
+            fine: endDate.toISOString(),
             durata: editForm.durata
           }).eq('id', apt.id);
         }
@@ -166,42 +170,49 @@ export default function ExamSessionModal({
   };
 
   const handleRespinto = async (clienteId: string) => {
-    const { error } = await supabase.from('clienti')
-      .update({ 
-        pronto_esame: true,
-        sessione_esame_id: null, 
-        bocciato: true 
-      })
-      .eq('id', clienteId);
-    
-    if (!error) {
+    setLoading(true);
+    const res = await registraEsitoEsameAction(clienteId, session!.id, 'RESPINTO');
+    if (res.success) {
       showToast('Allievo segnato come respinto.', 'info');
       setCandidates(prev => prev.filter(c => c.id !== clienteId));
       onSuccess();
+    } else {
+      showToast(res.error || 'Errore', 'error');
     }
+    setLoading(false);
   };
 
   const handlePromosso = async (clienteId: string) => {
-    const { error } = await supabase.from('clienti')
-      .update({ 
-        archiviato: true,
-        pronto_esame: false,
-        sessione_esame_id: null,
-        bocciato: false 
-      })
-      .eq('id', clienteId);
-    
-    if (!error) {
+    setLoading(true);
+    const res = await registraEsitoEsameAction(clienteId, session!.id, 'PROMOSSO');
+    if (res.success) {
       showToast('Allievo promosso e archiviato!', 'success');
       setCandidates(prev => prev.filter(c => c.id !== clienteId));
       onSuccess();
+    } else {
+      showToast(res.error || 'Errore', 'error');
     }
+    setLoading(false);
+  };
+
+  const handleAssente = async (clienteId: string) => {
+    setLoading(true);
+    const res = await registraEsitoEsameAction(clienteId, session!.id, 'ASSENTE');
+    if (res.success) {
+      showToast('Allievo segnato come assente.', 'info');
+      setCandidates(prev => prev.filter(c => c.id !== clienteId));
+      onSuccess();
+    } else {
+      showToast(res.error || 'Errore', 'error');
+    }
+    setLoading(false);
   };
 
   const toggleInstructor = async (istrId: string) => {
     if (!session) return;
     const isAssigned = session.istruttori_ids.includes(istrId);
     let newIds = [...session.istruttori_ids];
+    let newVehicles = [...session.veicoli_ids];
 
     if (isAssigned) {
       newIds = newIds.filter(id => id !== istrId);
@@ -216,15 +227,24 @@ export default function ExamSessionModal({
       }
     } else {
       newIds.push(istrId);
+      const istr = allIstruttori.find(i => i.id === istrId);
+      
+      if (istr?.veicolo_id && !session.veicoli_ids.includes(istr.veicolo_id)) {
+        newVehicles.push(istr.veicolo_id);
+      }
+
       // Create new appointment
+      const startDateStr = `${session.data}T${session.ora_inizio || '08:30'}`;
+      const startDate = new Date(startDateStr);
       await createAppointmentAction({
         istruttore_id: istrId,
         is_impegno: true,
         nome_impegno: 'Esame di guida',
-        data: `${session.data}T${session.ora_inizio || '08:30'}`,
+        data: startDate.toISOString(),
+        data_solo: session.data,
         durata: session.durata || 180,
         stato: 'programmato',
-        veicolo_id: null,
+        veicolo_id: istr?.veicolo_id || null,
         importo: null,
         note: '',
         sessione_esame_id: session.id
@@ -232,11 +252,11 @@ export default function ExamSessionModal({
     }
 
     const { error } = await supabase.from('sessioni_esame')
-      .update({ istruttori_ids: newIds })
+      .update({ istruttori_ids: newIds, veicoli_ids: newVehicles })
       .eq('id', session.id);
     
     if (!error) {
-      setSession({ ...session, istruttori_ids: newIds });
+      setSession({ ...session, istruttori_ids: newIds, veicoli_ids: newVehicles });
       showToast(isAssigned ? 'Istruttore rimosso' : 'Istruttore aggiunto', 'success');
       onSuccess();
     }
@@ -271,6 +291,21 @@ export default function ExamSessionModal({
       .eq('id', clienteId);
     
     if (!error) {
+      const cand = availableCandidates.find(c => c.id === clienteId);
+      if (cand && cand.patenti?.tipo && ['AM', 'A1', 'A2', 'A'].includes(cand.patenti.tipo.toUpperCase())) {
+         const habilitatedIds = cand.patenti.veicoli_abilitati || [];
+         let moto = allVeicoli.find(v => habilitatedIds.includes(v.id));
+         
+         if (!moto) {
+           moto = allVeicoli.find(v => ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente?.toUpperCase() || ''));
+         }
+
+         if (moto && !session.veicoli_ids.includes(moto.id)) {
+            const newVehicles = [...session.veicoli_ids, moto.id];
+            await supabase.from('sessioni_esame').update({ veicoli_ids: newVehicles }).eq('id', session.id);
+         }
+      }
+
       showToast('Allievo aggiunto alla seduta', 'success');
       fetchData();
       setShowCandidateSearch(false);
@@ -409,134 +444,13 @@ export default function ExamSessionModal({
                         {session?.esaminatore || 'Non specificato'}
                       </p>
                     </div>
-                    <button 
-                      onClick={() => setIsEditingInfo(true)}
-                      className="col-span-full h-12 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-2xl flex items-center justify-center gap-2 border border-sky-100 dark:border-sky-500/20 hover:bg-sky-100 transition-all"
-                    >
-                      <Edit3 size={18} /> <span className={BUTTON_TEXT_CLS}>Modifica Dettagli</span>
-                    </button>
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* SEZIONE 2: ISTRUTTORI */}
-          <div className={cn(
-            "rounded-[32px] transition-all duration-300 overflow-hidden border border-zinc-100 dark:border-zinc-800",
-            activeSection === 'istruttori' ? "bg-zinc-50 dark:bg-zinc-900/50 p-6" : "bg-white dark:bg-zinc-900 p-4"
-          )}>
-            <button 
-              onClick={() => changeSection('istruttori')}
-              className="w-full flex justify-between items-center group"
-            >
-              <div className="flex items-center gap-3">
-                <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all", activeSection === 'istruttori' ? "bg-amber-500 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400")}>
-                  <Users size={20} />
-                </div>
-                <div className="text-left">
-                  <h3 className={cn("font-black uppercase tracking-tight leading-none transition-all", activeSection === 'istruttori' ? "text-xl text-zinc-900 dark:text-white" : "text-sm text-zinc-500")}>
-                    Istruttori
-                  </h3>
-                  {activeSection !== 'istruttori' && (
-                    <p className="text-[10px] font-bold text-zinc-400 mt-1 uppercase">
-                      {session?.istruttori_ids.length} Assegnati
-                    </p>
-                  )}
-                </div>
-              </div>
-              <ChevronDown className={cn("transition-transform duration-300", activeSection === 'istruttori' ? "rotate-180 text-amber-500" : "text-zinc-300")} size={20} />
-            </button>
-
-            {activeSection === 'istruttori' && (
-              <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {allIstruttori.map(istr => {
-                    const isAssigned = session?.istruttori_ids.includes(istr.id);
-                    return (
-                      <button
-                        key={istr.id}
-                        onClick={() => toggleInstructor(istr.id)}
-                        className={cn(
-                          "flex items-center gap-2 p-3 rounded-2xl border transition-all text-left",
-                          isAssigned 
-                            ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20" 
-                            : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
-                        )}
-                      >
-                        <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: isAssigned ? 'white' : istr.colore }} />
-                        <span className="text-xs font-black uppercase truncate">{istr.cognome}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* SEZIONE 3: VEICOLI */}
-          <div className={cn(
-            "rounded-[32px] transition-all duration-300 overflow-hidden border border-zinc-100 dark:border-zinc-800",
-            activeSection === 'veicoli' ? "bg-zinc-50 dark:bg-zinc-900/50 p-6" : "bg-white dark:bg-zinc-900 p-4"
-          )}>
-            <button 
-              onClick={() => changeSection('veicoli')}
-              className="w-full flex justify-between items-center group"
-            >
-              <div className="flex items-center gap-3">
-                <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all", activeSection === 'veicoli' ? "bg-indigo-500 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400")}>
-                  <Car size={20} />
-                </div>
-                <div className="text-left">
-                  <h3 className={cn("font-black uppercase tracking-tight leading-none transition-all", activeSection === 'veicoli' ? "text-xl text-zinc-900 dark:text-white" : "text-sm text-zinc-500")}>
-                    Mezzi
-                  </h3>
-                  {activeSection !== 'veicoli' && (
-                    <p className="text-[10px] font-bold text-zinc-400 mt-1 uppercase">
-                      {session?.veicoli_ids.length} In uso
-                    </p>
-                  )}
-                </div>
-              </div>
-              <ChevronDown className={cn("transition-transform duration-300", activeSection === 'veicoli' ? "rotate-180 text-indigo-500" : "text-zinc-300")} size={20} />
-            </button>
-
-            {activeSection === 'veicoli' && (
-              <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {allVeicoli.map(veh => {
-                    const isAssigned = session?.veicoli_ids.includes(veh.id);
-                    const isMoto = ['AM', 'A1', 'A2', 'A'].includes(veh.tipo_patente || '');
-                    return (
-                      <button
-                        key={veh.id}
-                        onClick={() => toggleVehicle(veh.id)}
-                        className={cn(
-                          "flex items-center justify-between p-4 rounded-3xl border transition-all text-left",
-                          isAssigned 
-                            ? "bg-indigo-600 border-indigo-700 text-white shadow-lg shadow-indigo-500/20" 
-                            : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shrink-0", isAssigned ? "bg-white/20" : "bg-zinc-100 dark:bg-zinc-700")}>
-                            {isMoto ? <Bike size={20} /> : <Car size={20} />}
-                          </div>
-                          <div>
-                            <p className="text-xs font-black uppercase truncate">{veh.nome}</p>
-                            <p className={cn("text-[9px] font-bold uppercase", isAssigned ? "opacity-70" : "text-zinc-400")}>{veh.targa}</p>
-                          </div>
-                        </div>
-                        {isAssigned && <CheckCircle2 size={18} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* SEZIONE 4: CANDIDATI */}
+          {/* SEZIONE 2: CANDIDATI */}
           <div className={cn(
             "rounded-[32px] transition-all duration-300 overflow-hidden border border-zinc-100 dark:border-zinc-800",
             activeSection === 'candidati' ? "bg-zinc-50 dark:bg-zinc-900/50 p-6" : "bg-white dark:bg-zinc-900 p-4"
@@ -589,14 +503,18 @@ export default function ExamSessionModal({
                     )}
                   </div>
 
-                  {showCandidateSearch && candidateSearch && (
+                  {showCandidateSearch && (
                     <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl z-50 p-2 max-h-[250px] overflow-y-auto no-scrollbar animate-in fade-in slide-in-from-top-2">
                       {availableCandidates.filter(c => 
-                        `${c.nome} ${c.cognome}`.toLowerCase().includes(candidateSearch.toLowerCase())
+                        !candidateSearch || `${c.nome} ${c.cognome}`.toLowerCase().includes(candidateSearch.toLowerCase())
                       ).map(c => (
                         <button
                           key={c.id}
-                          onClick={() => assignCandidate(c.id)}
+                          onClick={() => {
+                            assignCandidate(c.id);
+                            setShowCandidateSearch(false);
+                            setCandidateSearch('');
+                          }}
                           className="w-full text-left p-4 hover:bg-sky-50 dark:hover:bg-sky-500/10 rounded-[20px] transition-all flex items-center justify-between group"
                         >
                           <div>
@@ -607,7 +525,7 @@ export default function ExamSessionModal({
                         </button>
                       ))}
                       {availableCandidates.filter(c => 
-                        `${c.nome} ${c.cognome}`.toLowerCase().includes(candidateSearch.toLowerCase())
+                        !candidateSearch || `${c.nome} ${c.cognome}`.toLowerCase().includes(candidateSearch.toLowerCase())
                       ).length === 0 && (
                         <div className="p-6 text-center text-xs font-bold text-zinc-400 uppercase">Nessun allievo pronto trovato</div>
                       )}
@@ -651,20 +569,27 @@ export default function ExamSessionModal({
                         />
                       </div>
                       
-                      <div className="flex items-center gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <button
                           onClick={() => handlePromosso(c.id)}
-                          className="flex-1 px-4 py-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center gap-2 border border-emerald-100/50 dark:border-emerald-500/20 active:scale-95 transition-all"
+                          className="px-2 py-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-2xl flex flex-col items-center justify-center gap-1 border border-emerald-100/50 dark:border-emerald-500/20 active:scale-95 transition-all"
                         >
                           <CheckCircle2 size={16} strokeWidth={3} />
-                          <span className={BUTTON_TEXT_CLS}>Promosso</span>
+                          <span className="text-[10px] font-black uppercase tracking-wider">Promosso</span>
                         </button>
                         <button
                           onClick={() => handleRespinto(c.id)}
-                          className="flex-1 px-4 py-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center gap-2 border border-red-100/50 dark:border-red-500/20 active:scale-95 transition-all"
+                          className="px-2 py-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl flex flex-col items-center justify-center gap-1 border border-red-100/50 dark:border-red-500/20 active:scale-95 transition-all"
                         >
                           <XCircle size={16} strokeWidth={3} />
-                          <span className={BUTTON_TEXT_CLS}>Respinto</span>
+                          <span className="text-[10px] font-black uppercase tracking-wider">Respinto</span>
+                        </button>
+                        <button
+                          onClick={() => handleAssente(c.id)}
+                          className="px-2 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-2xl flex flex-col items-center justify-center gap-1 border border-zinc-200/50 dark:border-zinc-700/50 active:scale-95 transition-all"
+                        >
+                          <UserMinus size={16} strokeWidth={2.5} />
+                          <span className="text-[10px] font-black uppercase tracking-wider">Assente</span>
                         </button>
                       </div>
                     </div>
@@ -673,6 +598,130 @@ export default function ExamSessionModal({
               </div>
             )}
           </div>
+          {/* SEZIONE 3: ISTRUTTORI */}
+          <div className={cn(
+            "rounded-[32px] transition-all duration-300 overflow-hidden border border-zinc-100 dark:border-zinc-800",
+            activeSection === 'istruttori' ? "bg-zinc-50 dark:bg-zinc-900/50 p-6" : "bg-white dark:bg-zinc-900 p-4"
+          )}>
+            <button 
+              onClick={() => changeSection('istruttori')}
+              className="w-full flex justify-between items-center group"
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all", activeSection === 'istruttori' ? "bg-amber-500 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400")}>
+                  <Users size={20} />
+                </div>
+                <div className="text-left">
+                  <h3 className={cn("font-black uppercase tracking-tight leading-none transition-all", activeSection === 'istruttori' ? "text-xl text-zinc-900 dark:text-white" : "text-sm text-zinc-500")}>
+                    Istruttori
+                  </h3>
+                  {activeSection !== 'istruttori' && (
+                    <p className="text-[10px] font-bold text-zinc-400 mt-1 uppercase">
+                      {session?.istruttori_ids.length} Assegnati
+                    </p>
+                  )}
+                </div>
+              </div>
+              <ChevronDown className={cn("transition-transform duration-300", activeSection === 'istruttori' ? "rotate-180 text-amber-500" : "text-zinc-300")} size={20} />
+            </button>
+
+            {activeSection === 'istruttori' && (
+              <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {allIstruttori.map(istr => {
+                    const isAssigned = session?.istruttori_ids.includes(istr.id);
+                    return (
+                      <button
+                        key={istr.id}
+                        onClick={() => toggleInstructor(istr.id)}
+                        className={cn(
+                          "flex items-center gap-2 p-3 rounded-2xl border transition-all text-left",
+                          isAssigned 
+                            ? "bg-amber-500 border-amber-600 text-white shadow-lg shadow-amber-500/20" 
+                            : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
+                        )}
+                      >
+                        <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: isAssigned ? 'white' : istr.colore }} />
+                        <span className="text-xs font-black uppercase truncate">{istr.cognome}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SEZIONE 4: VEICOLI */}
+          <div className={cn(
+            "rounded-[32px] transition-all duration-300 overflow-hidden border border-zinc-100 dark:border-zinc-800",
+            activeSection === 'veicoli' ? "bg-zinc-50 dark:bg-zinc-900/50 p-6" : "bg-white dark:bg-zinc-900 p-4"
+          )}>
+            <button 
+              onClick={() => changeSection('veicoli')}
+              className="w-full flex justify-between items-center group"
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center transition-all", activeSection === 'veicoli' ? "bg-indigo-500 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400")}>
+                  <Car size={20} />
+                </div>
+                <div className="text-left">
+                  <h3 className={cn("font-black uppercase tracking-tight leading-none transition-all", activeSection === 'veicoli' ? "text-xl text-zinc-900 dark:text-white" : "text-sm text-zinc-500")}>
+                    Veicoli Impegnati
+                  </h3>
+                  {activeSection !== 'veicoli' && (
+                    <p className="text-[10px] font-bold text-zinc-400 mt-1 uppercase">
+                      {session?.veicoli_ids.length} In uso
+                    </p>
+                  )}
+                </div>
+              </div>
+              <ChevronDown className={cn("transition-transform duration-300", activeSection === 'veicoli' ? "rotate-180 text-indigo-500" : "text-zinc-300")} size={20} />
+            </button>
+
+            {activeSection === 'veicoli' && (
+              <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {allVeicoli.map(veh => {
+                    const isAssigned = session?.veicoli_ids.includes(veh.id);
+                    const isMoto = ['AM', 'A1', 'A2', 'A'].includes(veh.tipo_patente || '');
+                    return (
+                      <button
+                        key={veh.id}
+                        onClick={() => toggleVehicle(veh.id)}
+                        className={cn(
+                          "flex items-center justify-between p-4 rounded-3xl border transition-all text-left",
+                          isAssigned 
+                            ? "bg-indigo-600 border-indigo-700 text-white shadow-lg shadow-indigo-500/20" 
+                            : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shrink-0", isAssigned ? "bg-white/20" : "bg-zinc-100 dark:bg-zinc-700")}>
+                            {isMoto ? <Bike size={20} /> : <Car size={20} />}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black uppercase truncate">{veh.nome}</p>
+                            <p className={cn("text-[9px] font-bold uppercase", isAssigned ? "opacity-70" : "text-zinc-400")}>{veh.targa}</p>
+                          </div>
+                        </div>
+                        {isAssigned && <CheckCircle2 size={18} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button 
+            onClick={() => {
+              changeSection('info');
+              setIsEditingInfo(true);
+            }}
+            className="w-full mt-2 h-14 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-3xl flex items-center justify-center gap-2 border border-sky-100 dark:border-sky-500/20 hover:bg-sky-100 dark:hover:bg-sky-500/20 transition-all active:scale-[0.98]"
+          >
+            <Edit3 size={18} /> <span className={BUTTON_TEXT_CLS}>Modifica Dettagli Seduta</span>
+          </button>
         </div>
       )}
     </Modal>

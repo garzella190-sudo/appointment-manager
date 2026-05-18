@@ -763,110 +763,125 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             )
           )}
           {isView && appointmentId && (
-            <div className="flex justify-center gap-3 mb-4 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+            <div className="flex justify-center gap-3 md:gap-4 mb-4 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
               {/* MODIFICA */}
-              <button
-                type="button"
-                onClick={() => setMode('edit')}
-                className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-all active:scale-95 shadow-sm border border-blue-100/50 dark:border-blue-900/30"
-                title="Modifica"
-              >
-                <Pencil size={18} />
-              </button>
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setMode('edit')}
+                  className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-all active:scale-95 shadow-sm border border-blue-100/50 dark:border-blue-900/30"
+                  title="Modifica"
+                >
+                  <Pencil size={18} />
+                </button>
+                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Modifica</span>
+              </div>
 
               {/* PRONTO PER ESAME */}
               {!isImpegno && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (!form.cliente_id) return;
-                    setIsExamModalOpen(true);
-                  }}
-                  className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center hover:bg-emerald-100 transition-all active:scale-95 shadow-sm border border-emerald-100/50 dark:border-emerald-900/30"
-                  title="Pronto per Esame"
-                >
-                  <GraduationCap size={18} />
-                </button>
+                <div className="flex flex-col items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (!form.cliente_id) return;
+                      setIsExamModalOpen(true);
+                    }}
+                    className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center hover:bg-emerald-100 transition-all active:scale-95 shadow-sm border border-emerald-100/50 dark:border-emerald-900/30"
+                    title="Pronto per Esame"
+                  >
+                    <GraduationCap size={18} />
+                  </button>
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Esame</span>
+                </div>
               )}
 
               {/* ANNULLA */}
-              <ConfirmBubble
-                title="Annulla appuntamento"
-                message="Vuoi annullare questa guida? L'azione è reversibile solo manualmente."
-                confirmLabel="Annulla Guida"
-                onConfirm={async () => {
-                  setLoading(true); 
-                  if (!navigator.onLine) {
-                    await addToOfflineQueue('appuntamento', 'cancel', { id: appointmentId });
-                    showToast('Sei offline. Appuntamento annullato in locale.', 'info');
-                    onSuccess();
-                    return;
+              <div className="flex flex-col items-center gap-1.5">
+                <ConfirmBubble
+                  title="Annulla appuntamento"
+                  message="Vuoi annullare questa guida? L'azione è reversibile solo manualmente."
+                  confirmLabel="Annulla Guida"
+                  onConfirm={async () => {
+                    setLoading(true); 
+                    if (!navigator.onLine) {
+                      await addToOfflineQueue('appuntamento', 'cancel', { id: appointmentId });
+                      showToast('Sei offline. Appuntamento annullato in locale.', 'info');
+                      onSuccess();
+                      return;
+                    }
+                    const result = await cancelAppointmentAction(appointmentId!); 
+                    if (result.success) {
+                      showToast('Appuntamento annullato', 'info');
+                      onSuccess(); 
+                    } else {
+                      showToast(result.error || 'Errore durante l\'annullamento', 'error');
+                      setLoading(false);
+                    }
+                  }}
+                  trigger={
+                    <button 
+                      type="button" 
+                      disabled={form.stato === 'annullato'}  
+                      className="w-10 h-10 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center hover:bg-orange-100 transition-all active:scale-95 disabled:opacity-30 shadow-sm border border-orange-100/50 dark:border-orange-900/30"
+                      title="Annulla"
+                    >
+                      <X size={18} />
+                    </button>
                   }
-                  const result = await cancelAppointmentAction(appointmentId!); 
-                  if (result.success) {
-                    showToast('Appuntamento annullato', 'info');
-                    onSuccess(); 
-                  } else {
-                    showToast(result.error || 'Errore durante l\'annullamento', 'error');
-                    setLoading(false);
-                  }
-                }}
-                trigger={
-                  <button 
-                    type="button" 
-                    disabled={form.stato === 'annullato'}  
-                    className="w-10 h-10 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center hover:bg-orange-100 transition-all active:scale-95 disabled:opacity-30 shadow-sm border border-orange-100/50 dark:border-orange-900/30"
-                    title="Annulla"
-                  >
-                    <X size={18} />
-                  </button>
-                }
-              />
+                />
+                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Annulla</span>
+              </div>
 
               {/* ELIMINA */}
-              <ConfirmBubble
-                title="Elimina definitivamente"
-                message="Sei sicuro di voler eliminare questo record? Non potrai tornare indietro."
-                confirmLabel="Elimina"
-                onConfirm={async () => {
-                  setLoading(true); 
-                  if (!navigator.onLine) {
-                    await addToOfflineQueue('appuntamento', 'delete', { id: appointmentId });
-                    showToast('Sei offline. Appuntamento eliminato in locale.', 'info');
-                    onSuccess();
-                    return;
+              <div className="flex flex-col items-center gap-1.5">
+                <ConfirmBubble
+                  title="Elimina definitivamente"
+                  message="Sei sicuro di voler eliminare questo record? Non potrai tornare indietro."
+                  confirmLabel="Elimina"
+                  onConfirm={async () => {
+                    setLoading(true); 
+                    if (!navigator.onLine) {
+                      await addToOfflineQueue('appuntamento', 'delete', { id: appointmentId });
+                      showToast('Sei offline. Appuntamento eliminato in locale.', 'info');
+                      onSuccess();
+                      return;
+                    }
+                    const result = await deleteAppointmentAction(appointmentId!); 
+                    if (result.success) {
+                      showToast('Appuntamento eliminato definitivamente', 'info');
+                      onSuccess(); 
+                    } else {
+                      showToast(result.error || 'Errore durante l\'eliminazione', 'error');
+                      setLoading(false);
+                    }
+                  }}
+                  trigger={
+                    <button
+                      type="button"
+                      className="w-10 h-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all active:scale-95 shadow-sm border border-red-100/50 dark:border-red-900/30"
+                      title="Elimina"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   }
-                  const result = await deleteAppointmentAction(appointmentId!); 
-                  if (result.success) {
-                    showToast('Appuntamento eliminato definitivamente', 'info');
-                    onSuccess(); 
-                  } else {
-                    showToast(result.error || 'Errore durante l\'eliminazione', 'error');
-                    setLoading(false);
-                  }
-                }}
-                trigger={
-                  <button
-                    type="button"
-                    className="w-10 h-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all active:scale-95 shadow-sm border border-red-100/50 dark:border-red-900/30"
-                    title="Elimina"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                }
-              />
+                />
+                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Elimina</span>
+              </div>
 
               {/* AGGIUNGI AL CALENDARIO */}
-              <a
-                href={`/api/calendar?id=${appointmentId}`}
-                className="w-10 h-10 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 rounded-xl flex items-center justify-center hover:bg-violet-100 transition-all active:scale-95 shadow-sm border border-violet-100/50 dark:border-violet-900/30"
-                title="Aggiungi al calendario"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <CalendarPlus size={18} />
-              </a>
+              <div className="flex flex-col items-center gap-1.5">
+                <a
+                  href={`/api/calendar?id=${appointmentId}`}
+                  className="w-10 h-10 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 rounded-xl flex items-center justify-center hover:bg-violet-100 transition-all active:scale-95 shadow-sm border border-violet-100/50 dark:border-violet-900/30"
+                  title="Aggiungi al calendario"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <CalendarPlus size={18} />
+                </a>
+                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Export</span>
+              </div>
             </div>
           )}
 

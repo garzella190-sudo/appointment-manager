@@ -27,6 +27,28 @@ interface ComputedStatus {
 }
 
 const getDynamicStatus = (apt: AppuntamentoConDettagli): ComputedStatus => {
+  if (apt.note && apt.note.startsWith('ESITO ESAME:')) {
+    if (apt.note.includes('PROMOSSO')) {
+      return {
+        label: 'Promosso',
+        style: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20',
+        dot: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+      };
+    } else if (apt.note.includes('RESPINTO')) {
+      return {
+        label: 'Respinto',
+        style: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-red-200 dark:border-red-500/20',
+        dot: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+      };
+    } else {
+      return {
+        label: 'Assente',
+        style: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700',
+        dot: 'bg-zinc-500 shadow-[0_0_8px_rgba(113,113,122,0.5)]'
+      };
+    }
+  }
+
   if (apt.stato === 'annullato') {
     return {
       label: 'Annullata',
@@ -141,25 +163,40 @@ export const StoricoPagamentiTable = ({ appuntamenti }: StoricoPagamentiTablePro
 
                   {/* Note / Dettagli */}
                   <td className="px-6 py-5 max-w-[200px]">
-                    {apt.note ? (
-                      <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate" title={apt.note}>
-                        {apt.note}
-                      </p>
-                    ) : (
-                      <span className="text-zinc-300 dark:text-zinc-600 font-medium italic">—</span>
-                    )}
+                    <div className="flex flex-col gap-1.5">
+                      {apt.note ? (
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 truncate" title={apt.note}>
+                          {apt.note}
+                        </p>
+                      ) : (
+                        <span className="text-zinc-300 dark:text-zinc-600 font-medium italic">—</span>
+                      )}
+                      
+                      {apt.note && apt.note.startsWith('ESITO ESAME:') && (
+                        <a 
+                          href="/esami" 
+                          className="text-[10px] font-bold text-sky-500 hover:text-sky-600 dark:text-sky-400 hover:underline inline-flex items-center gap-1 w-fit"
+                        >
+                          Vedi Seduta Esame →
+                        </a>
+                      )}
+                    </div>
                   </td>
 
                   {/* Importo */}
                   <td className="px-6 py-5 whitespace-nowrap last:pr-8">
-                    <span className={cn(
-                      'px-3 py-1.5 rounded-lg text-sm font-bold tabular-nums',
-                      apt.importo != null 
-                        ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100' 
-                        : 'text-zinc-400'
-                    )}>
-                      {formatEur(apt.importo)}
-                    </span>
+                    {apt.note && apt.note.startsWith('ESITO ESAME:') ? (
+                      <span className="text-zinc-400 font-medium italic">—</span>
+                    ) : (
+                      <span className={cn(
+                        'px-3 py-1.5 rounded-lg text-sm font-bold tabular-nums',
+                        apt.importo != null 
+                          ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100' 
+                          : 'text-zinc-400'
+                      )}>
+                        {formatEur(apt.importo)}
+                      </span>
+                    )}
                   </td>
                 </tr>
               );

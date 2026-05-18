@@ -16,6 +16,7 @@ interface UserFormProps {
 
 import { Check, ShieldCheck, Settings2, Calendar, Users, GraduationCap, LayoutDashboard, FileText, ChevronDown } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 const supabase = createClient();
 
 const PERMISSION_CATEGORIES = [
@@ -60,10 +61,12 @@ interface UserFormProps {
 }
 
 export function UserForm({ user, isAdmin, onSuccess, onCancel }: UserFormProps) {
+  const { role: currentUserRole } = useAuth();
+  const canAssignAdminDev = currentUserRole === 'AdminDev' || currentUserRole === 'admin' || user?.user_metadata?.role === 'AdminDev';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [role, setRole] = useState<'admin' | 'istruttore' | 'segreteria'>(user?.user_metadata?.role || 'segreteria');
+  const [role, setRole] = useState<'admin' | 'AdminDev' | 'istruttore' | 'segreteria'>(user?.user_metadata?.role || 'segreteria');
   const [permissions, setPermissions] = useState<Record<string, boolean>>(user?.user_metadata?.permissions || {});
   const [showPermissions, setShowPermissions] = useState(!!user);
   const [istruttori, setIstruttori] = useState<any[]>([]);
@@ -130,7 +133,7 @@ export function UserForm({ user, isAdmin, onSuccess, onCancel }: UserFormProps) 
           full_name,
           role,
           permissions,
-          istruttore_id: role === 'istruttore' ? selectedIstruttoreId : null,
+          istruttore_id: selectedIstruttoreId || null,
           ...(password && { password })
         });
       } else {
@@ -138,7 +141,7 @@ export function UserForm({ user, isAdmin, onSuccess, onCancel }: UserFormProps) 
           email, 
           password, 
           full_name, 
-          role,
+          role: role as any,
           permissions
         });
       }
@@ -206,23 +209,26 @@ export function UserForm({ user, isAdmin, onSuccess, onCancel }: UserFormProps) 
               options={[
                 { id: 'segreteria', label: 'Segreteria' },
                 { id: 'istruttore', label: 'Istruttore' },
-                { id: 'admin', label: 'Amministratore' }
+                { id: 'admin', label: 'Amministratore' },
+                ...(canAssignAdminDev ? [{ id: 'AdminDev', label: '★ Admin Dev' }] : [])
               ]}
               value={role}
               onChange={setRoleDefaults}
               icon={ShieldCheck}
               placeholder="Ruolo"
             />
-            {role === 'istruttore' && (
-              <Select
-                options={istruttori.map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}` }))}
-                value={selectedIstruttoreId}
-                onChange={setSelectedIstruttoreId}
-                icon={Users}
-                placeholder="Associa a..."
-                searchable
-              />
-            )}
+            {/* Selettore istruttore: visibile per tutti i ruoli */}
+            <Select
+              options={[
+                { id: '', label: '— Nessuno —' },
+                ...istruttori.map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}` }))
+              ]}
+              value={selectedIstruttoreId}
+              onChange={setSelectedIstruttoreId}
+              icon={Users}
+              placeholder="Associa a Istruttore..."
+              searchable
+            />
           </div>
         </div>
       </div>

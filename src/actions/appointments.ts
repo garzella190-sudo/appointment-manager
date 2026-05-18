@@ -6,7 +6,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { sendConfirmationEmailAction } from './notifications';
-import { sendNotificationToInstructor } from '@/lib/pushHelper';
+import { sendNotificationToAllUsers } from '@/lib/pushHelper';
 
 // Initialized lazily inside the action
 
@@ -209,25 +209,22 @@ export async function createAppointmentAction(payload: {
     }
   }
 
-  // 4. Web Push Notification to Instructor
+  // 4. Web Push Broadcast — notifica TUTTI gli utenti tranne chi ha fatto l'azione
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+    const currentUserId = session?.user?.id || null;
     
-    // Send if the person creating the appointment is NOT the assigned instructor
-    if (currentUserIstruttoreId !== payload.istruttore_id) {
-      const clientName = clientData.nome && clientData.nome !== 'UFFICIO' 
-        ? `${clientData.nome} ${clientData.cognome}` 
-        : (payload.nome_impegno || 'Impegno');
-        
-      const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
+    const clientName = clientData.nome && clientData.nome !== 'UFFICIO' 
+      ? `${clientData.cognome} ${clientData.nome}` 
+      : (payload.nome_impegno || 'Impegno');
       
-      await sendNotificationToInstructor(payload.istruttore_id, {
-        title: 'Nuova Guida Inserita',
-        body: `È stata inserita una guida per ${clientName} il ${timeStr}`,
-        url: '/'
-      });
-    }
+    const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
+    
+    await sendNotificationToAllUsers(currentUserId, {
+      title: '📅 Nuova Guida Inserita',
+      body: `${clientName} — ${timeStr}`,
+      url: '/'
+    });
   } catch (err) {
     console.error('Web Push Error:', err);
   }
@@ -383,21 +380,18 @@ export async function updateAppointmentAction(id: string, payload: any) {
     }
   }
 
-  // 4. Web Push Notification to Instructor
+  // 4. Web Push Broadcast — notifica TUTTI gli utenti tranne chi ha fatto la modifica
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+    const currentUserId = session?.user?.id || null;
     
-    // Send if the person modifying the appointment is NOT the assigned instructor
-    if (currentUserIstruttoreId !== payload.istruttore_id) {
-      const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
-      
-      await sendNotificationToInstructor(payload.istruttore_id, {
-        title: 'Guida Modificata',
-        body: `Una guida è stata modificata: ora è prevista il ${timeStr}`,
-        url: '/'
-      });
-    }
+    const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
+    
+    await sendNotificationToAllUsers(currentUserId, {
+      title: '✏️ Guida Modificata',
+      body: `Una guida è stata aggiornata: ${timeStr}`,
+      url: '/'
+    });
   } catch (err) {
     console.error('Web Push Error:', err);
   }

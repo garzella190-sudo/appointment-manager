@@ -13,12 +13,15 @@ import { ConflictsAlert } from '@/components/ConflictsAlert';
 
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
+import ExamSessionModal from '@/components/modals/ExamSessionModal';
 import Select from '@/components/forms/Select';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
 import DatePickerModal from '@/components/modals/DatePickerModal';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Home() {
+  const { istruttoreId, isIstruttore, loading: authLoading } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +32,7 @@ export default function Home() {
   const [showFilter, setShowFilter] = useState(false);
   const lastScrollY = useRef(0);
   const hasAutoScrolled = useRef(false);
+  const [hasAppliedAutoFilter, setHasAppliedAutoFilter] = useState(false);
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
@@ -46,7 +50,7 @@ export default function Home() {
         supabase
           .from('appuntamenti')
           .select(`
-            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine,
+            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, sessione_esame_id,
             clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
             istruttori ( nome, cognome, colore ),
             veicoli ( id, targa, nome, colore )
@@ -92,7 +96,8 @@ export default function Home() {
             name: istruttoreObj ? `${istruttoreObj.cognome} ${istruttoreObj.nome}` : 'Non ass.',
             color: istruttoreObj?.colore || '#3b82f6'
           },
-          exam_status: clienteObj?.sessione_esame_id ? 'scheduled' : (clienteObj?.pronto_esame ? 'ready' : 'none')
+          exam_status: clienteObj?.sessione_esame_id ? 'scheduled' : (clienteObj?.pronto_esame ? 'ready' : 'none'),
+          sessione_esame_id: row.sessione_esame_id
         };
       });
 
@@ -129,6 +134,16 @@ export default function Home() {
       window.removeEventListener('home-reset-today', handleResetToday);
     };
   }, [fetchAppointments]);
+
+  // Auto-filter: si applica a qualunque ruolo se l'account è associato a un istruttore
+  useEffect(() => {
+    if (!authLoading && istruttoreId && !hasAppliedAutoFilter) {
+      setSelectedInstructorId(istruttoreId);
+      setHasAppliedAutoFilter(true);
+    } else if (!authLoading && !hasAppliedAutoFilter) {
+      setHasAppliedAutoFilter(true); // marca comunque per evitare loop
+    }
+  }, [authLoading, istruttoreId, hasAppliedAutoFilter]);
 
   // Reset auto-scroll flag when date changes
   useEffect(() => {
@@ -315,10 +330,12 @@ export default function Home() {
               <Select
                 options={[
                   { id: '', label: 'Tutti gli Istruttori' },
-                  ...istruttori.map(i => ({ 
-                    id: i.id, 
-                    label: `${i.cognome} ${i.nome}`
-                  }))
+                  ...[...istruttori]
+                    .sort((a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'))
+                    .map(i => ({ 
+                      id: i.id, 
+                      label: `${i.cognome} ${i.nome}`
+                    }))
                 ]}
                 value={selectedInstructorId}
                 onChange={(val) => {
@@ -508,12 +525,21 @@ export default function Home() {
       />
 
       {selectedAppointment && (
-        <DetailsModal
-          isOpen={true}
-          onClose={() => setSelectedAppointment(null)}
-          onSuccess={fetchAppointments}
-          appointmentId={selectedAppointment.id}
-        />
+        selectedAppointment.sessione_esame_id ? (
+          <ExamSessionModal
+            isOpen={true}
+            onClose={() => setSelectedAppointment(null)}
+            onSuccess={fetchAppointments}
+            sessionId={selectedAppointment.sessione_esame_id}
+          />
+        ) : (
+          <DetailsModal
+            isOpen={true}
+            onClose={() => setSelectedAppointment(null)}
+            onSuccess={fetchAppointments}
+            appointmentId={selectedAppointment.id}
+          />
+        )
       )}
 
       <DatePickerModal

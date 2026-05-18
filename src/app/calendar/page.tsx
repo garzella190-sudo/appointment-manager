@@ -105,7 +105,7 @@ let datePickerCloseTime = 0;
 import { useAuth } from '@/hooks/useAuth';
 
 export default function CalendarPage() {
-  const { role, isSegreteria, isAdmin } = useAuth();
+  const { role, isSegreteria, isAdmin, istruttoreId, isIstruttore, loading: authLoading } = useAuth();
   const supabase = supabaseClient;
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -200,6 +200,30 @@ export default function CalendarPage() {
     localStorage.setItem('calendar_viewMode', viewMode);
   }, [selectedInstructorIds, viewDays, showWeekends, currentDate, granularity, viewMode, mounted]);
 
+  // Auto-filter: se l'utente ha un istruttoreId associato, filtralo di default
+  const [hasAppliedAutoFilter, setHasAppliedAutoFilter] = useState(false);
+  useEffect(() => {
+    if (!mounted || authLoading || hasAppliedAutoFilter) return;
+    const savedInstructorIds = localStorage.getItem('calendar_selectedInstructorIds');
+    // '[]' o null sono entrambi considerati "nessuna preferenza"
+    const hasRealPreference = savedInstructorIds && savedInstructorIds !== '[]';
+    if (!hasRealPreference && istruttoreId) {
+      setSelectedInstructorIds([istruttoreId]);
+    }
+    setHasAppliedAutoFilter(true);
+  }, [mounted, authLoading, istruttoreId, hasAppliedAutoFilter]);
+
+  // Auto-switch viewMode: se selezionato esattamente 1 istruttore → week; altrimenti → resource
+  // Questo si applica sempre (non dipende da hasAppliedAutoFilter) per garantire no-overlap
+  useEffect(() => {
+    if (!mounted) return;
+    if (selectedInstructorIds.length === 1) {
+      setViewMode('week');
+    } else if (selectedInstructorIds.length !== 1) {
+      setViewMode('resource');
+    }
+  }, [selectedInstructorIds, mounted]);
+
   const getDayClass = (date: Date) => {
     if (isItalianHoliday(date) || isWeekend(date)) return "is-holiday";
     return "";
@@ -264,10 +288,11 @@ export default function CalendarPage() {
         supabase
           .from('appuntamenti')
           .select(`
-            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo,
+            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id,
             clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
             istruttori ( nome, cognome, colore ),
-            veicoli ( id, targa, nome, colore )
+            veicoli ( id, targa, nome, colore ),
+            sessioni_esame ( id, nome, clienti ( id, nome, cognome ) )
           `)
           .gte('data_solo', format(fetchStartDate, 'yyyy-MM-dd'))
           .lt('data_solo', format(fetchEndDate, 'yyyy-MM-dd')),
@@ -276,11 +301,30 @@ export default function CalendarPage() {
       ]);
 
       if (dbError) throw dbError;
-      if (istruttoriData) setIstruttori(istruttoriData);
+
+      // Costruisce la lista istruttori unendo quelli dalla tabella + quelli negli appuntamenti
+      // (per coprire casi dove un istruttore ha appuntamenti ma non compare nella tabella)
+      const istruttoriDaAppuntamenti: { id: string; nome: string; cognome: string }[] = [];
+      const istruttoriIds = new Set((istruttoriData || []).map((i: any) => i.id));
+      for (const row of dbData || []) {
+        if (row.istruttore_id && !istruttoriIds.has(row.istruttore_id) && row.istruttori) {
+          istruttoriDaAppuntamenti.push({
+            id: row.istruttore_id,
+            nome: row.istruttori.nome || '',
+            cognome: row.istruttori.cognome || '',
+          });
+          istruttoriIds.add(row.istruttore_id);
+        }
+      }
+      const allIstruttori = [...(istruttoriData || []), ...istruttoriDaAppuntamenti]
+        .sort((a: any, b: any) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'));
+      setIstruttori(allIstruttori);
       
       const patentiMap = new Map<string, string>((patentiData || []).map((p: any) => [p.id, p.tipo]));
 
-      const mappedAppointments = (dbData || []).map((row: any) => {
+      const mappedAppointments = (dbData || [])
+        .filter((row: any) => !(row.note && String(row.note).startsWith('ESITO ESAME:')))
+        .map((row: any) => {
         const dateStr = row.data_solo || row.data.split('T')[0];
         const rowDate = new Date(row.data);
         const patenteId = row.clienti?.patente_richiesta_id;
@@ -320,7 +364,9 @@ export default function CalendarPage() {
           vehicle_color: row.veicoli?.colore,
           is_impegno: isUfficio,
           tipo_impegno: tipoImpegno,
-          exam_status: row.clienti?.sessione_esame_id ? 'scheduled' : (row.clienti?.pronto_esame ? 'ready' : 'none')
+          exam_status: row.clienti?.sessione_esame_id ? 'scheduled' : (row.clienti?.pronto_esame ? 'ready' : 'none'),
+          candidates: row.sessioni_esame?.clienti || [],
+          sessione_esame_id: row.sessione_esame_id
         };
       });
 
@@ -556,12 +602,16 @@ export default function CalendarPage() {
               
               <div className="flex shrink-0 items-center gap-1 sm:gap-2 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
                 <button
-                  onClick={() => setViewMode('week')}
+                  onClick={() => { if (selectedInstructorIds.length === 1) setViewMode('week'); }}
+                  disabled={selectedInstructorIds.length !== 1}
+                  title={selectedInstructorIds.length !== 1 ? 'Seleziona 1 solo istruttore per la vista Settimana' : 'Vista Settimana'}
                   className={cn(
                     "px-2.5 sm:px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
-                    viewMode === 'week' 
+                    viewMode === 'week' && selectedInstructorIds.length === 1
                       ? "bg-blue-600 text-white border-blue-500 shadow-md" 
-                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent"
+                      : selectedInstructorIds.length !== 1
+                        ? "opacity-30 cursor-not-allowed text-zinc-400 border-transparent"
+                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent"
                   )}
                 >
                   Settimana
@@ -804,7 +854,7 @@ export default function CalendarPage() {
               {/* Corpo Scorrevole */}
               <div 
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto scroll-container scrollbar-hide relative pb-4"
+                className="flex-1 overflow-y-auto scroll-container scrollbar-hide relative pb-24"
               >
                 {loading && (
                   <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
@@ -834,7 +884,7 @@ export default function CalendarPage() {
                         )}
                         style={{ 
                           gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayIstruttori.length)}, minmax(0, 1fr))`,
-                          zIndex: isCurrentSlot ? 40 : timeSlots.length - timeSlots.indexOf(slot),
+                          zIndex: isCurrentSlot ? 40 : timeSlots.indexOf(slot) + 1,
                         } as React.CSSProperties}
                       >
                       {isCurrentSlot && hasToday && (
@@ -1036,7 +1086,6 @@ export default function CalendarPage() {
             isOpen={true}
             onClose={() => setSelectedAppointment(null)}
             onSuccess={async () => {
-              setSelectedAppointment(null);
               router.refresh();
               await new Promise(r => setTimeout(r, 300));
               await fetchWeekAppointments();

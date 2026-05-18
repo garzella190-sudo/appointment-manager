@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/useToast';
 import { useRouter } from 'next/navigation';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import DatePicker from '@/components/DatePicker';
-import { toggleProntoEsameAction } from '@/actions/clienti';
+import { toggleProntoEsameAction, deleteSessioneEsameAction } from '@/actions/clienti';
 import { createAppointmentAction } from '@/actions/appointments';
 import { deleteImpegniBySessionAction } from '@/actions/impegni';
 import ExamSessionModal from '@/components/modals/ExamSessionModal';
@@ -116,9 +116,13 @@ export default function EsamiPage() {
       data: formData.data,
       n_candidati: formData.n_candidati,
       note: formData.note,
-      esaminatore: formData.esaminatore || null,
+      esaminatore: formData.esaminatore,
       ora_inizio: formData.ora_inizio,
-      istruttori_ids: formData.istruttori_ids
+      istruttori_ids: formData.istruttori_ids,
+      veicoli_ids: Array.from(new Set(formData.istruttori_ids.map(id => {
+        const istr = istruttori.find(i => i.id === id);
+        return istr?.veicolo_id;
+      }).filter(Boolean)))
     };
 
     let error;
@@ -149,17 +153,18 @@ export default function EsamiPage() {
 
         if (newSession) {
           for (const instrId of formData.istruttori_ids) {
-            await createAppointmentAction({
-              istruttore_id: instrId,
-              is_impegno: true,
-              nome_impegno: 'Esame di guida',
-              data: `${formData.data}T${formData.ora_inizio}`,
-              durata: formData.durata_blocco, // Use user selected duration
-              stato: 'programmato',
-              veicolo_id: null,
-              importo: null,
-              note: '',
-              sessione_esame_id: newSession.id
+              const istr = istruttori.find(i => i.id === instrId);
+              await createAppointmentAction({
+                istruttore_id: instrId,
+                is_impegno: true,
+                nome_impegno: 'Esame di guida',
+                data: new Date(`${formData.data}T${formData.ora_inizio}`).toISOString(),
+                durata: formData.durata_blocco, // Use user selected duration
+                stato: 'programmato',
+                veicolo_id: istr?.veicolo_id || null,
+                importo: null,
+                note: '',
+                sessione_esame_id: newSession.id
             });
           }
         }
@@ -187,15 +192,15 @@ export default function EsamiPage() {
   };
 
   const handleDeleteSeduta = async (id: string) => {
-    // 1. Eliminiamo i blocchi d'impegno associati
-    await deleteImpegniBySessionAction(id);
-
-    // 2. Eliminiamo la seduta
-    const { error } = await supabase.from('sessioni_esame').delete().eq('id', id);
-    if (!error) {
+    setLoading(true);
+    const res = await deleteSessioneEsameAction(id);
+    if (res.success) {
       showToast('Seduta (e impegni associati) eliminata', 'info');
       fetchData();
+    } else {
+      showToast(res.error || 'Errore durante l\'eliminazione', 'error');
     }
+    setLoading(false);
   };
 
   const openDetailModal = (seduta: any) => {
@@ -304,58 +309,77 @@ export default function EsamiPage() {
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] dark:bg-zinc-950 overflow-hidden">
       {/* Header */}
-      <header className="pt-6 px-4 md:px-8 pb-4 flex-shrink-0 animate-in fade-in duration-500">
+      <header className="pt-5 px-4 md:px-8 pb-3 flex-shrink-0 animate-in fade-in duration-500">
         <div className="flex justify-between items-center max-w-5xl mx-auto">
           <div>
-            <h1 className="text-3xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
-              <GraduationCap className="text-sky-500" size={32} />
+            <h1 className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
+              <GraduationCap className="text-sky-500" size={28} />
               Esami
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-widest mt-1">Gestione allievi e sedute</p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">Gestione allievi e sedute d'esame</p>
           </div>
           {(isAdmin || isSegreteria) && (
             <button 
-              onClick={() => setIsModalOpen(true)}
-              className="bg-zinc-900 dark:bg-sky-500 text-white p-3 rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all outline-none"
+              onClick={() => { setSelectedSeduta(null); setIsModalOpen(true); }}
+              className="flex items-center gap-2 bg-zinc-900 dark:bg-sky-500 text-white px-4 py-3 rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all outline-none text-xs font-black uppercase tracking-wider"
             >
-              <Plus size={20} strokeWidth={3} />
+              <Plus size={16} strokeWidth={3} />
+              <span className="hidden sm:inline">Nuova Seduta</span>
             </button>
           )}
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="px-4 md:px-8 pb-4 flex-shrink-0">
+      {/* Tabs con badge */}
+      <div className="px-4 md:px-8 pb-3 flex-shrink-0">
         <div className="max-w-5xl mx-auto flex bg-white/50 dark:bg-zinc-900/50 p-1.5 rounded-[22px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm">
           <button 
             onClick={() => setActiveTab('pronti')}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest transition-all",
+              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all",
               activeTab === 'pronti' ? "bg-white dark:bg-zinc-800 text-sky-600 shadow-sm" : "text-zinc-400"
             )}
           >
-            <Users size={16} />
+            <Users size={14} />
             Pronti
+            {prontiFiltrati.length > 0 && (
+              <span className={cn(
+                "ml-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black min-w-[18px] text-center",
+                activeTab === 'pronti' ? "bg-sky-100 dark:bg-sky-900 text-sky-600" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+              )}>{prontiFiltrati.length}</span>
+            )}
           </button>
           <button 
             onClick={() => setActiveTab('sedute')}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest transition-all",
+              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all",
               activeTab === 'sedute' ? "bg-white dark:bg-zinc-800 text-sky-600 shadow-sm" : "text-zinc-400"
             )}
           >
-            <CalendarIcon size={16} />
+            <CalendarIcon size={14} />
             Sedute
+            {futureSedute.length > 0 && (
+              <span className={cn(
+                "ml-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black min-w-[18px] text-center",
+                activeTab === 'sedute' ? "bg-sky-100 dark:bg-sky-900 text-sky-600" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+              )}>{futureSedute.length}</span>
+            )}
           </button>
           <button 
             onClick={() => setActiveTab('archivio')}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest transition-all",
+              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all",
               activeTab === 'archivio' ? "bg-white dark:bg-zinc-800 text-amber-600 shadow-sm" : "text-zinc-400"
             )}
           >
-            <GraduationCap size={16} />
+            <GraduationCap size={14} />
             Archivio
+            {pastSedute.length > 0 && (
+              <span className={cn(
+                "ml-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black min-w-[18px] text-center",
+                activeTab === 'archivio' ? "bg-amber-100 dark:bg-amber-900 text-amber-600" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+              )}>{pastSedute.length}</span>
+            )}
           </button>
         </div>
       </div>
@@ -365,8 +389,20 @@ export default function EsamiPage() {
           {activeTab === 'pronti' ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {prontiFiltrati.length === 0 ? (
-                <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
-                  Nessun allievo pronto per esame
+                <div className="py-16 flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="w-16 h-16 rounded-3xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center">
+                    <GraduationCap className="text-sky-400" size={32} />
+                  </div>
+                  <div>
+                    <p className="text-zinc-700 dark:text-zinc-300 font-black uppercase text-sm tracking-tight">Nessun allievo pronto</p>
+                    <p className="text-zinc-400 text-xs mt-1">Aggiungi un allievo dalla lista clienti</p>
+                  </div>
+                  <button
+                    onClick={() => setIsAddProntoModalOpen(true)}
+                    className="mt-2 px-6 py-3 bg-sky-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-sky-500/25 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                  >
+                    <Plus size={14} strokeWidth={3} /> Dichiara Pronto
+                  </button>
                 </div>
                ) : (
                   Object.values(prontiFiltrati.reduce<Record<string, {istruttore: any, clienti: any[]}>>((acc, c) => {
@@ -552,6 +588,7 @@ export default function EsamiPage() {
                </button>
             </div>
           ) : activeTab === 'sedute' ? (
+            <>
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {futureSedute.length === 0 ? (
                 <div className="py-20 text-center text-zinc-400 font-bold uppercase tracking-widest text-xs">
@@ -573,15 +610,20 @@ export default function EsamiPage() {
                       </span>
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h4 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-tight">
                           {s.nome || 'Seduta d\'Esame'}
                         </h4>
                         <span className="px-2 py-0.5 bg-sky-100 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-full text-[10px] font-black uppercase">
                           {s.clienti?.[0]?.count || 0} / {s.n_candidati} Candidati
                         </span>
+                        {s.ora_inizio && (
+                          <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full text-[10px] font-black flex items-center gap-1">
+                            <Clock size={9} /> {s.ora_inizio}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400 font-bold">{s.note || 'Nessuna nota aggiuntiva'}</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{s.note || 'Nessuna nota aggiuntiva'}</p>
                     </div>
                   </div>
                   {isAdmin && (
@@ -626,6 +668,20 @@ export default function EsamiPage() {
                 </div>
               ))}
             </div>
+
+            {/* CTA Nuova Seduta in fondo alla lista */}
+            {(isAdmin || isSegreteria) && (
+              <button
+                onClick={() => { setSelectedSeduta(null); setIsModalOpen(true); }}
+                className="w-full mt-2 py-5 border-[3px] border-dashed border-sky-100 dark:border-sky-900/50 rounded-[32px] text-sky-600 dark:text-sky-500 hover:bg-sky-50/50 dark:hover:bg-sky-900/10 hover:border-sky-500/50 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2 group"
+              >
+                <div className="w-10 h-10 rounded-2xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-sky-500 group-hover:text-white transition-all duration-300">
+                  <Plus size={20} strokeWidth={3} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest">Nuova Seduta d'Esame</span>
+              </button>
+            )}
+            </>
           ) : (
             // Archivio - sedute passate
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -737,7 +793,7 @@ export default function EsamiPage() {
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Inizio Blocco</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Orario di inizio</label>
               <input 
                 required
                 type="time" 
@@ -889,11 +945,11 @@ export default function EsamiPage() {
               </div>
             </button>
 
-            {sedute.length === 0 ? (
+            {futureSedute.length === 0 ? (
                <div className="py-20 text-center bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
                   <p className="text-xs font-bold text-zinc-400 uppercase">Nessuna seduta programmata</p>
                </div>
-            ) : sedute.map(s => {
+            ) : futureSedute.map(s => {
               const count = s.clienti?.[0]?.count || 0;
               const isFull = count >= s.n_candidati;
               return (

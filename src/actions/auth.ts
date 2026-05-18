@@ -48,7 +48,14 @@ export async function listUsersAction() {
     return { error: error.message };
   }
 
-  return { users: data.users };
+  // Ordine alfabetico per full_name
+  const sorted = [...(data.users || [])].sort((a, b) => {
+    const nameA = (a.user_metadata?.full_name || a.email || '').toLowerCase();
+    const nameB = (b.user_metadata?.full_name || b.email || '').toLowerCase();
+    return nameA.localeCompare(nameB, 'it');
+  });
+
+  return { users: sorted };
 }
 
 export async function updateUserAction(userId: string, data: { 

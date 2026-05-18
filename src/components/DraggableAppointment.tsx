@@ -15,6 +15,7 @@ interface DraggableAppointmentProps {
   isStacked?: boolean;
   isFirst?: boolean;
   granularity?: number;
+  totalColumns?: number;
 }
 
 const hexToRgba = (hex: string, alpha: number) => {
@@ -27,7 +28,7 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isStacked, isFirst, granularity = 15 }: DraggableAppointmentProps) => {
+export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isStacked, isFirst, granularity = 15, totalColumns = 1 }: DraggableAppointmentProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: appointment.id,
     data: appointment
@@ -55,12 +56,15 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (onClick) onClick(appointment);
+      onPointerUp={(e) => {
+        if (!isDragging && onClick) {
+          e.stopPropagation();
+          onClick(appointment);
+        }
       }}
       className={cn(
-        "relative w-full p-2 mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] flex flex-col justify-between border",
+        "relative w-full mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] flex flex-col justify-between border",
+        totalColumns > 1 ? "p-1.5" : "p-2",
         isDragging ? "invisible" : "hover:scale-[1.02] hover:shadow-lg hover:z-[30]",
         isOverlapping && "ring-2 ring-red-500 animate-pulse",
         appointment.stato === 'annullato' && "opacity-60 grayscale border-zinc-300 dark:border-zinc-700",
@@ -77,25 +81,27 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
         borderRight: appointment.vehicle_color ? `4px solid ${appointment.vehicle_color}` : undefined,
       } as React.CSSProperties}
     >
-      <div>
+      <div className="overflow-hidden">
+        {/* Riga 1: dot istruttore + nome cliente */}
         <div className="flex items-start justify-between gap-1">
-          <div className="flex items-center gap-1.5 overflow-hidden">
+          <div className="flex items-center gap-1 overflow-hidden">
              <div 
-               className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white shrink-0 shadow-sm"
+               className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black text-white shrink-0 shadow-sm"
                style={{ backgroundColor: instructorColor }}
                title={appointment.istruttore?.name}
              >
                {instructorInitial}
              </div>
              <p className={cn(
-               "text-[11px] sm:text-[13px] font-black text-zinc-900 dark:text-zinc-100 leading-tight truncate",
+               "font-black text-zinc-900 dark:text-zinc-100 leading-tight truncate",
+               totalColumns > 1 ? "text-[10px]" : "text-[11px] sm:text-[13px]",
                appointment.stato === 'annullato' && "line-through text-zinc-500 dark:text-zinc-400"
              )}>
                {appointment.client_name}
              </p>
              {appointment.exam_status && appointment.exam_status !== 'none' && (
                <GraduationCap 
-                 size={14} 
+                 size={totalColumns > 1 ? 10 : 14} 
                  className={cn(
                    "shrink-0",
                    appointment.exam_status === 'scheduled' ? "text-emerald-500 fill-emerald-500/10" : "text-zinc-300"
@@ -104,29 +110,53 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
              )}
           </div>
           
-          <div className="flex items-center gap-1 shrink-0">
-            {appointment.notes && appointment.notes.trim() !== '' && (
-              <div className="flex items-center justify-center p-1 bg-amber-100 dark:bg-amber-900/40 rounded-lg text-amber-600 dark:text-amber-400 shadow-sm ring-1 ring-amber-500/20" title={appointment.notes}>
-                <StickyNote size={12} fill="currentColor" fillOpacity={0.2} />
-              </div>
-            )}
-            {isOverlapping && (
-              <AlertTriangle size={14} className="text-red-600 dark:text-red-400 shrink-0" />
-            )}
-          </div>
+          {totalColumns === 1 && (
+            <div className="flex items-center gap-1 shrink-0">
+              {appointment.notes && appointment.notes.trim() !== '' && (
+                <div className="flex items-center justify-center p-1 bg-amber-100 dark:bg-amber-900/40 rounded-lg text-amber-600 dark:text-amber-400 shadow-sm ring-1 ring-amber-500/20" title={appointment.notes}>
+                  <StickyNote size={12} fill="currentColor" fillOpacity={0.2} />
+                </div>
+              )}
+              {isOverlapping && (
+                <AlertTriangle size={14} className="text-red-600 dark:text-red-400 shrink-0" />
+              )}
+            </div>
+          )}
         </div>
         
-        <div className="flex flex-col gap-0.5 mt-1 sm:mt-1.5 text-left">
-          <div className="flex items-center gap-1.5 opacity-80">
-            <span className="text-[10px] font-bold text-zinc-800 dark:text-zinc-300">
-              {appointment.appointment_time.slice(0, 5)} — {format(endTime, 'HH:mm')}
+        {/* Riga 2: orario + tipo patente (nascosto in modalità molto compressa) */}
+        {totalColumns === 1 && (
+          <div className="flex items-center gap-1 mt-0.5 opacity-80">
+            <span className={cn("font-bold text-zinc-800 dark:text-zinc-300", totalColumns > 1 ? "text-[9px]" : "text-[10px]")}>
+              {appointment.appointment_time.slice(0, 5)}
+              {totalColumns === 1 && <> — {format(endTime, 'HH:mm')}</>}
             </span>
-            <span className="w-1 h-1 rounded-full bg-zinc-400 dark:bg-zinc-600"></span>
-            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
-              {appointment.license_type}
-            </span>
+            {totalColumns === 1 && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-zinc-400 dark:bg-zinc-600" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
+                  {appointment.license_type}
+                </span>
+              </>
+            )}
           </div>
-          
+        )}
+        
+        {/* Lista Allievi (Task List) per Esami */}
+        {totalColumns === 1 && appointment.candidates && appointment.candidates.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {appointment.candidates.map(cand => (
+              <div key={cand.id} className="flex items-center gap-1.5 opacity-90 pl-1">
+                <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 uppercase leading-none truncate">
+                  {cand.cognome} {cand.nome}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {totalColumns === 1 && (
           <div className="absolute right-2 bottom-2">
             <button
               type="button"
@@ -140,7 +170,7 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
               <Trash2 size={12} />
             </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
