@@ -17,7 +17,9 @@ import {
   Check,
   User,
   ChevronDown,
-  StickyNote
+  StickyNote,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import Select from '@/components/forms/Select';
 import {
@@ -124,6 +126,7 @@ export default function CalendarPage() {
   const [showWeekends, setShowWeekends] = useState(true);
   const [granularity, setGranularity] = useState<15 | 30 | 60>(15);
   const [viewMode, setViewMode] = useState<'week' | 'resource'>('week');
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -601,12 +604,36 @@ export default function CalendarPage() {
         onDragEnd={handleDragEnd}
         modifiers={[snapCenterToCursor]}
       >
-        <div className="flex flex-col h-full w-full overflow-hidden">
-          <header className="px-2 sm:px-4 md:px-6 py-2 pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0">
+        <div className={cn(
+          "flex flex-col h-full w-full overflow-hidden",
+          isFullScreen && "fixed inset-0 z-[40] bg-[#F4F4F4] dark:bg-zinc-950 p-2 sm:p-3"
+        )}>
+          {isFullScreen && (
+            <button
+              type="button"
+              onClick={() => setIsFullScreen(false)}
+              title="Esci da Schermo Intero"
+              className="fixed top-4 right-4 z-50 h-10 w-10 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-xl hover:text-blue-600 dark:hover:text-blue-400 transition-all text-zinc-500 shadow-lg active:scale-95 cursor-pointer"
+            >
+              <Minimize2 size={18} />
+            </button>
+          )}
+          <header className={cn(
+            "px-2 sm:px-4 md:px-6 py-2 pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0",
+            isFullScreen && "hidden"
+          )}>
             <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 font-display">Calendario</h1>
               <RefreshButton onRefresh={fetchWeekAppointments} className="h-8 w-8 p-0" />
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(true)}
+                title="Schermo Intero"
+                className="h-8 w-8 flex items-center justify-center bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-xl hover:text-blue-600 dark:hover:text-blue-400 transition-all text-zinc-500 shadow-sm cursor-pointer"
+              >
+                <Maximize2 size={16} />
+              </button>
             </div>
               <p className="text-zinc-500 dark:text-zinc-400 mt-0.5 capitalize text-xs font-medium">
                 {viewMode === 'resource' 
