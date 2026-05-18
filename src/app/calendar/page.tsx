@@ -606,17 +606,59 @@ export default function CalendarPage() {
       >
         <div className={cn(
           "flex flex-col h-full w-full overflow-hidden",
-          isFullScreen && "fixed inset-0 z-[40] bg-[#F4F4F4] dark:bg-zinc-950 p-2 sm:p-3"
+          isFullScreen && "fixed inset-0 z-[40] bg-[#F4F4F4] dark:bg-zinc-950 p-2 sm:p-3 pt-16"
         )}>
           {isFullScreen && (
-            <button
-              type="button"
-              onClick={() => setIsFullScreen(false)}
-              title="Esci da Schermo Intero"
-              className="fixed top-4 right-4 z-50 h-10 w-10 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-xl hover:text-blue-600 dark:hover:text-blue-400 transition-all text-zinc-500 shadow-lg active:scale-95 cursor-pointer"
-            >
-              <Minimize2 size={18} />
-            </button>
+            <div className="fixed top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
+              {/* Date Navigation Block (floating on the left) */}
+              <div className="pointer-events-auto flex items-center h-10 gap-0.5 sm:gap-1.5 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-1.5 py-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => navigateWeek(-1)}
+                  title="Precedente"
+                  className="h-8 w-8 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400 cursor-pointer"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentDate(new Date())}
+                  title="Vai a oggi"
+                  className="px-2 sm:px-3 h-8 text-[10px] sm:text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all flex items-center cursor-pointer"
+                >
+                  {displayDays.some(d => isToday(d)) ? 'Oggi' : format(currentDate, 'd MMM', { locale: it })}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateWeek(1)}
+                  title="Successiva"
+                  className="h-8 w-8 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400 cursor-pointer"
+                >
+                  <ChevronRight size={18} />
+                </button>
+                
+                <div className="w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
+                
+                <button
+                  type="button"
+                  onClick={() => setIsDatePickerOpen(true)}
+                  className="flex h-8 w-8 items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
+                  title="Scegli una data"
+                >
+                  <CalendarIcon size={18} />
+                </button>
+              </div>
+
+              {/* Exit Full Screen Button (floating on the right) */}
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(false)}
+                title="Esci da Schermo Intero"
+                className="pointer-events-auto h-10 w-10 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-xl hover:text-blue-600 dark:hover:text-blue-400 transition-all text-zinc-500 shadow-lg active:scale-95 cursor-pointer"
+              >
+                <Minimize2 size={18} />
+              </button>
+            </div>
           )}
           <header className={cn(
             "px-2 sm:px-4 md:px-6 py-2 pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0",
