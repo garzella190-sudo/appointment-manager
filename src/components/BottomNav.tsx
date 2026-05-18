@@ -97,21 +97,14 @@ const BottomNav = () => {
       <nav className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-[96vw] md:max-w-2xl z-50 flex justify-center items-end pointer-events-none print:hidden">
         {isCalendarFullScreen ? (
           <>
-            {/* Left Segment: Profile + Home */}
+            {/* Left Segment: Plus + Home */}
             <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center gap-3 py-2 px-3 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-1 sm:mr-2 pointer-events-auto transition-all">
               <button 
-                onClick={() => setIsPermissionsModalOpen(true)}
-                className="flex items-center gap-2 shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-1 sm:p-1.5 rounded-[16px] sm:rounded-[20px] transition-all active:scale-95 text-left border-none outline-none"
+                onClick={() => setIsModalOpen(true)}
+                title="Nuovo Appuntamento"
+                className="relative flex flex-col items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0 text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/10 cursor-pointer"
               >
-                <div className={cn(
-                  "w-8 h-8 sm:w-9 sm:h-9 rounded-[12px] sm:rounded-[14px] flex items-center justify-center shrink-0 shadow-inner",
-                  role === 'AdminDev' ? "bg-gradient-to-tr from-zinc-800 to-zinc-900 text-amber-400" :
-                  role === 'admin' ? "bg-gradient-to-tr from-amber-100 to-amber-200 text-amber-600" : 
-                  "bg-gradient-to-tr from-sky-100 to-sky-200 text-sky-600"
-                )}>
-                  {role === 'AdminDev' ? <ShieldCheck size={16} strokeWidth={2.5} /> :
-                   role === 'admin' ? <ShieldCheck size={16} strokeWidth={2.5} /> : <User size={16} strokeWidth={2.5} />}
-                </div>
+                <PlusCircle size={20} strokeWidth={2.5} className="transition-transform duration-300 sm:w-[22px] sm:h-[22px] group-hover:scale-110" />
               </button>
               <Link
                 href="/"
