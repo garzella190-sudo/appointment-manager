@@ -200,43 +200,44 @@ export default function CalendarPage() {
     localStorage.setItem('calendar_viewMode', viewMode);
   }, [selectedInstructorIds, viewDays, showWeekends, currentDate, granularity, viewMode, mounted]);
 
+  // Calcolo dell'istruttore associato (da metadata o da matching nome/email)
+  const resolvedIstruttoreId = useMemo(() => {
+    if (istruttoreId) return istruttoreId;
+    if (!user || istruttori.length === 0) return null;
+    
+    const userEmail = user.email?.toLowerCase() || '';
+    const userMetaName = (user.user_metadata?.nome || user.user_metadata?.name || '').toLowerCase();
+    
+    const matched = istruttori.find(i => {
+      const iNome = (i.nome || '').toLowerCase();
+      const iCognome = (i.cognome || '').toLowerCase();
+      return (
+        (iNome && userMetaName.includes(iNome)) ||
+        (iCognome && userMetaName.includes(iCognome)) ||
+        (iNome && userEmail.includes(iNome)) ||
+        (iCognome && userEmail.includes(iCognome))
+      );
+    });
+    return matched ? matched.id : null;
+  }, [istruttoreId, user, istruttori]);
+
   // Auto-filter: se l'utente ha un istruttoreId associato, filtralo di default
   const [hasAppliedAutoFilter, setHasAppliedAutoFilter] = useState(false);
   useEffect(() => {
     if (!mounted || authLoading || hasAppliedAutoFilter || istruttori.length === 0) return;
     
-    let targetIstruttoreId = istruttoreId;
-    if (!targetIstruttoreId && user) {
-      const userEmail = user.email?.toLowerCase() || '';
-      const userMetaName = (user.user_metadata?.nome || user.user_metadata?.name || '').toLowerCase();
-      
-      const matched = istruttori.find(i => {
-        const iNome = (i.nome || '').toLowerCase();
-        const iCognome = (i.cognome || '').toLowerCase();
-        return (
-          (iNome && userMetaName.includes(iNome)) ||
-          (iCognome && userMetaName.includes(iCognome)) ||
-          (iNome && userEmail.includes(iNome)) ||
-          (iCognome && userEmail.includes(iCognome))
-        );
-      });
-      if (matched) {
-        targetIstruttoreId = matched.id;
-      }
-    }
-
-    if (isIstruttore && targetIstruttoreId) {
-      setSelectedInstructorIds([targetIstruttoreId]);
+    if (isIstruttore && resolvedIstruttoreId) {
+      setSelectedInstructorIds([resolvedIstruttoreId]);
     } else {
       const savedInstructorIds = localStorage.getItem('calendar_selectedInstructorIds');
       // '[]' o null sono entrambi considerati "nessuna preferenza"
       const hasRealPreference = savedInstructorIds && savedInstructorIds !== '[]';
-      if (!hasRealPreference && targetIstruttoreId) {
-        setSelectedInstructorIds([targetIstruttoreId]);
+      if (!hasRealPreference && resolvedIstruttoreId) {
+        setSelectedInstructorIds([resolvedIstruttoreId]);
       }
     }
     setHasAppliedAutoFilter(true);
-  }, [mounted, authLoading, istruttoreId, isIstruttore, istruttori, user, hasAppliedAutoFilter]);
+  }, [mounted, authLoading, resolvedIstruttoreId, isIstruttore, istruttori, hasAppliedAutoFilter]);
 
   // Auto-switch viewMode: se selezionato esattamente 1 istruttore → week; altrimenti → resource
   // Questo si applica sempre (non dipende da hasAppliedAutoFilter) per garantire no-overlap
@@ -688,6 +689,11 @@ export default function CalendarPage() {
                 <button
                   onClick={() => {
                     if (viewMode === 'resource') {
+                      if (resolvedIstruttoreId) {
+                        setSelectedInstructorIds([resolvedIstruttoreId]);
+                      } else if (istruttori.length > 0) {
+                        setSelectedInstructorIds([istruttori[0].id]);
+                      }
                       setViewMode('week');
                     } else {
                       setShowFilter(!showFilter);
