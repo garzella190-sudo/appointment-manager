@@ -963,7 +963,20 @@ export default function CalendarPage() {
                               (selectedInstructorIds.length === 0 || selectedInstructorIds.includes(apt.trainer_id))
                             );
                           })
-                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
+                          .filter(apt => {
+                            if (apt.stato !== 'annullato') return true;
+                            // Se è annullato, mostra solo se non ci sono appuntamenti attivi che si sovrappongono nello stesso orario per lo stesso istruttore
+                            const hasOverlappingActive = dayAppointments.some(other => {
+                              if (other.stato === 'annullato' || other.trainer_id !== apt.trainer_id) return false;
+                              const otherStart = new Date(`${other.appointment_date}T${other.appointment_time}`).getTime();
+                              const otherEnd = otherStart + other.duration * 60000;
+                              const aptStart = new Date(`${apt.appointment_date}T${apt.appointment_time}`).getTime();
+                              const aptEnd = aptStart + apt.duration * 60000;
+                              return otherStart < aptEnd && otherEnd > aptStart;
+                            });
+                            return !hasOverlappingActive;
+                          });
 
                         // Raggruppa gli appuntamenti della cella per l'ora esatta di inizio
                         const appointmentsByTime: { [time: string]: typeof cellAppointments } = {};
@@ -1035,7 +1048,20 @@ export default function CalendarPage() {
                               apt.trainer_id === ist.id
                             );
                           })
-                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+                          .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time))
+                          .filter(apt => {
+                            if (apt.stato !== 'annullato') return true;
+                            // Se è annullato, mostra solo se non ci sono appuntamenti attivi che si sovrappongono nello stesso orario per lo stesso istruttore
+                            const hasOverlappingActive = dayAppointments.some(other => {
+                              if (other.stato === 'annullato' || other.trainer_id !== apt.trainer_id) return false;
+                              const otherStart = new Date(`${other.appointment_date}T${other.appointment_time}`).getTime();
+                              const otherEnd = otherStart + other.duration * 60000;
+                              const aptStart = new Date(`${apt.appointment_date}T${apt.appointment_time}`).getTime();
+                              const aptEnd = aptStart + apt.duration * 60000;
+                              return otherStart < aptEnd && otherEnd > aptStart;
+                            });
+                            return !hasOverlappingActive;
+                          });
 
                         // Raggruppa gli appuntamenti della cella per l'ora esatta di inizio
                         const appointmentsByTime: { [time: string]: typeof cellAppointments } = {};
