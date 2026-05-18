@@ -965,35 +965,53 @@ export default function CalendarPage() {
                           })
                           .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
 
+                        // Raggruppa gli appuntamenti della cella per l'ora esatta di inizio
+                        const appointmentsByTime: { [time: string]: typeof cellAppointments } = {};
+                        cellAppointments.forEach(apt => {
+                          const time = apt.appointment_time.slice(0, 5);
+                          if (!appointmentsByTime[time]) {
+                            appointmentsByTime[time] = [];
+                          }
+                          appointmentsByTime[time].push(apt);
+                        });
+                        const sortedTimes = Object.keys(appointmentsByTime).sort();
+
                         return (
                           <DroppableCell key={cellId} id={cellId}>
                             <div 
-                              className="w-full flex flex-col gap-0 relative cursor-pointer min-h-[40px]"
+                              className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px]"
                               onClick={() => handleCellClick(dateStr, slot)}
                             >
-                              {cellAppointments
-                                .map((apt, idx) => {
-                                const activeAppointments = cellAppointments.filter(a => a.stato !== 'annullato');
-                                const hasConflict = apt.stato !== 'annullato' && activeAppointments.some(other => 
-                                  other.id !== apt.id && 
-                                  (other.trainer_id === apt.trainer_id || 
-                                   other.vehicle_id_uuid === apt.vehicle_id_uuid || 
-                                   other.cliente_id === apt.cliente_id)
-                                );
-                                
+                              {sortedTimes.map((time) => {
+                                const group = appointmentsByTime[time];
                                 return (
-                                  <div
-                                    key={apt.id}
-                                    className="relative w-full"
-                                  >
-                                    <DraggableAppointment
-                                      appointment={apt}
-                                      isOverlapping={hasConflict}
-                                      onClick={setSelectedAppointment}
-                                      isStacked={cellAppointments.length > 1}
-                                      granularity={15}
-                                      isFirst={idx === 0}
-                                    />
+                                  <div key={time} className="w-full flex flex-row gap-1">
+                                    {group.map((apt, idx) => {
+                                      const activeAppointments = cellAppointments.filter(a => a.stato !== 'annullato');
+                                      const hasConflict = apt.stato !== 'annullato' && activeAppointments.some(other => 
+                                        other.id !== apt.id && 
+                                        (other.trainer_id === apt.trainer_id || 
+                                         other.vehicle_id_uuid === apt.vehicle_id_uuid || 
+                                         other.cliente_id === apt.cliente_id)
+                                      );
+                                      
+                                      return (
+                                        <div
+                                          key={apt.id}
+                                          className="relative flex-1 min-w-0"
+                                        >
+                                          <DraggableAppointment
+                                            appointment={apt}
+                                            isOverlapping={hasConflict}
+                                            onClick={setSelectedAppointment}
+                                            isStacked={true}
+                                            granularity={15}
+                                            isFirst={idx === 0}
+                                            totalColumns={group.length}
+                                          />
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 );
                               })}
@@ -1019,35 +1037,53 @@ export default function CalendarPage() {
                           })
                           .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
 
+                        // Raggruppa gli appuntamenti della cella per l'ora esatta di inizio
+                        const appointmentsByTime: { [time: string]: typeof cellAppointments } = {};
+                        cellAppointments.forEach(apt => {
+                          const time = apt.appointment_time.slice(0, 5);
+                          if (!appointmentsByTime[time]) {
+                            appointmentsByTime[time] = [];
+                          }
+                          appointmentsByTime[time].push(apt);
+                        });
+                        const sortedTimes = Object.keys(appointmentsByTime).sort();
+
                         return (
                           <DroppableCell key={cellId} id={cellId}>
                             <div 
-                              className="w-full flex flex-col gap-0 relative cursor-pointer min-h-[40px]"
+                              className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px]"
                               onClick={() => handleCellClick(dateStr, slot)}
                             >
-                              {cellAppointments
-                                .map((apt, idx) => {
-                                const activeAppointments = cellAppointments.filter(a => a.stato !== 'annullato');
-                                const hasConflict = apt.stato !== 'annullato' && activeAppointments.some(other => 
-                                  other.id !== apt.id && 
-                                  (other.trainer_id === apt.trainer_id || 
-                                   other.vehicle_id_uuid === apt.vehicle_id_uuid || 
-                                   other.cliente_id === apt.cliente_id)
-                                );
-                                
+                              {sortedTimes.map((time) => {
+                                const group = appointmentsByTime[time];
                                 return (
-                                  <div
-                                    key={apt.id}
-                                    className="relative w-full"
-                                  >
-                                    <DraggableAppointment
-                                      appointment={apt}
-                                      isOverlapping={hasConflict}
-                                      onClick={setSelectedAppointment}
-                                      isStacked={cellAppointments.length > 1}
-                                      granularity={15}
-                                      isFirst={idx === 0}
-                                    />
+                                  <div key={time} className="w-full flex flex-row gap-1">
+                                    {group.map((apt, idx) => {
+                                      const activeAppointments = cellAppointments.filter(a => a.stato !== 'annullato');
+                                      const hasConflict = apt.stato !== 'annullato' && activeAppointments.some(other => 
+                                        other.id !== apt.id && 
+                                        (other.trainer_id === apt.trainer_id || 
+                                         other.vehicle_id_uuid === apt.vehicle_id_uuid || 
+                                         other.cliente_id === apt.cliente_id)
+                                      );
+                                      
+                                      return (
+                                        <div
+                                          key={apt.id}
+                                          className="relative flex-1 min-w-0"
+                                        >
+                                          <DraggableAppointment
+                                            appointment={apt}
+                                            isOverlapping={hasConflict}
+                                            onClick={setSelectedAppointment}
+                                            isStacked={true}
+                                            granularity={15}
+                                            isFirst={idx === 0}
+                                            totalColumns={group.length}
+                                          />
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 );
                               })}
