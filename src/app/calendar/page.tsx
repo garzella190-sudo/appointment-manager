@@ -105,7 +105,7 @@ let datePickerCloseTime = 0;
 import { useAuth } from '@/hooks/useAuth';
 
 export default function CalendarPage() {
-  const { role, isSegreteria, isAdmin, istruttoreId, isIstruttore, loading: authLoading } = useAuth();
+  const { user, role, isSegreteria, isAdmin, istruttoreId, isIstruttore, loading: authLoading } = useAuth();
   const supabase = supabaseClient;
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -203,15 +203,40 @@ export default function CalendarPage() {
   // Auto-filter: se l'utente ha un istruttoreId associato, filtralo di default
   const [hasAppliedAutoFilter, setHasAppliedAutoFilter] = useState(false);
   useEffect(() => {
-    if (!mounted || authLoading || hasAppliedAutoFilter) return;
-    const savedInstructorIds = localStorage.getItem('calendar_selectedInstructorIds');
-    // '[]' o null sono entrambi considerati "nessuna preferenza"
-    const hasRealPreference = savedInstructorIds && savedInstructorIds !== '[]';
-    if (!hasRealPreference && istruttoreId) {
-      setSelectedInstructorIds([istruttoreId]);
+    if (!mounted || authLoading || hasAppliedAutoFilter || istruttori.length === 0) return;
+    
+    let targetIstruttoreId = istruttoreId;
+    if (!targetIstruttoreId && user) {
+      const userEmail = user.email?.toLowerCase() || '';
+      const userMetaName = (user.user_metadata?.nome || user.user_metadata?.name || '').toLowerCase();
+      
+      const matched = istruttori.find(i => {
+        const iNome = (i.nome || '').toLowerCase();
+        const iCognome = (i.cognome || '').toLowerCase();
+        return (
+          (iNome && userMetaName.includes(iNome)) ||
+          (iCognome && userMetaName.includes(iCognome)) ||
+          (iNome && userEmail.includes(iNome)) ||
+          (iCognome && userEmail.includes(iCognome))
+        );
+      });
+      if (matched) {
+        targetIstruttoreId = matched.id;
+      }
+    }
+
+    if (isIstruttore && targetIstruttoreId) {
+      setSelectedInstructorIds([targetIstruttoreId]);
+    } else {
+      const savedInstructorIds = localStorage.getItem('calendar_selectedInstructorIds');
+      // '[]' o null sono entrambi considerati "nessuna preferenza"
+      const hasRealPreference = savedInstructorIds && savedInstructorIds !== '[]';
+      if (!hasRealPreference && targetIstruttoreId) {
+        setSelectedInstructorIds([targetIstruttoreId]);
+      }
     }
     setHasAppliedAutoFilter(true);
-  }, [mounted, authLoading, istruttoreId, hasAppliedAutoFilter]);
+  }, [mounted, authLoading, istruttoreId, isIstruttore, istruttori, user, hasAppliedAutoFilter]);
 
   // Auto-switch viewMode: se selezionato esattamente 1 istruttore → week; altrimenti → resource
   // Questo si applica sempre (non dipende da hasAppliedAutoFilter) per garantire no-overlap
@@ -284,18 +309,24 @@ export default function CalendarPage() {
     const fetchEndDate = addDays(displayDays[displayDays.length - 1], 1);
 
     try {
+      let apptQuery = supabase
+        .from('appuntamenti')
+        .select(`
+          id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id,
+          clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
+          istruttori ( nome, cognome, colore ),
+          veicoli ( id, targa, nome, colore ),
+          sessioni_esame ( id, nome, clienti ( id, nome, cognome ) )
+        `)
+        .gte('data_solo', format(fetchStartDate, 'yyyy-MM-dd'))
+        .lt('data_solo', format(fetchEndDate, 'yyyy-MM-dd'));
+
+      if (isIstruttore && istruttoreId) {
+        apptQuery = apptQuery.eq('istruttore_id', istruttoreId);
+      }
+
       const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
-        supabase
-          .from('appuntamenti')
-          .select(`
-            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id,
-            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
-            istruttori ( nome, cognome, colore ),
-            veicoli ( id, targa, nome, colore ),
-            sessioni_esame ( id, nome, clienti ( id, nome, cognome ) )
-          `)
-          .gte('data_solo', format(fetchStartDate, 'yyyy-MM-dd'))
-          .lt('data_solo', format(fetchEndDate, 'yyyy-MM-dd')),
+        apptQuery,
         supabase.from('patenti').select('id, tipo'),
         supabase.from('istruttori').select('id, nome, cognome').order('cognome')
       ]);
@@ -716,7 +747,7 @@ export default function CalendarPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-1.5">
                   <button
-                    onClick={() => { setSelectedInstructorIds([]); setViewMode('week'); }}
+                    onClick={() => { setSelectedInstructorIds([]); setViewMode('resource'); }}
                     className={cn(
                       "px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
                       selectedInstructorIds.length === 0
@@ -747,8 +778,10 @@ export default function CalendarPage() {
                                   next = [...prev, i.id];
                                 }
                                 
-                                // Auto-switch view mode only if going from 1 to 2+
-                                if (next.length >= 2 && viewMode === 'week') {
+                                // Auto-switch view mode: se 1 solo istruttore → week, altrimenti → resource
+                                if (next.length === 1) {
+                                  setViewMode('week');
+                                } else {
                                   setViewMode('resource');
                                 }
                                 return next;
