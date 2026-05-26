@@ -6,7 +6,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { sendConfirmationEmailAction } from './notifications';
-import { sendNotificationToAllUsers } from '@/lib/pushHelper';
+import { sendNotificationToAllUsers, sendNotificationToInstructor, isInstructorGarzella } from '@/lib/pushHelper';
 
 // Initialized lazily inside the action
 
@@ -210,9 +210,11 @@ export async function createAppointmentAction(payload: {
   }
 
   // 4. Web Push Broadcast — notifica TUTTI gli utenti tranne chi ha fatto l'azione
+  // OPPURE notifica solo Manuele Garzella se l'azione è compiuta dall'ufficio
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const currentUserId = session?.user?.id || null;
+    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
     
     const clientName = clientData.nome && clientData.nome !== 'UFFICIO' 
       ? `${clientData.cognome} ${clientData.nome}` 
@@ -220,11 +222,22 @@ export async function createAppointmentAction(payload: {
       
     const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
     
-    await sendNotificationToAllUsers(currentUserId, {
-      title: '📅 Nuova Guida Inserita',
-      body: `${clientName} — ${timeStr}`,
-      url: '/'
-    });
+    const isGarzella = await isInstructorGarzella(payload.istruttore_id);
+    if (isGarzella) {
+      if (currentUserIstruttoreId !== payload.istruttore_id) {
+        await sendNotificationToInstructor(payload.istruttore_id, {
+          title: '📅 Nuova Guida Inserita',
+          body: `${clientName} — ${timeStr}`,
+          url: '/'
+        });
+      }
+    } else {
+      await sendNotificationToAllUsers(currentUserId, {
+        title: '📅 Nuova Guida Inserita',
+        body: `${clientName} — ${timeStr}`,
+        url: '/'
+      });
+    }
   } catch (err) {
     console.error('Web Push Error:', err);
   }
@@ -381,17 +394,30 @@ export async function updateAppointmentAction(id: string, payload: any) {
   }
 
   // 4. Web Push Broadcast — notifica TUTTI gli utenti tranne chi ha fatto la modifica
+  // OPPURE notifica solo Manuele Garzella se l'azione è compiuta dall'ufficio
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const currentUserId = session?.user?.id || null;
+    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
     
     const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
     
-    await sendNotificationToAllUsers(currentUserId, {
-      title: '✏️ Guida Modificata',
-      body: `Una guida è stata aggiornata: ${timeStr}`,
-      url: '/'
-    });
+    const isGarzella = await isInstructorGarzella(payload.istruttore_id);
+    if (isGarzella) {
+      if (currentUserIstruttoreId !== payload.istruttore_id) {
+        await sendNotificationToInstructor(payload.istruttore_id, {
+          title: '✏️ Guida Modificata',
+          body: `Una guida è stata aggiornata: ${timeStr}`,
+          url: '/'
+        });
+      }
+    } else {
+      await sendNotificationToAllUsers(currentUserId, {
+        title: '✏️ Guida Modificata',
+        body: `Una guida è stata aggiornata: ${timeStr}`,
+        url: '/'
+      });
+    }
   } catch (err) {
     console.error('Web Push Error:', err);
   }

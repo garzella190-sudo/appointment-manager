@@ -30,13 +30,15 @@ const NewAppointmentModal = ({
       title="Nuovo Appuntamento"
     >
       <div className="mt-2">
-        <AppointmentForm 
-          onSuccess={onSuccess} 
-          onCancel={onClose}
-          initialDate={initialDate}
-          initialTime={initialTime}
-          initialMode="create"
-        />
+        {isOpen && (
+          <AppointmentForm 
+            onSuccess={onSuccess} 
+            onCancel={onClose}
+            initialDate={initialDate}
+            initialTime={initialTime}
+            initialMode="create"
+          />
+        )}
       </div>
     </Modal>
   );

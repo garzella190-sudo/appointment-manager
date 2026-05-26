@@ -1103,8 +1103,12 @@ export default function CalendarPage() {
                         return (
                           <DroppableCell key={cellId} id={cellId}>
                             <div 
-                              className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px]"
-                              onClick={() => handleCellClick(dateStr, slot)}
+                              className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px] select-none"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleCellClick(dateStr, slot);
+                              }}
                             >
                               {sortedTimes.map((time) => {
                                 const group = appointmentsByTime[time];
@@ -1220,8 +1224,12 @@ export default function CalendarPage() {
                         return (
                           <DroppableCell key={cellId} id={cellId}>
                             <div 
-                              className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px]"
-                              onClick={() => handleCellClick(dateStr, slot)}
+                              className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px] select-none"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleCellClick(dateStr, slot);
+                              }}
                             >
                               {sortedTimes.map((time) => {
                                 const group = appointmentsByTime[time];

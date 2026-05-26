@@ -120,22 +120,6 @@ export const VeicoloForm = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!veicoloId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo veicolo? L'azione è definitiva.")) return;
-
-    setLoading(true);
-    const result = await deleteVeicoloAction(veicoloId);
-    setLoading(false);
-
-    if (result.success) {
-      showToast('Veicolo eliminato definitivamente', 'info');
-      onSuccess();
-    } else {
-      showToast(result.error || "Errore durante l'eliminazione", 'error');
-      setServerError(result.error || "Errore durante l'eliminazione.");
-    }
-  };
 
   const initials = form.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const isView = mode === 'view';

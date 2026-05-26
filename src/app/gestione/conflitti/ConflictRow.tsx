@@ -7,6 +7,8 @@ import { AlertCircle, Trash2, CheckCircle2, Loader2, ArrowRight } from 'lucide-r
 import { discardConflictAction, forceResolveConflictAction } from '@/actions/conflitti';
 import { useToast } from '@/hooks/useToast';
 
+import { ConfirmBubble } from '@/components/ConfirmBubble';
+
 export function ConflictRow({ conflict }: { conflict: any }) {
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
@@ -18,18 +20,6 @@ export function ConflictRow({ conflict }: { conflict: any }) {
       showToast('Modifica scartata', 'info');
     } else {
       showToast(res.error || 'Errore', 'error');
-      setLoading(false);
-    }
-  };
-
-  const handleForce = async () => {
-    if (!window.confirm('Forzare sovrascriverà eventuali blocchi. Sei sicuro?')) return;
-    setLoading(true);
-    const res = await forceResolveConflictAction(conflict.id);
-    if (res.success) {
-      showToast('Modifica forzata con successo', 'success');
-    } else {
-      showToast(res.error || 'Errore durante la forzatura', 'error');
       setLoading(false);
     }
   };
@@ -77,13 +67,29 @@ export function ConflictRow({ conflict }: { conflict: any }) {
             {loading ? <Loader2 size={16} className="animate-spin" /> : <><Trash2 size={16} /> Scarta</>}
           </button>
           
-          <button
-            onClick={handleForce}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 w-full p-3 rounded-xl bg-red-500 text-white font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-colors shadow-md shadow-red-500/20 disabled:opacity-50"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <><ArrowRight size={16} /> Forza Modifica</>}
-          </button>
+          <ConfirmBubble
+            title="Forza Modifica"
+            message="Forzare questa operazione sovrascriverà eventuali blocchi di sistema. Sei sicuro di voler procedere?"
+            confirmLabel="Forza"
+            onConfirm={async () => {
+              setLoading(true);
+              const res = await forceResolveConflictAction(conflict.id);
+              if (res.success) {
+                showToast('Modifica forzata con successo', 'success');
+              } else {
+                showToast(res.error || 'Errore durante la forzatura', 'error');
+                setLoading(false);
+              }
+            }}
+            trigger={
+              <button
+                disabled={loading}
+                className="flex items-center justify-center gap-2 w-full p-3 rounded-xl bg-red-500 text-white font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-colors shadow-md shadow-red-500/20 disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <><ArrowRight size={16} /> Forza Modifica</>}
+              </button>
+            }
+          />
         </div>
       </div>
     </div>

@@ -50,7 +50,7 @@ const TIME_OPTIONS = Array.from({ length: (22 - 8) * 4 + 1 }, (_, i) => {
 });
 
 export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
-  const { role, isAdmin, isSegreteria } = useAuth();
+  const { role, isAdmin, isSegreteria, istruttoreId } = useAuth();
   const [mode, setMode] = useState<'create' | 'edit' | 'view'>(appointmentId ? initialMode : 'create');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -68,7 +68,23 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   const [isImpegno, setIsImpegno] = useState(defaultIsImpegno);
   const [nomeImpegno, setNomeImpegno] = useState('');
   const [impegniNames, setImpegniNames] = useState<string[]>([]);
+  const [clientiUfficio, setClientiUfficio] = useState<Array<{ cognome: string; telefono: string | null }>>([]);
   const [showImpegniDropdown, setShowImpegniDropdown] = useState(false);
+  const [impegnoInstructorMap, setImpegnoInstructorMap] = useState<Record<string, string[]>>({});
+  const impegniDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close impegni dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (impegniDropdownRef.current && !impegniDropdownRef.current.contains(event.target as Node)) {
+        setShowImpegniDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const [form, setForm] = useState({
     cliente_id: '',
@@ -76,7 +92,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     veicolo_id: '',
     data: initialDate || new Date().toISOString().split('T')[0],
     ora: initialTime || '09:00',
-    durata: 60,
+    durata: initialTime ? 30 : 60,
     patente_id: '',
     cambio: 'manuale' as 'manuale' | 'automatico',
     note: '',
@@ -90,7 +106,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   const [selectedIstruttore, setSelectedIstruttore] = useState<Istruttore | null>(null);
   const [selectedVeicolo, setSelectedVeicolo] = useState<Veicolo | null>(null);
   
-  const [durationMode, setDurationMode] = useState<'30' | '60' | 'custom'>('60');
+  const [durationMode, setDurationMode] = useState<'30' | '60' | 'custom'>(initialTime ? '30' : '60');
   const [serverError, setServerError] = useState<string | null>(null);
   const [addingCliente, setAddingCliente] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<{ instructor_ids: string[], vehicle_ids: string[], busy_client_ids: string[] }>({ 
@@ -114,17 +130,64 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     async function loadData() {
       setFetching(true);
       try {
-        const [cRes, iRes, vRes, pRes, impRes] = await Promise.all([
+        // Auto-migrazione silente dei record storici al nuovo standard 'DEFAULT'
+        try {
+          const { data: ufficioClienti } = await supabase
+            .from('clienti')
+            .select('id, cognome, telefono')
+            .eq('nome', 'UFFICIO');
+            
+          if (ufficioClienti) {
+            const defaultNames = ['FERIE', 'QUIZ B', 'ESAME', 'TEORIA B', 'TEST IMPEGNO'];
+            const toMigrate = ufficioClienti.filter((c: any) => 
+              defaultNames.includes(c.cognome.toUpperCase()) && c.telefono !== 'DEFAULT'
+            );
+            
+            if (toMigrate.length > 0) {
+              await Promise.all(toMigrate.map((c: any) => 
+                supabase.from('clienti').update({ telefono: 'DEFAULT' }).eq('id', c.id)
+              ));
+            }
+          }
+        } catch (err) {
+          console.error("Errore durante la migrazione silenziosa in AppointmentForm:", err);
+        }
+
+        const [cRes, iRes, vRes, pRes, impRes, apptImpRes] = await Promise.all([
           supabase.from('clienti').select('*, sessioni_esame(data)').neq('nome', 'UFFICIO').order('cognome'),
           supabase.from('istruttori').select('*').order('cognome'),
           supabase.from('veicoli').select('*').order('nome'),
           supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
-          supabase.from('clienti').select('cognome').eq('nome', 'UFFICIO'),
+          supabase.from('clienti').select('cognome, telefono').eq('nome', 'UFFICIO'),
+          supabase.from('appuntamenti').select('istruttore_id, clienti!inner(cognome, telefono)').eq('clienti.nome', 'UFFICIO')
         ]);
+
+        // Save detailed office clients list
+        setClientiUfficio(impRes.data ?? []);
 
         // Extract unique impegno names
         const uniqueNames = Array.from(new Set((impRes.data ?? []).map((c: {cognome: string}) => c.cognome))).filter(Boolean).sort() as string[];
         setImpegniNames(uniqueNames);
+
+        // Extract commitment names to instructor mapping
+        const map: Record<string, Set<string>> = {};
+        if (apptImpRes.data) {
+          (apptImpRes.data as any[]).forEach((appt: any) => {
+            const instrId = appt.istruttore_id;
+            const name = appt.clienti?.cognome;
+            if (instrId && name) {
+              if (!map[instrId]) {
+                map[instrId] = new Set<string>();
+              }
+              map[instrId].add(name);
+            }
+          });
+        }
+        const finalMap: Record<string, string[]> = {};
+        Object.keys(map).forEach(key => {
+          finalMap[key] = Array.from(map[key]);
+        });
+        setImpegnoInstructorMap(finalMap);
 
         // Filter active clients: not archived and no past exam
         const today = startOfDay(new Date());
@@ -291,12 +354,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       const pat = patenti.find(p => p.id === cliente.patente_richiesta_id);
       if (pat) {
         currentPatenteTipo = pat.tipo;
-        if (pat.durata_default) {
-          updates.durata = pat.durata_default;
-          if (pat.durata_default === 30) setDurationMode('30');
-          else if (pat.durata_default === 60) setDurationMode('60');
-          else setDurationMode('custom');
-        }
+        const isMotoPatente = ['AM', 'A1', 'A2', 'A'].includes(pat.tipo);
+        const defaultDuration = isMotoPatente ? 60 : (initialTime ? 30 : (pat.durata_default || 60));
+        updates.durata = defaultDuration;
+        if (defaultDuration === 30) setDurationMode('30');
+        else if (defaultDuration === 60) setDurationMode('60');
+        else setDurationMode('custom');
       }
     }
 
@@ -407,6 +470,19 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
   };
 
+  const handlePatenteChange = (patId: string) => {
+    const pat = patenti.find(p => p.id === patId);
+    let duration = form.durata;
+    if (pat) {
+      const isMotoPatente = ['AM', 'A1', 'A2', 'A'].includes(pat.tipo);
+      duration = isMotoPatente ? 60 : (initialTime ? 30 : (pat.durata_default || 60));
+      if (duration === 30) setDurationMode('30');
+      else if (duration === 60) setDurationMode('60');
+      else setDurationMode('custom');
+    }
+    setForm(prev => ({ ...prev, patente_id: patId, durata: duration }));
+  };
+
   const handleIstruttoreChange = (instrId: string) => {
     const instr = istruttori.find(i => i.id === instrId);
     setSelectedIstruttore(instr || null);
@@ -440,6 +516,52 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
     
     setForm(prev => ({ ...prev, istruttore_id: instrId }));
+  };
+
+  const executeDeleteImpegnoName = async (name: string) => {
+    try {
+      const { data: client, error: findError } = await supabase
+        .from('clienti')
+        .select('id')
+        .eq('nome', 'UFFICIO')
+        .eq('cognome', name.toUpperCase())
+        .single();
+        
+      if (findError || !client) {
+        showToast("Impossibile trovare l'impegno da eliminare.", "error");
+        return;
+      }
+      
+      const { count, error: countError } = await supabase
+        .from('appuntamenti')
+        .select('*', { count: 'exact', head: true })
+        .eq('cliente_id', client.id);
+        
+      if (countError) {
+        showToast("Errore durante la verifica dell'utilizzo.", "error");
+        return;
+      }
+      
+      if (count && count > 0) {
+        showToast("Questo impegno è attualmente in uso in agenda e non può essere eliminato.", "info");
+        return;
+      }
+      
+      const { error: deleteError } = await supabase
+        .from('clienti')
+        .delete()
+        .eq('id', client.id);
+        
+      if (deleteError) {
+        showToast("Errore durante l'eliminazione dell'impegno: " + deleteError.message, "error");
+        return;
+      }
+      
+      setImpegniNames(prev => prev.filter(n => n !== name));
+      showToast(`Impegno "${name}" eliminato con successo!`, "success");
+    } catch (err: any) {
+      showToast("Errore imprevisto: " + err.message, "error");
+    }
   };
 
   const currentPatenteTipo = useMemo(() => {
@@ -483,11 +605,91 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
   }, [form.ora, form.durata]);
   
-  const filteredImpegniNames = useMemo(() => {
-    if (!nomeImpegno.trim()) return impegniNames;
-    const q = nomeImpegno.toLowerCase();
-    return impegniNames.filter(name => name.toLowerCase().includes(q));
-  }, [impegniNames, nomeImpegno]);
+  const dropdownItems = useMemo(() => {
+    const targetInstrId = form.istruttore_id || istruttoreId;
+    const myCommitments = targetInstrId ? (impegnoInstructorMap[targetInstrId] || []) : [];
+    const mySet = new Set(myCommitments.map(n => n.toUpperCase()));
+    const searchString = nomeImpegno.trim().toLowerCase();
+    
+    // Filter base list of all unique names
+    const filteredBase = searchString 
+      ? impegniNames.filter(name => name.toLowerCase().includes(searchString))
+      : impegniNames;
+      
+    // Distinguish defaults and specific
+    const defaults = filteredBase.filter(name => {
+      const client = clientiUfficio.find(c => c.cognome.toUpperCase() === name.toUpperCase());
+      return client?.telefono === 'DEFAULT' || !client?.telefono;
+    });
+
+    const specific = filteredBase.filter(name => {
+      const client = clientiUfficio.find(c => c.cognome.toUpperCase() === name.toUpperCase());
+      return client?.telefono !== 'DEFAULT' && client?.telefono;
+    });
+
+    // Mine
+    const mine = specific.filter(name => mySet.has(name.toUpperCase()));
+    const others = specific.filter(name => !mySet.has(name.toUpperCase()));
+    
+    const items: Array<{ type: 'header'; label: string } | { type: 'commitment'; name: string; isMine: boolean }> = [];
+    
+    // 1. Add Default FIRST at the very top!
+    if (defaults.length > 0) {
+      items.push({ type: 'header', label: '---- Default ----' });
+      defaults.forEach(name => {
+        items.push({ type: 'commitment', name, isMine: false });
+      });
+    }
+
+    // 2. Add mine
+    if (mine.length > 0) {
+      items.push({ type: 'header', label: '---- Tuoi ----' });
+      mine.forEach(name => {
+        items.push({ type: 'commitment', name, isMine: true });
+      });
+    }
+    
+    // 3. Add others grouped by instructor
+    if (others.length > 0) {
+      // Group others by instructor
+      const otherInstructors = istruttori.filter(i => i.id !== targetInstrId);
+      const groupedOthers: Record<string, string[]> = {};
+      const categorizedSet = new Set<string>();
+      
+      otherInstructors.forEach(inst => {
+        const instId = inst.id;
+        const instCommitments = impegnoInstructorMap[instId] || [];
+        const instCommitmentsSet = new Set(instCommitments.map(n => n.toUpperCase()));
+        
+        const matches = others.filter(name => instCommitmentsSet.has(name.toUpperCase()));
+        if (matches.length > 0) {
+          const instFullName = `${inst.cognome} ${inst.nome}`;
+          groupedOthers[instFullName] = matches;
+          matches.forEach(m => categorizedSet.add(m.toUpperCase()));
+        }
+      });
+      
+      const uncategorized = others.filter(name => !categorizedSet.has(name.toUpperCase()));
+      
+      // Add grouped instructors
+      Object.keys(groupedOthers).forEach(instName => {
+        items.push({ type: 'header', label: `---- ${instName} ----` });
+        groupedOthers[instName].forEach(name => {
+          items.push({ type: 'commitment', name, isMine: false });
+        });
+      });
+      
+      // Add uncategorized (general commitments)
+      if (uncategorized.length > 0) {
+        items.push({ type: 'header', label: '---- Altri ----' });
+        uncategorized.forEach(name => {
+          items.push({ type: 'commitment', name, isMine: false });
+        });
+      }
+    }
+    
+    return items;
+  }, [impegniNames, nomeImpegno, form.istruttore_id, istruttoreId, impegnoInstructorMap, istruttori, clientiUfficio]);
 
   const handleHoraFineChange = (newFine: string) => {
     try {
@@ -680,7 +882,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           </label>
           
           {isImpegno ? (
-            <div className="relative">
+            <div className="relative" ref={impegniDropdownRef}>
               <input
                 required
                 disabled={isView}
@@ -690,19 +892,54 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 className={isView ? VIEW_BLOCK_CLS : INPUT_CLS}
                 placeholder="Es: Teoria B, Riunione, Ferie..."
               />
-              {showImpegniDropdown && filteredImpegniNames.length > 0 && !isView && (
+              {showImpegniDropdown && dropdownItems.length > 0 && !isView && (
                 <div className="absolute z-50 w-full mt-2 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[20px] shadow-2xl shadow-black/5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="max-h-[200px] overflow-y-auto p-2">
-                    {filteredImpegniNames.map((name) => (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => { setNomeImpegno(name); setShowImpegniDropdown(false); }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all text-sm font-semibold text-zinc-900 dark:text-zinc-100"
-                      >
-                        {name}
-                      </button>
-                    ))}
+                  <div className="max-h-[280px] overflow-y-auto p-2">
+                    {dropdownItems.map((item, index) => {
+                      if (item.type === 'header') {
+                        return (
+                          <div 
+                            key={`header-${item.label}-${index}`}
+                            className="px-4 py-2 text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center select-none"
+                          >
+                            {item.label}
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <div
+                          key={`commitment-${item.name}-${index}`}
+                          onClick={() => { setNomeImpegno(item.name); setShowImpegniDropdown(false); }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all text-sm font-semibold text-zinc-900 dark:text-zinc-100 cursor-pointer group"
+                        >
+                          <div className="flex-1 flex items-center justify-between mr-2">
+                            <span>{item.name}</span>
+                            {item.isMine && (
+                              <span className="text-[9px] bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-black uppercase">
+                                Tuoi
+                              </span>
+                            )}
+                          </div>
+                          
+                          <ConfirmBubble
+                            title="Elimina definitivamente"
+                            message={`Sei sicuro di voler eliminare l'impegno "${item.name}"?`}
+                            confirmLabel="Elimina"
+                            onConfirm={() => executeDeleteImpegnoName(item.name)}
+                            trigger={
+                              <button
+                                type="button"
+                                className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all active:scale-95 shrink-0 ml-2"
+                                title="Elimina impegno"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            }
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -867,20 +1104,6 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   }
                 />
                 <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Elimina</span>
-              </div>
-
-              {/* AGGIUNGI AL CALENDARIO */}
-              <div className="flex flex-col items-center gap-1.5">
-                <a
-                  href={`/api/calendar?id=${appointmentId}`}
-                  className="w-10 h-10 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 rounded-xl flex items-center justify-center hover:bg-violet-100 transition-all active:scale-95 shadow-sm border border-violet-100/50 dark:border-violet-900/30"
-                  title="Aggiungi al calendario"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <CalendarPlus size={18} />
-                </a>
-                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Export</span>
               </div>
             </div>
           )}
@@ -1200,7 +1423,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               <Select
                 options={patenti.map(p => ({ id: p.id, label: p.tipo }))}
                 value={form.patente_id}
-                onChange={(val: string) => setForm(prev => ({ ...prev, patente_id: val }))}
+                onChange={handlePatenteChange}
                 placeholder="Seleziona Patente"
               />
             )}

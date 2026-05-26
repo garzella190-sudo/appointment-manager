@@ -316,20 +316,23 @@ const BottomNav = () => {
             >
               Ricevuto
             </button>
-            <ConfirmBubble
-              title="Esci dall'app"
-              message="Vuoi terminare la sessione attuale?"
-              confirmLabel="Esci"
-              onConfirm={handleLogout}
-              trigger={
-                <button
-                  disabled={isLoggingOut}
-                  className="flex-1 h-14 bg-red-50 text-red-600 rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <LogOut size={16} /> Esci
-                </button>
-              }
-            />
+            <div className="flex-1 flex">
+              <ConfirmBubble
+                title="Esci dall'app"
+                message="Vuoi terminare la sessione attuale?"
+                confirmLabel="Esci"
+                onConfirm={handleLogout}
+                fullWidth
+                trigger={
+                  <button
+                    disabled={isLoggingOut}
+                    className="w-full h-14 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-red-100 dark:hover:bg-red-900/30 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-red-500/5"
+                  >
+                    <LogOut size={16} /> Esci
+                  </button>
+                }
+              />
+            </div>
           </div>
         </div>
       </Modal>

@@ -3,6 +3,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { Impegno, TipoImpegno } from '@/lib/database.types';
+import { sendNotificationToInstructor, isInstructorGarzella } from '@/lib/pushHelper';
+import { format } from 'date-fns';
 
 export async function getTipiImpegnoAction() {
   const supabase = await createClient();
@@ -49,6 +51,27 @@ export async function createImpegnoAction(payload: {
     return { success: false, error: error.message };
   }
 
+  try {
+    if (payload.istruttore_id) {
+      const isGarzella = await isInstructorGarzella(payload.istruttore_id);
+      if (isGarzella) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+        if (currentUserIstruttoreId !== payload.istruttore_id) {
+          const dateFormatted = format(new Date(payload.data), 'dd/MM');
+          const timeFormatted = payload.ora_inizio.substring(0, 5);
+          await sendNotificationToInstructor(payload.istruttore_id, {
+            title: '📅 Nuovo Impegno Inserito',
+            body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
+            url: '/'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Push notification error in createImpegnoAction:', err);
+  }
+
   revalidatePath('/calendar');
   revalidatePath('/gestione');
 
@@ -84,6 +107,27 @@ export async function updateImpegnoAction(id: string, payload: {
     return { success: false, error: error.message };
   }
 
+  try {
+    if (payload.istruttore_id) {
+      const isGarzella = await isInstructorGarzella(payload.istruttore_id);
+      if (isGarzella) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+        if (currentUserIstruttoreId !== payload.istruttore_id) {
+          const dateFormatted = format(new Date(payload.data), 'dd/MM');
+          const timeFormatted = payload.ora_inizio.substring(0, 5);
+          await sendNotificationToInstructor(payload.istruttore_id, {
+            title: '✏️ Impegno Modificato',
+            body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
+            url: '/'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Push notification error in updateImpegnoAction:', err);
+  }
+
   revalidatePath('/calendar');
   revalidatePath('/gestione');
 
@@ -93,6 +137,12 @@ export async function updateImpegnoAction(id: string, payload: {
 export async function deleteImpegnoAction(id: string) {
   const supabase = await createClient();
 
+  const { data: impegnoToDelete } = await supabase
+    .from('impegni')
+    .select('istruttore_id, data, ora_inizio, tipo')
+    .eq('id', id)
+    .single();
+
   const { error } = await supabase
     .from('impegni')
     .delete()
@@ -101,6 +151,27 @@ export async function deleteImpegnoAction(id: string) {
   if (error) {
     console.error('Error deleting commitment:', error.message);
     return { success: false, error: error.message };
+  }
+
+  try {
+    if (impegnoToDelete && impegnoToDelete.istruttore_id) {
+      const isGarzella = await isInstructorGarzella(impegnoToDelete.istruttore_id);
+      if (isGarzella) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+        if (currentUserIstruttoreId !== impegnoToDelete.istruttore_id) {
+          const dateFormatted = format(new Date(impegnoToDelete.data), 'dd/MM');
+          const timeFormatted = impegnoToDelete.ora_inizio.substring(0, 5);
+          await sendNotificationToInstructor(impegnoToDelete.istruttore_id, {
+            title: '🗑️ Impegno Eliminato',
+            body: `${impegnoToDelete.tipo} del ${dateFormatted} alle ${timeFormatted} è stato eliminato.`,
+            url: '/'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Push notification error in deleteImpegnoAction:', err);
   }
 
   revalidatePath('/calendar');

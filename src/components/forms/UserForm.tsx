@@ -48,6 +48,7 @@ const PERMISSION_CATEGORIES = [
       { id: 'access_gestione', label: 'Pannello Gestione', desc: 'Accesso all\'area amministrativa' },
       { id: 'manage_staff', label: 'Gestione Staff', desc: 'Modifica istruttori e veicoli' },
       { id: 'view_reports', label: 'Report Finanziari', desc: 'Visualizza incassi e statistiche' },
+      { id: 'view_all_reports', label: 'Visualizza Tutti i Report', desc: 'Abilita la visualizzazione dei report di tutti gli istruttori dello staff' },
       { id: 'manage_users', label: 'Gestione Permessi', desc: 'Modifica utenti e password' },
     ]
   }
@@ -282,9 +283,17 @@ export function UserForm({ user, isAdmin, onSuccess, onCancel }: UserFormProps) 
                             "text-xs font-bold transition-colors",
                             permissions[p.id] ? "text-blue-900 dark:text-blue-100" : "text-zinc-700 dark:text-zinc-200"
                           )}>
-                            {p.label}
+                            {p.id === 'view_all_reports' 
+                              ? (permissions[p.id] ? "Visualizza Tutti i Report" : "Vedi Report Personale") 
+                              : p.label}
                           </p>
-                          <p className="text-[9px] text-zinc-400 font-medium">{p.desc}</p>
+                          <p className="text-[9px] text-zinc-400 font-medium">
+                            {p.id === 'view_all_reports' 
+                              ? (permissions[p.id] 
+                                ? "Abilita la visualizzazione dei report di tutti gli istruttori dello staff" 
+                                : "Limita la visualizzazione esclusivamente alle proprie guide ed impegni") 
+                              : p.desc}
+                          </p>
                         </div>
                       </label>
                     ))}

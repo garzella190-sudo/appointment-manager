@@ -137,22 +137,6 @@ export const IstruttoreForm = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!istruttoreId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo istruttore? L'azione è definitiva.")) return;
-
-    setLoading(true);
-    const result = await deleteIstruttoreAction(istruttoreId);
-    setLoading(false);
-
-    if (result.success) {
-      showToast('Istruttore eliminato correttamente', 'info');
-      onSuccess();
-    } else {
-      showToast(result.error || "Errore durante l'eliminazione", 'error');
-      setServerError(result.error || "Errore durante l'eliminazione.");
-    }
-  };
 
   const initials = `${form.cognome[0] ?? ''}${form.nome[0] ?? ''}`.toUpperCase();
   const isView = mode === 'view';

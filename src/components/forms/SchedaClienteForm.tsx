@@ -125,22 +125,6 @@ export const SchedaClienteForm = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!clienteId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo cliente? L'azione è definitiva.")) return;
-
-    setLoading(true);
-    const result = await deleteClienteAction(clienteId);
-    setLoading(false);
-
-    if (result.success) {
-      showToast('Cliente eliminato definitivamente', 'info');
-      onSuccess(clienteId);
-    } else {
-      showToast(result.error || "Errore durante l'eliminazione", 'error');
-      setServerError(result.error || "Errore durante l'eliminazione.");
-    }
-  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">

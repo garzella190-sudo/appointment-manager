@@ -15,6 +15,7 @@ interface ConfirmBubbleProps {
   confirmLabel?: string;
   cancelLabel?: string;
   isLoading?: boolean;
+  fullWidth?: boolean;
 }
 
 export const ConfirmBubble = ({
@@ -26,7 +27,8 @@ export const ConfirmBubble = ({
   className,
   confirmLabel = 'Elimina',
   cancelLabel = 'Annulla',
-  isLoading = false
+  isLoading = false,
+  fullWidth = false
 }: ConfirmBubbleProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -118,14 +120,14 @@ export const ConfirmBubble = ({
 
   return (
     <div 
-      className="inline-block relative z-[15]"
+      className={cn("relative z-[15]", fullWidth ? "w-full" : "inline-block")}
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
       }}
     >
       <div 
-        className="cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+        className={cn("cursor-pointer hover:scale-110 active:scale-95 transition-transform", fullWidth && "w-full")}
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);

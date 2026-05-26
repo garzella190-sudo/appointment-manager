@@ -32,6 +32,7 @@ import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
 import { useAuth } from '@/hooks/useAuth';
 import { FileText, Printer, ChevronDown } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 
 // ── Stili per la stampa ────────────────────────────────────────
 const PrintStyles = () => (
@@ -718,7 +719,7 @@ const TabUtenti = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, 
 };
 
 // ── Tab: Impegni (Altri Impegni) ─────────────────────────────
-const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionColor: string }) => {
+const TabImpegni = ({ refreshKey, sectionColor, role, istruttoreId }: { refreshKey: number, sectionColor: string, role?: string, istruttoreId?: string }) => {
   const [loading, setLoading] = useState(true);
   const [impegni, setImpegni] = useState<any[]>([]);
   const [istruttori, setIstruttori] = useState<any[]>([]);
@@ -726,23 +727,74 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
   const [showStorico, setShowStorico] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [expandedInstructorId, setExpandedInstructorId] = useState<string | null>(null);
+  
+  // States for Default commitments
+  const [defaultTypes, setDefaultTypes] = useState<any[]>([]);
+  const [showAddDefault, setShowAddDefault] = useState(false);
+  const [newDefaultName, setNewDefaultName] = useState('');
+  const [isDefaultExpanded, setIsDefaultExpanded] = useState(false);
+
+  const toggleInstructorExpand = (id: string) => {
+    setIsDefaultExpanded(false);
+    setExpandedInstructorId(prev => prev === id ? null : id);
+  };
+
+  const toggleDefaultExpand = () => {
+    setExpandedInstructorId(null);
+    setIsDefaultExpanded(prev => !prev);
+  };
+
+  const { showToast } = useToast();
 
   const fetch = useCallback(async () => {
     setLoading(true);
-    const [{ data: aptData, error: aptError }, { data: istData }] = await Promise.all([
-      supabase
-        .from('appuntamenti')
-        .select(`
-          id, data, durata, stato, note, istruttore_id, 
-          clienti!inner(id, nome, cognome),
-          istruttori(id, nome, cognome, colore)
-        `)
-        .eq('clienti.nome', 'UFFICIO')
-        .order('data', { ascending: false }),
-      supabase.from('istruttori').select('id, nome, cognome').order('cognome')
+    const showAllImpegni = role === 'admin' || role === 'AdminDev';
+    
+    // Auto-migrazione silente per allineare i record storici generici al nuovo standard 'DEFAULT'
+    try {
+      const { data: ufficioClienti } = await supabase
+        .from('clienti')
+        .select('id, cognome, telefono')
+        .eq('nome', 'UFFICIO');
+        
+      if (ufficioClienti) {
+        const defaultNames = ['FERIE', 'QUIZ B', 'ESAME', 'TEORIA B', 'TEST IMPEGNO'];
+        const toMigrate = ufficioClienti.filter((c: any) => 
+          defaultNames.includes(c.cognome.toUpperCase()) && c.telefono !== 'DEFAULT'
+        );
+        
+        if (toMigrate.length > 0) {
+          await Promise.all(toMigrate.map((c: any) => 
+            supabase.from('clienti').update({ telefono: 'DEFAULT' }).eq('id', c.id)
+          ));
+        }
+      }
+    } catch (err) {
+      console.error("Errore durante la migrazione silenziosa:", err);
+    }
+
+    let dbQuery = supabase
+      .from('appuntamenti')
+      .select(`
+        id, data, durata, stato, note, istruttore_id, 
+        clienti!inner(id, nome, cognome, telefono),
+        istruttori(id, nome, cognome, colore)
+      `)
+      .eq('clienti.nome', 'UFFICIO');
+
+    if (!showAllImpegni && istruttoreId) {
+      dbQuery = dbQuery.eq('istruttore_id', istruttoreId);
+    }
+
+    const [{ data: aptData, error: aptError }, { data: istData }, { data: defData }] = await Promise.all([
+      dbQuery.order('data', { ascending: false }),
+      supabase.from('istruttori').select('id, nome, cognome, colore').order('cognome'),
+      supabase.from('clienti').select('id, cognome, telefono').eq('nome', 'UFFICIO').eq('telefono', 'DEFAULT').order('cognome')
     ]);
     
     setIstruttori(istData ?? []);
+    setDefaultTypes(defData ?? []);
 
     if (aptError) {
       console.error("Error fetching impegni:", aptError);
@@ -757,25 +809,105 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
         stato: a.stato,
         istruttore: a.istruttori,
         istruttore_id: a.istruttore_id,
+        cliente_telefono: a.clienti.telefono,
         ora_inizio: format(new Date(a.data), 'HH:mm'),
       }));
       setImpegni(mapped);
     }
     setLoading(false);
-  }, []);
+  }, [role, istruttoreId]);
 
-  // handleDelete removed, moved to ConfirmBubble trigger
-
-  const handleClone = (i: ImpegnoDettagliato) => {
-    // Apriamo il form con gli stessi valori ma senza ID per creare un nuovo record
-    const clone = { ...i };
-    delete (clone as any).id;
-    delete (clone as any).created_at;
-    delete (clone as any).updated_at;
-    // Impostiamo la data a oggi per default nel clone
-    clone.data = new Date().toISOString().split('T')[0];
+  const handleCreateDefault = async () => {
+    if (!newDefaultName.trim()) return;
+    const formatted = newDefaultName.trim().toUpperCase();
     
-    setEditing(clone as any);
+    // Verifica se esiste già
+    const { data: existing } = await supabase
+      .from('clienti')
+      .select('id, telefono')
+      .eq('nome', 'UFFICIO')
+      .eq('cognome', formatted)
+      .limit(1);
+      
+    if (existing && existing.length > 0) {
+      if (existing[0].telefono === 'DEFAULT') {
+        showToast(`L'impegno Default "${formatted}" esiste già!`, 'info');
+        setNewDefaultName('');
+        setShowAddDefault(false);
+        return;
+      }
+      
+      // Riattiva impostando telefono a 'DEFAULT'
+      await supabase
+        .from('clienti')
+        .update({ telefono: 'DEFAULT' })
+        .eq('id', existing[0].id);
+      
+      showToast(`Impegno Default "${formatted}" attivato con successo!`, 'success');
+      setNewDefaultName('');
+      setShowAddDefault(false);
+      fetch();
+      return;
+    }
+    
+    // Altrimenti creiamo il nuovo record
+    const { error } = await supabase
+      .from('clienti')
+      .insert({
+        nome: 'UFFICIO',
+        cognome: formatted,
+        telefono: 'DEFAULT',
+        riceve_email: false,
+        riceve_whatsapp: false
+      });
+      
+    if (error) {
+      showToast('Errore durante la creazione: ' + error.message, 'error');
+    } else {
+      showToast(`Impegno Default "${formatted}" creato con successo!`, 'success');
+      setNewDefaultName('');
+      setShowAddDefault(false);
+      fetch();
+    }
+  };
+
+  const handleDeleteDefault = async (id: string, name: string) => {
+    // Verifica se in uso in appuntamenti
+    const { count, error: checkError } = await supabase
+      .from('appuntamenti')
+      .select('*', { count: 'exact', head: true })
+      .eq('cliente_id', id);
+      
+    if (checkError) {
+      showToast("Errore durante il controllo dell'utilizzo.", "error");
+      return;
+    }
+    
+    if (count && count > 0) {
+      showToast("Impossibile eliminare: questo impegno è in uso in agenda.", "info");
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('clienti')
+      .delete()
+      .eq('id', id);
+      
+    if (error) {
+      showToast("Errore durante l'eliminazione: " + error.message, "error");
+    } else {
+      showToast(`Impegno Default "${name}" eliminato con successo!`, "success");
+      fetch();
+    }
+  };
+
+  const handleClone = (i: any) => {
+    const clone = { ...i };
+    delete clone.id;
+    delete clone.created_at;
+    delete clone.updated_at;
+    clone.data = new Date().toISOString().split('T')[0];
+    setEditing(clone);
     setModalOpen(true);
   };
 
@@ -783,7 +915,6 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
 
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
 
-  // Generate last 24 months for selector
   const monthOptions = useMemo(() => {
     return Array.from({ length: 24 }, (_, i) => {
       const date = new Date();
@@ -796,6 +927,7 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
   }, []);
 
   const filtered = impegni.filter(i => {
+    if (i.cliente_telefono === 'DEFAULT') return false;
     if (selectedIstruttoreId !== 'all' && i.istruttore_id !== selectedIstruttoreId) return false;
     
     const impegnoDate = new Date(i.data);
@@ -809,6 +941,44 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
       return impegnoDate >= today;
     }
   });
+
+  const sortedIstruttoriForSelect = useMemo(() => {
+    if (!istruttori || istruttori.length === 0) return [];
+    return [...istruttori].sort((a, b) => {
+      if (a.id === istruttoreId) return -1;
+      if (b.id === istruttoreId) return 1;
+      return (a.cognome || '').localeCompare(b.cognome || '');
+    });
+  }, [istruttori, istruttoreId]);
+
+  const groups = useMemo(() => {
+    const grp: Record<string, { instructor: any; list: any[] }> = {};
+    
+    filtered.forEach(i => {
+      const key = i.istruttore_id || 'generale';
+      if (!grp[key]) {
+        grp[key] = {
+          instructor: i.istruttore || (i.istruttore_id ? istruttori.find((ist: any) => ist.id === i.istruttore_id) : null),
+          list: []
+        };
+      }
+      grp[key].list.push(i);
+    });
+    
+    return Object.entries(grp).map(([key, value]) => ({
+      id: key,
+      instructor: value.instructor,
+      list: value.list.sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
+    })).sort((a, b) => {
+      if (istruttoreId) {
+        if (a.id === istruttoreId) return -1;
+        if (b.id === istruttoreId) return 1;
+      }
+      if (a.id === 'generale') return 1;
+      if (b.id === 'generale') return -1;
+      return (a.instructor?.cognome || '').localeCompare(b.instructor?.cognome || '');
+    });
+  }, [filtered, istruttori, istruttoreId]);
 
   const openEdit = (i: any) => { setEditing(i); setModalOpen(true); };
   const onSuccess = () => { setModalOpen(false); fetch(); };
@@ -858,7 +1028,7 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
               <Select
                 options={[
                   { id: 'all', label: 'Tutti gli Istruttori' },
-                  ...istruttori.map(ist => ({
+                  ...sortedIstruttoriForSelect.map(ist => ({
                     id: ist.id,
                     label: `${ist.cognome} ${ist.nome}`,
                     color: ist.colore
@@ -881,111 +1051,262 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
             <Loader2 className="animate-spin text-sky-500" size={32} /> 
             <span className="text-sm font-medium uppercase tracking-widest">Caricamento impegni...</span>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-[32px] p-16 text-center shadow-sm">
-            <Clock size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
-            <p className="text-zinc-500 font-medium">
-              {selectedIstruttoreId !== 'all' ? 'Nessun impegno per questo istruttore.' : 'Nessun impegno trovato.'}
-            </p>
-          </div>
         ) : (
-          <div className="grid gap-3">
-            {filtered.map(i => (
-            <div 
-              key={i.id} 
-              onClick={() => openEdit(i)}
-              className={cn(
-                "relative border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer transition-all pr-24",
-                i.stato === 'annullato' ? "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950" : "bg-white dark:bg-zinc-900/50 hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/5"
-              )}
-            >
-              <div className="flex items-center gap-4">
-                <div 
-                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-md bg-gradient-to-br from-orange-400 to-orange-600 text-white"
-                >
-                  <Clock size={20} />
-                </div>
-                <div>
+          <div className="space-y-4 animate-in fade-in duration-500">
+            {/* 1. SEZIONE DEFAULT CON IL TASTO + IN CIMA */}
+            {(role === 'admin' || role === 'AdminDev') && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[24px] overflow-hidden shadow-sm transition-all duration-300">
+                <div className="w-full flex items-center justify-between p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                  <button
+                    onClick={toggleDefaultExpand}
+                    className="flex-1 flex items-center gap-3 text-left focus:outline-none"
+                  >
+                    <div className="w-3 h-3 rounded-full shrink-0 bg-purple-500" />
+                    <span className="text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
+                      Default
+                    </span>
+                    <span className="text-[10px] font-black text-purple-500 bg-purple-50 dark:bg-purple-500/10 px-2.5 py-0.5 rounded-full uppercase">
+                      {defaultTypes.length} {defaultTypes.length === 1 ? 'impegno' : 'impegni'}
+                    </span>
+                  </button>
                   <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-sm font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-tight",
-                      i.stato === 'annullato' && "line-through text-zinc-500"
-                    )}>
-                      {i.tipo}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-zinc-500 font-bold uppercase tracking-widest">
-                      {i.istruttore?.cognome} {i.istruttore?.nome}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-400 font-bold">
-                    <span className="flex items-center gap-1 font-mono uppercase tracking-tighter">
-                      {format(new Date(i.data), 'dd MMM yyyy', { locale: it })}
-                    </span>
-                    <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 rounded uppercase">{i.ora_inizio.slice(0, 5)}</span>
-                    <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 rounded text-[10px] uppercase font-black tracking-widest">
-                      {Number(i.durata) <= 60 
-                        ? `${i.durata}m` 
-                        : `${Math.floor(Number(i.durata) / 60)}h${Number(i.durata) % 60 > 0 ? ` e ${Number(i.durata) % 60}m` : ''}`
-                      }
-                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAddDefault(!showAddDefault);
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg border transition-all active:scale-95 flex items-center justify-center shrink-0 cursor-pointer",
+                        showAddDefault 
+                          ? "bg-zinc-100 text-zinc-600 border-zinc-200" 
+                          : "bg-purple-50 text-purple-600 border-purple-100 hover:bg-purple-100 dark:bg-purple-950/20 dark:text-purple-400 dark:border-purple-900/50"
+                      )}
+                      title="Aggiungi impegno Default"
+                    >
+                      <Plus size={16} />
+                    </button>
+                    <button onClick={toggleDefaultExpand} className="text-zinc-400 p-1 hover:text-zinc-600">
+                      <ChevronDown 
+                        size={18} 
+                        className={cn("transition-transform duration-300", !isDefaultExpanded && "rotate-180")} 
+                      />
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div className="absolute top-3 right-3 z-10 flex gap-1.5 items-center">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleClone(i); }} 
-                  title="Duplica"
-                  className="p-1.5 text-zinc-300 hover:text-blue-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg hover:border-blue-200 dark:hover:border-blue-900/50"
-                >
-                  <Copy size={16} />
-                </button>
-                {i.stato !== 'annullato' && (
-                  <ConfirmBubble
-                    title="Annulla Impegno"
-                    message="Vuoi annullare questo impegno? Resterà visibile nello storico."
-                    confirmLabel="Annulla"
-                    onConfirm={async () => {
-                      const result = await cancelAppointmentAction(i.id);
-                      if (result.success) {
-                        fetch();
-                      } else {
-                        alert(result.error || "Errore durante l'annullamento.");
-                      }
-                    }}
-                    trigger={
-                      <button 
-                        title="Annulla"
-                        className="p-1.5 text-zinc-300 hover:text-orange-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg hover:border-orange-200 dark:hover:border-orange-900/50"
-                      >
-                        <X size={16} />
-                      </button>
-                    }
-                  />
-                )}
-                <ConfirmBubble
-                  title="Elimina Impegno"
-                  message="Sei sicuro di voler eliminare questo impegno?"
-                  confirmLabel="Elimina"
-                  onConfirm={async () => {
-                    const result = await deleteAppointmentAction(i.id);
-                    if (result.success) {
-                      fetch();
-                    } else {
-                      alert(result.error || "Errore durante l'eliminazione.");
-                    }
-                  }}
-                  trigger={
-                    <button 
-                      title="Elimina"
-                      className="p-1.5 text-zinc-300 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg hover:border-red-200 dark:hover:border-red-900/50"
+
+                {/* Input inserimento nuovo impegno default */}
+                {showAddDefault && (
+                  <div className="px-4 pb-4 pt-1 border-t border-zinc-100 dark:border-zinc-800/50 flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newDefaultName}
+                      onChange={(e) => setNewDefaultName(e.target.value)}
+                      placeholder="NOME NUOVO IMPEGNO DEFAULT (es. FERIE)"
+                      className="flex-1 bg-[#F4F4F4] dark:bg-zinc-800 border-transparent rounded-xl px-4 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-purple-500/20 text-zinc-900 dark:text-zinc-100 h-10 uppercase"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateDefault();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleCreateDefault}
+                      disabled={!newDefaultName.trim()}
+                      className="px-4 h-10 bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-purple-700 disabled:opacity-50 cursor-pointer"
                     >
-                      <Trash2 size={16} />
+                      Crea
                     </button>
-                  }
-                />
+                  </div>
+                )}
+
+                {/* Lista degli impegni default */}
+                {isDefaultExpanded && (
+                  <div className="p-4 pt-0 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-zinc-100 dark:border-zinc-800/50">
+                    {defaultTypes.length === 0 ? (
+                      <p className="text-xs text-zinc-400 italic text-center py-4">Nessun impegno default registrato.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mt-4">
+                        {defaultTypes.map(def => (
+                          <div 
+                            key={def.id}
+                            className="bg-zinc-50 dark:bg-zinc-850 border border-zinc-100 dark:border-zinc-800/50 rounded-xl p-3 flex items-center justify-between text-sm font-semibold"
+                          >
+                            <span className="text-zinc-850 dark:text-zinc-200 uppercase tracking-tight font-bold">{def.cognome}</span>
+                            <ConfirmBubble
+                              title="Elimina Impegno Default"
+                              message={`Sei sicuro di voler eliminare definitivamente l'impegno Default "${def.cognome}"? Non potrai tornare indietro.`}
+                              confirmLabel="Elimina"
+                              onConfirm={() => handleDeleteDefault(def.id, def.cognome)}
+                              trigger={
+                                <button 
+                                  title="Elimina"
+                                  className="p-1.5 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg border border-red-100/50 dark:border-red-900/50 shadow-sm transition-all active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-            ))}
+            )}
+
+            {/* 2. ACCORDIONS PER GLI ISTRUTTORI */}
+            {filtered.length === 0 ? (
+              <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-[32px] p-16 text-center shadow-sm">
+                <Clock size={48} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" strokeWidth={1.5} />
+                <p className="text-zinc-500 font-medium">
+                  {selectedIstruttoreId !== 'all' ? 'Nessun impegno in programma per questo istruttore.' : 'Nessun impegno in programma.'}
+                </p>
+              </div>
+            ) : (
+              groups.map(group => {
+                const isExpanded = expandedInstructorId === group.id;
+                const isGenerale = group.id === 'generale';
+                const name = isGenerale 
+                  ? 'Impegni Generali' 
+                  : `${group.instructor?.cognome || ''} ${group.instructor?.nome || ''}`;
+                const dotColor = isGenerale ? '#9ca3af' : (group.instructor?.colore || '#3b82f6');
+                
+                return (
+                  <div 
+                    key={group.id} 
+                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[24px] overflow-hidden shadow-sm transition-all duration-300"
+                  >
+                    <button
+                      onClick={() => toggleInstructorExpand(group.id)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
+                        <span className="text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-white">
+                          {name}
+                        </span>
+                        <span className="text-[10px] font-black text-sky-500 bg-sky-50 dark:bg-sky-500/10 px-2.5 py-0.5 rounded-full uppercase">
+                          {group.list.length} {group.list.length === 1 ? 'impegno' : 'impegni'}
+                        </span>
+                      </div>
+                      <ChevronDown 
+                        size={18} 
+                        className={cn("text-zinc-400 transition-transform duration-300", !isExpanded && "rotate-180")} 
+                      />
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="p-4 pt-0 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-zinc-100 dark:border-zinc-800/50">
+                        <div className="grid gap-3 mt-4">
+                          {group.list.map(i => (
+                            <div 
+                              key={i.id} 
+                              onClick={() => openEdit(i)}
+                              className={cn(
+                                "relative border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between group cursor-pointer transition-all pr-24",
+                                i.stato === 'annullato' ? "opacity-60 grayscale bg-zinc-50 dark:bg-zinc-950" : "bg-white dark:bg-zinc-900/50 hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/5"
+                              )}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div 
+                                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-md bg-gradient-to-br from-orange-400 to-orange-600 text-white"
+                                >
+                                  <Clock size={20} />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={cn(
+                                      "text-sm font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-tight",
+                                      i.stato === 'annullato' && "line-through text-zinc-500"
+                                    )}>
+                                      {i.tipo}
+                                    </span>
+                                    {!isGenerale && (
+                                      <span className="text-[10px] px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-zinc-500 font-bold uppercase tracking-widest">
+                                        {i.istruttore?.cognome} {i.istruttore?.nome}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-400 font-bold">
+                                    <span className="flex items-center gap-1 font-mono uppercase tracking-tighter">
+                                      {format(new Date(i.data), 'dd MMM yyyy', { locale: it })}
+                                    </span>
+                                    <span className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 rounded uppercase">{i.ora_inizio.slice(0, 5)}</span>
+                                    <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1.5 rounded text-[10px] uppercase font-black tracking-widest">
+                                      {Number(i.durata) <= 60 
+                                        ? `${i.durata}m` 
+                                        : `${Math.floor(Number(i.durata) / 60)}h${Number(i.durata) % 60 > 0 ? ` e ${Number(i.durata) % 60}m` : ''}`
+                                      }
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="absolute top-3 right-3 z-10 flex gap-1.5 items-center">
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleClone(i); }} 
+                                  title="Duplica"
+                                  className="p-1.5 text-zinc-300 hover:text-blue-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg hover:border-blue-200 dark:hover:border-blue-900/50"
+                                >
+                                  <Copy size={16} />
+                                </button>
+                                {i.stato !== 'annullato' && (
+                                  <ConfirmBubble
+                                    title="Annulla Impegno"
+                                    message="Vuoi annullare questo impegno? Resterà visibile nello storico."
+                                    confirmLabel="Annulla"
+                                    onConfirm={async () => {
+                                      const result = await cancelAppointmentAction(i.id);
+                                      if (result.success) {
+                                        fetch();
+                                      } else {
+                                        alert(result.error || "Errore durante l'annullamento.");
+                                      }
+                                    }}
+                                    trigger={
+                                      <button 
+                                        title="Annulla"
+                                        className="p-1.5 text-zinc-300 hover:text-orange-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg hover:border-orange-200 dark:hover:border-orange-900/50"
+                                      >
+                                        <X size={16} />
+                                      </button>
+                                    }
+                                  />
+                                )}
+                                <ConfirmBubble
+                                  title="Elimina definitivamente"
+                                  message={`Sei sicuro di voler eliminare definitivamente l'impegno "${i.tipo}"? Non potrai tornare indietro.`}
+                                  confirmLabel="Elimina"
+                                  onConfirm={async () => {
+                                    const result = await deleteAppointmentAction(i.id);
+                                    if (result.success) {
+                                      fetch();
+                                    } else {
+                                      alert(result.error || "Errore durante l'eliminazione.");
+                                    }
+                                  }}
+                                  trigger={
+                                    <button 
+                                      title="Elimina"
+                                      className="p-1.5 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg border border-red-100/50 dark:border-red-900/50 shadow-sm transition-all active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
       </div>
@@ -1002,12 +1323,14 @@ const TabImpegni = ({ refreshKey, sectionColor }: { refreshKey: number, sectionC
 };
 
 // ── Tab: Report ───────────────────────────────────────────────
-const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, role?: string, istruttoreId?: string }) => {
+const TabReport = ({ refreshKey, role, istruttoreId, permissions }: { refreshKey: number, role?: string, istruttoreId?: string, permissions?: any }) => {
   const [loading, setLoading] = useState(true);
   const [istruttori, setIstruttori] = useState<any[]>([]);
   const [patenti, setPatenti] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   
+  const showAllReports = role === 'admin' || role === 'AdminDev' || !!permissions?.view_all_reports;
+
   // Filtri
   const [selectedIstruttori, setSelectedIstruttori] = useState<string[]>([]);
   const [selectedPatente, setSelectedPatente] = useState<string>('all');
@@ -1037,7 +1360,7 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
       .gte('data_solo', `${selectedMonth}-01`)
       .lt('data_solo', format(addDays(new Date(`${selectedMonth}-01`), 32), 'yyyy-MM-01'));
     
-    if (role === 'istruttore' && istruttoreId) {
+    if (!showAllReports && istruttoreId) {
       query = query.eq('istruttore_id', istruttoreId);
     }
 
@@ -1055,7 +1378,7 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
     setPatenti(pData ?? []);
     setAppointments(aData ?? []);
     setLoading(false);
-  }, [selectedMonth, refreshKey, role, istruttoreId]);
+  }, [selectedMonth, refreshKey, role, istruttoreId, showAllReports]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -1140,7 +1463,9 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Search size={16} className="text-zinc-400 shrink-0" />
-              <span className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white truncate">Filtri Report</span>
+              <span className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-white truncate">
+                {showAllReports ? 'Filtri Report' : 'Filtri Report Personale'}
+              </span>
               {!isFiltersOpen && (
                 <span className="text-[10px] font-bold text-sky-500 bg-sky-50 dark:bg-sky-500/10 px-2 py-0.5 rounded-full uppercase whitespace-nowrap">
                   {format(new Date(`${selectedMonth}-01`), 'MMMM', { locale: it })}
@@ -1218,8 +1543,8 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
                 </div>
               </div>
 
-              {/* Multiselect Istruttori - Solo per Admin */}
-              {(role === 'admin' || role === 'AdminDev') && (
+              {/* Multiselect Istruttori - Solo per Admin o chi può vedere tutti i report */}
+              {showAllReports && (
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Istruttori</label>
                   <div className="flex flex-wrap gap-1.5">
@@ -1276,7 +1601,9 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
           
           {/* Header Stampa (Solo print) */}
           <div className="hidden print:block mb-8 border-b-2 border-zinc-900 pb-4">
-            <h1 className="text-3xl font-black uppercase tracking-tighter">Report Attività</h1>
+            <h1 className="text-3xl font-black uppercase tracking-tighter">
+              {showAllReports ? 'Report Attività' : 'Report Personale'}
+            </h1>
             <div className="flex justify-between items-end mt-2">
               <p className="text-sm font-bold text-zinc-600 uppercase">Periodo: {format(new Date(`${selectedMonth}-01`), 'MMMM yyyy', { locale: it })}</p>
               <p className="text-xs text-zinc-400 italic">Generato il {format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
@@ -1289,7 +1616,9 @@ const TabReport = ({ refreshKey, role, istruttoreId }: { refreshKey: number, rol
               <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center print:bg-emerald-50">
                 <Car size={20} />
               </div>
-              <h3 className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-white">Statistiche Guide</h3>
+              <h3 className="text-lg font-black uppercase tracking-tight text-zinc-900 dark:text-white">
+                {showAllReports ? 'Statistiche Guide' : 'Statistiche Guide Personali'}
+              </h3>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1701,11 +2030,11 @@ export default function GestionePage() {
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
             {active === 'veicoli' && <TabVeicoli refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
             {active === 'istruttori' && <TabIstruttori refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
-            {active === 'report' && <TabReport refreshKey={refreshKey} role={role || undefined} istruttoreId={istruttoreId || undefined} />}
+            {active === 'report' && <TabReport refreshKey={refreshKey} role={role || undefined} istruttoreId={istruttoreId || undefined} permissions={permissions} />}
             {active === 'patenti' && <TabPatenti refreshKey={refreshKey} sectionColor={sectionColor} />}
             {active === 'utenti' && <TabUtenti refreshKey={refreshKey} sectionColor={sectionColor} isAdmin={isAdmin} />}
             {active === 'impostazioni' && <TabImpostazioni />}
-            {active === 'impegni' && <TabImpegni refreshKey={refreshKey} sectionColor={sectionColor} />}
+            {active === 'impegni' && <TabImpegni refreshKey={refreshKey} sectionColor={sectionColor} role={role || undefined} istruttoreId={istruttoreId || undefined} />}
           </div>
         </div>
       </main>

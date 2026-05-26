@@ -91,3 +91,27 @@ export async function sendNotificationToAllUsers(excludeUserId: string | null, p
 
   await Promise.all(promises);
 }
+
+/**
+ * Checks if a given instructor ID belongs to Manuele Garzella.
+ */
+export async function isInstructorGarzella(instructorId: string): Promise<boolean> {
+  const { createClient: createAdminClient } = await import('@supabase/supabase-js');
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) return false;
+
+  const adminDb = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
+
+  const { data: instructor, error } = await adminDb
+    .from('istruttori')
+    .select('nome, cognome')
+    .eq('id', instructorId)
+    .single();
+
+  if (error || !instructor) return false;
+
+  return (
+    instructor.nome?.toLowerCase() === 'manuele' &&
+    instructor.cognome?.toLowerCase() === 'garzella'
+  );
+}

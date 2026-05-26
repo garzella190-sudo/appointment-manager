@@ -119,21 +119,6 @@ export const ImpegnoForm = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!impegnoId) return;
-    if (!window.confirm("Sei sicuro di voler eliminare questo impegno? L'azione è definitiva.")) return;
-
-    setLoading(true);
-    const result = await deleteImpegnoAction(impegnoId);
-    setLoading(false);
-
-    if (result.success) {
-      showToast('Impegno eliminato', 'info');
-      onSuccess();
-    } else {
-      showToast(result.error || "Errore eliminazione", 'error');
-    }
-  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
