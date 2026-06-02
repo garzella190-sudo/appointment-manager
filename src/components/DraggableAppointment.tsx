@@ -56,14 +56,11 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      onPointerUp={(e) => {
-        if (!isDragging && onClick) {
-          e.stopPropagation();
-          onClick(appointment);
-        }
-      }}
       onClick={(e) => {
         e.stopPropagation();
+        if (onClick) {
+          onClick(appointment);
+        }
       }}
       className={cn(
         "relative w-full mb-1 rounded-xl cursor-grab active:cursor-grabbing transition-all z-[20] flex flex-col justify-between border",

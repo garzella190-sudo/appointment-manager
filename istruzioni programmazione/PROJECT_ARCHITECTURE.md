@@ -48,7 +48,7 @@ Tutte le interazioni con il database Supabase devono utilizzare esclusivamente l
 ### `AppointmentForm` (SSOT per i Dati)
 È il modulo universale per la **Creazione** e **Modifica** delle guide.
 - **Logica Durata**: Gestisce step predefiniti (30, 60 min) o "Personalizzato".
-- **Auto-selezione**: Quando si sceglie un istruttore, il sistema seleziona automaticamente il suo veicolo di default (se compatibile con la patente del cliente).
+- **Auto-selezione e Ricalcolo**: Quando si seleziona il cliente, l'istruttore, il tipo patente o il tipo di cambio, il sistema ricalcola e seleziona automaticamente il veicolo compatibile ottimale (Priorità: veicolo default istruttore -> primo veicolo compatibile libero per quello slot -> primo veicolo compatibile globale).
 - **Integrazioni**: Include trigger per l'invio di notifiche Email e WhatsApp.
 - **Error Handling Notifiche**: Il sistema comunica chiaramente all'utente se l'invio dell'email ha avuto successo o se ci sono errori di configurazione (es. API Key mancante).
 
@@ -106,6 +106,8 @@ L'identità visiva è "Premium, Clean & Dynamic" con un focus estremo sul recupe
 - **Dettagli Ultra-Compact**:
   - **Top Nav**: Assente. Il contenuto inizia a `pt-0`.
   - **Calendario**: Cerchi date `w-7 h-7`, titoli minimali, granularità variabile (15/30/60 min).
+- **Gestione Sovrapposizioni (z-index)**: Le righe degli slot orari del calendario hanno un `zIndex` decrescente rispetto all'ora (`zIndex = timeSlots.length - index`). Questo assicura che le schede degli appuntamenti (che si sviluppano verticalmente verso il basso) vengano visualizzate *sopra* gli slot successivi, garantendo la completa cliccabilità di tutta l'area colorata ed evitando che gli slot vuoti catturino erroneamente i click.
+- **Eventi di Click su Elementi Draggable**: L'apertura dei dettagli avviene tramite l'evento `onClick` nativo con `stopPropagation()`. Grazie al sensore `SmartPointerSensor` con vincolo di attivazione a 8px, dnd-kit distingue e previene automaticamente i click accidentali durante il trascinamento su desktop, disattivando il drag & drop su tutti i touch-screen mobili per garantire una navigazione fluida.
 - **Colori**:
   - Background neutri (`bg-[#F4F4F4]` in light mode).
   - Accenti di colore basati sugli istruttori.

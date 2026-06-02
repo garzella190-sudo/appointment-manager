@@ -911,10 +911,10 @@ export default function CalendarPage() {
             <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px] scrollbar-hide">
               <div className="w-full flex flex-col h-full">
               <div 
-                className="grid border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0"
+                className="grid border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0"
                 style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayIstruttori.length)}, minmax(0, 1fr))` } as React.CSSProperties}
               >
-                <div className="p-1 sm:p-4 border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
+                <div className="p-1 sm:p-4 border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
                   <Clock size={16} className="text-zinc-400" />
                 </div>
                 {viewMode === 'week' ? displayDays.map((day: Date) => {
@@ -928,7 +928,7 @@ export default function CalendarPage() {
                   );
                   return (
                     <div key={day.toString()} className={cn(
-                      "p-1 sm:p-2 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0",
+                      "p-1 sm:p-2 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0",
                       isToday ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
                     )}>
                       <span className={cn(
@@ -957,7 +957,7 @@ export default function CalendarPage() {
                 }) : displayIstruttori.map((ist: any) => {
                   const istColor = appointments.find(a => a.trainer_id === ist.id)?.istruttore?.color || '#3b82f6';
                   return (
-                    <div key={ist.id} className="p-1 sm:p-2 text-center border-r border-zinc-100 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center">
+                    <div key={ist.id} className="p-1 sm:p-2 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md mb-1" style={{ backgroundColor: istColor }}>
                         {ist.cognome?.[0] || '?'}{ist.nome?.[0] || ''}
                       </div>
@@ -998,11 +998,11 @@ export default function CalendarPage() {
                         id={`slot-${slot}`}
                         className={cn(
                           "grid min-h-[40px] transition-colors relative",
-                          isFullHour ? "border-zinc-200 dark:border-zinc-700 border-b" : "border-zinc-100/50 dark:border-zinc-800/30 border-b"
+                          isFullHour ? "border-zinc-300 dark:border-zinc-700 border-b" : "border-zinc-200 dark:border-zinc-800/60 border-b"
                         )}
                         style={{ 
                           gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayIstruttori.length)}, minmax(0, 1fr))`,
-                          zIndex: isCurrentSlot ? 40 : timeSlots.indexOf(slot) + 1,
+                          zIndex: isCurrentSlot ? 80 : timeSlots.length - timeSlots.indexOf(slot),
                         } as React.CSSProperties}
                       >
                       {isCurrentSlot && hasToday && (
@@ -1020,7 +1020,7 @@ export default function CalendarPage() {
                       )}
 
                       <div className={cn(
-                        "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-100 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
+                        "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
                         isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
                       )}>
                         {isFullHour ? slot : slot.split(':')[1]}

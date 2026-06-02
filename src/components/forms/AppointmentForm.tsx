@@ -470,6 +470,53 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
   };
 
+  const findCompatibleVehicle = (
+    patId: string, 
+    gearbox: 'manuale' | 'automatico', 
+    instructor: Istruttore | null
+  ): Veicolo | null => {
+    const pat = patenti.find(p => p.id === patId);
+    const patenteTipo = pat ? pat.tipo : 'B';
+    const isLicenseMoto = ['AM', 'A1', 'A2', 'A'].includes(patenteTipo);
+
+    const isCompatible = (v: Veicolo) => {
+      const isLicenseMatch = isLicenseMoto 
+        ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) 
+        : v.tipo_patente === patenteTipo;
+      const isGearboxMatch = v.cambio_manuale ? (gearbox === 'manuale') : (gearbox === 'automatico');
+      return isLicenseMatch && isGearboxMatch;
+    };
+
+    // 1. Prioritize instructor's default vehicle if compatible
+    if (instructor?.veicolo_id) {
+      const defaultVeh = veicoli.find(v => v.id === instructor.veicolo_id);
+      if (defaultVeh && isCompatible(defaultVeh)) {
+        return defaultVeh;
+      }
+    }
+
+    // 2. Keep the currently selected vehicle if it is compatible
+    if (selectedVeicolo && isCompatible(selectedVeicolo)) {
+      return selectedVeicolo;
+    }
+
+    // 3. Find first compatible vehicle from available (non-busy) vehicles
+    const availableCompatible = veicoli.filter(v => 
+      (availableSlots?.vehicle_ids || []).includes(v.id) && isCompatible(v)
+    );
+    if (availableCompatible.length > 0) {
+      return availableCompatible[0];
+    }
+
+    // 4. Find first compatible vehicle globally (fallback)
+    const globalCompatible = veicoli.filter(isCompatible);
+    if (globalCompatible.length > 0) {
+      return globalCompatible[0];
+    }
+
+    return null;
+  };
+
   const handlePatenteChange = (patId: string) => {
     const pat = patenti.find(p => p.id === patId);
     let duration = form.durata;
@@ -480,42 +527,42 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       else if (duration === 60) setDurationMode('60');
       else setDurationMode('custom');
     }
-    setForm(prev => ({ ...prev, patente_id: patId, durata: duration }));
+    const veh = findCompatibleVehicle(patId, form.cambio, selectedIstruttore);
+    setSelectedVeicolo(veh);
+    setForm(prev => ({ 
+      ...prev, 
+      patente_id: patId, 
+      durata: duration, 
+      veicolo_id: veh ? veh.id : '' 
+    }));
   };
 
   const handleIstruttoreChange = (instrId: string) => {
     const instr = istruttori.find(i => i.id === instrId);
     setSelectedIstruttore(instr || null);
     if (!instr) {
-      setForm(prev => ({ ...prev, istruttore_id: '' }));
+      setSelectedVeicolo(null);
+      setForm(prev => ({ ...prev, istruttore_id: '', veicolo_id: '' }));
       return;
     }
     
-    // PRIORITY: If instructor has a default vehicle AND it's compatible with the current appointment requirements
-    const instrDefaultVehicleId = instr?.veicolo_id;
-    if (instrDefaultVehicleId) {
-      const veh = veicoli.find(v => v.id === instrDefaultVehicleId);
-      if (veh) {
-        // Validation: Is it compatible with selected patente?
-        const currentPatenteTipo = patenti.find(p => p.id === form.patente_id)?.tipo || 'B';
-        const isGearboxMatch = veh.cambio_manuale ? (form.cambio === 'manuale') : (form.cambio === 'automatico');
-        const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
-        const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(veh.tipo_patente) : veh.tipo_patente === currentPatenteTipo;
-        
-        // Se c'è un match totale, lo selezioniamo
-        if (isGearboxMatch && isLicenseMatch) {
-          setSelectedVeicolo(veh);
-          setForm(prev => ({ 
-            ...prev, 
-            istruttore_id: instrId, 
-            veicolo_id: instrDefaultVehicleId
-          }));
-          return;
-        }
-      }
-    }
-    
-    setForm(prev => ({ ...prev, istruttore_id: instrId }));
+    const veh = findCompatibleVehicle(form.patente_id, form.cambio, instr);
+    setSelectedVeicolo(veh);
+    setForm(prev => ({ 
+      ...prev, 
+      istruttore_id: instrId, 
+      veicolo_id: veh ? veh.id : '' 
+    }));
+  };
+
+  const handleCambioChange = (newCambio: 'manuale' | 'automatico') => {
+    const veh = findCompatibleVehicle(form.patente_id, newCambio, selectedIstruttore);
+    setSelectedVeicolo(veh);
+    setForm(prev => ({ 
+      ...prev, 
+      cambio: newCambio, 
+      veicolo_id: veh ? veh.id : '' 
+    }));
   };
 
   const executeDeleteImpegnoName = async (name: string) => {
@@ -1498,7 +1545,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 <label className={LABEL_CLS}>⚙️ TIPO CAMBIO</label>
                 <div className="flex bg-zinc-100 border border-zinc-100 p-1 rounded-2xl h-12 items-center shadow-sm">
                   {(['manuale', 'automatico'] as const).map(opt => (
-                    <button key={opt} disabled={isView} type="button" onClick={() => setForm(prev => ({ ...prev, cambio: opt }))} className={cn("flex-1 h-10 rounded-xl text-[10px] font-black transition-all", form.cambio === opt ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400 uppercase")}>
+                    <button key={opt} disabled={isView} type="button" onClick={() => handleCambioChange(opt)} className={cn("flex-1 h-10 rounded-xl text-[10px] font-black transition-all", form.cambio === opt ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400 uppercase")}>
                       {opt.charAt(0).toUpperCase() + opt.slice(1)}
                     </button>
                   ))}
