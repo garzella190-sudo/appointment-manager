@@ -49,6 +49,10 @@ Tutte le interazioni con il database Supabase devono utilizzare esclusivamente l
 È il modulo universale per la **Creazione** e **Modifica** delle guide.
 - **Logica Durata**: Gestisce step predefiniti (30, 60 min) o "Personalizzato".
 - **Auto-selezione e Ricalcolo**: Quando si seleziona il cliente, l'istruttore, il tipo patente o il tipo di cambio, il sistema ricalcola e seleziona automaticamente il veicolo compatibile ottimale (Priorità: veicolo default istruttore -> primo veicolo compatibile libero per quello slot -> primo veicolo compatibile globale).
+- **Auto-selezione Nuovo Cliente**: Quando viene registrato un nuovo cliente tramite il pulsante `+`, il sistema lo seleziona automaticamente compilando la barra di ricerca del modulo con il suo nome.
+- **Privacy e Suddivisione Impegni ("Altro Impegno")**: Nella tendina di ricerca per gli impegni di ufficio, gli impegni vengono suddivisi in:
+  - `---- Default ----`: contenente gli impegni definiti nelle impostazioni (identificati da `telefono: 'DEFAULT'`).
+  - `---- [Nome Istruttore] ----`: contenente esclusivamente gli impegni personalizzati inseriti o utilizzati dall'istruttore attivo (identificati da `telefono` uguale al suo ID o presenti nei suoi appuntamenti in `impegnoInstructorMap`). Gli impegni personalizzati di altri istruttori rimangono nascosti.
 - **Integrazioni**: Include trigger per l'invio di notifiche Email e WhatsApp.
 - **Error Handling Notifiche**: Il sistema comunica chiaramente all'utente se l'invio dell'email ha avuto successo o se ci sono errori di configurazione (es. API Key mancante).
 
@@ -89,9 +93,13 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 - **Contenuto**: Include credenziali predefinite, link di accesso diretto e istruzioni per l'installazione della PWA su iOS e Android.
 - **Reportistica**: Al termine del ciclo di invio, il sistema invia un report dettagliato di esecuzione all'amministratore.
 
-### ⏰ Automazione Promemoria (Cron)
+### ⏰ Automazione Promemoria (Cron) & E-mail
 - **Logica**: Il cron job giornaliero (`/api/cron/reminders`) invia promemoria per le guide del **giorno successivo** (Domani), garantendo un preavviso adeguato.
 - **Schedule**: Eseguito ogni mattina alle 05:30 UTC tramite Vercel Cron.
+- **Modelli E-mail Personalizzati**:
+  - **Conferma Prenotazione**: E-mail inviata alla creazione con testo *"La guida per il giorno gg/mm/yyyy alle ore hh:mm è stata prenotata correttamente"*.
+  - **Promemoria 24h**: E-mail di promemoria con oggetto *"Promemoria Guida Prenotata"* e testo *"Ricordati la guida per il giorno gg/mm/yyyy alle ore hh:mm"*.
+  - Entrambe le e-mail mantengono il layout premium, l'allegato `.ics` e includono in calce le note fisse di disdetta (*"NB: le guide vanno disdette 24h prima, pena addebito dell'importo"* e *"Per disdire le guide chiama in autoscuola oppure contatta il tuo istruttore"*).
 
 ---
 

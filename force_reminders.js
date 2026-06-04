@@ -28,8 +28,8 @@ function getEmailTemplate(name, dateStr, timeStr) {
     <body>
       <div class="container">
         <div class="card">
-          <div class="title">Promemoria</div>
-          <div class="subtitle">Ricorda la guida programmata per ${dateStr} alle ${timeStr}</div>
+          <div class="title">Promemoria Guida Prenotata</div>
+          <div class="subtitle">Ricordati la guida per il giorno ${dateStr} alle ore ${timeStr}</div>
           <div class="disclaimer">
             NB: le guide vanno disdette 24h prima, pena addebito dell'importo
           </div>
@@ -88,7 +88,7 @@ async function forceRun() {
       await resend.emails.send({
         from: 'Autoscuola Toscana Fauglia <onboarding@resend.dev>',
         to: email,
-        subject: 'Promemoria: Lezione di Guida - ' + dateStr + ' alle ' + timeStr,
+        subject: 'Promemoria Guida Prenotata',
         html: getEmailTemplate(clientName, dateStr, timeStr)
       });
       console.log(`SUCCESS: ${email}`);

@@ -74,11 +74,16 @@ serve(async (req) => {
         body: JSON.stringify({
           from: 'Autoscuola Toscana Fauglia <onboarding@resend.dev>',
           to: apt.clienti.email,
-          subject: mode === '24h' ? 'Promemoria: Lezione di Guida Domani' : 'Promemoria: Lezione di Guida Oggi',
+          subject: mode === '24h' ? 'Promemoria Guida Prenotata' : 'Promemoria: Lezione di Guida Oggi',
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333; text-align: center; border: 1px solid #f3f4f6; border-radius: 24px; padding: 40px;">
-              <h2 style="color: #6b7280; font-size: 18px; font-weight: 700; margin-bottom: 24px;">Promemoria</h2>
-              <p style="font-size: 20px; color: #111827; margin-bottom: 40px; font-weight: 600;">Ricorda la guida programmata per <strong>${format(new Date(apt.inizio), "EEEE d MMMM 'alle' HH:mm", { locale: it })}</strong></p>
+              <h2 style="color: #6b7280; font-size: 18px; font-weight: 700; margin-bottom: 24px;">Promemoria Guida Prenotata</h2>
+              <p style="font-size: 20px; color: #111827; margin-bottom: 40px; font-weight: 600;">
+                ${mode === '24h'
+                  ? `Ricordati la guida per il giorno <strong>${format(new Date(apt.inizio), "dd/MM/yyyy", { locale: it })}</strong> alle ore <strong>${format(new Date(apt.inizio), "HH:mm")}</strong>`
+                  : `Ricorda la guida programmata per <strong>${format(new Date(apt.inizio), "EEEE d MMMM 'alle' HH:mm", { locale: it })}</strong>`
+                }
+              </p>
               
               <p style="font-size: 16px; color: #ef4444; font-weight: bold; text-align: center; margin-bottom: 48px; line-height: 1.6;">
                 NB: le guide vanno disdette 24h prima, pena addebito dell'importo

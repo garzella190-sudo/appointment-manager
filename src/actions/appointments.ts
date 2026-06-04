@@ -38,9 +38,11 @@ export async function createAppointmentAction(payload: {
     const { data: existing } = await supabase
       .from('clienti')
       .select('id')
-      .eq('cognome', payload.nome_impegno)
       .eq('nome', 'UFFICIO')
-      .single();
+      .eq('cognome', payload.nome_impegno.toUpperCase())
+      .in('telefono', ['DEFAULT', payload.istruttore_id])
+      .limit(1)
+      .maybeSingle();
     
     if (existing) {
       finalClienteId = existing.id;
@@ -49,7 +51,8 @@ export async function createAppointmentAction(payload: {
         .from('clienti')
         .insert({ 
           nome: 'UFFICIO', 
-          cognome: payload.nome_impegno.toUpperCase() 
+          cognome: payload.nome_impegno.toUpperCase(),
+          telefono: payload.istruttore_id
         })
         .select()
         .single();
@@ -258,21 +261,28 @@ export async function updateAppointmentAction(id: string, payload: any) {
     const { data: existing } = await supabase
       .from('clienti')
       .select('id')
-      .eq('cognome', payload.nome_impegno)
       .eq('nome', 'UFFICIO')
-      .single();
+      .eq('cognome', payload.nome_impegno.toUpperCase())
+      .in('telefono', ['DEFAULT', payload.istruttore_id])
+      .limit(1)
+      .maybeSingle();
     
     if (existing) {
       finalClienteId = existing.id;
     } else {
-      const { data: created } = await supabase
+      const { data: created, error: createError } = await supabase
         .from('clienti')
         .insert({ 
           nome: 'UFFICIO', 
-          cognome: payload.nome_impegno.toUpperCase() 
+          cognome: payload.nome_impegno.toUpperCase(),
+          telefono: payload.istruttore_id
         })
         .select()
         .single();
+      
+      if (createError) {
+        return { success: false, error: "Errore creazione slot impegno: " + createError.message };
+      }
       finalClienteId = created?.id;
     }
   }

@@ -68,7 +68,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   const [isImpegno, setIsImpegno] = useState(defaultIsImpegno);
   const [nomeImpegno, setNomeImpegno] = useState('');
   const [impegniNames, setImpegniNames] = useState<string[]>([]);
-  const [clientiUfficio, setClientiUfficio] = useState<Array<{ cognome: string; telefono: string | null }>>([]);
+  const [clientiUfficio, setClientiUfficio] = useState<Array<{ id: string; cognome: string; telefono: string | null }>>([]);
   const [showImpegniDropdown, setShowImpegniDropdown] = useState(false);
   const [impegnoInstructorMap, setImpegnoInstructorMap] = useState<Record<string, string[]>>({});
   const impegniDropdownRef = useRef<HTMLDivElement>(null);
@@ -158,7 +158,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           supabase.from('istruttori').select('*').order('cognome'),
           supabase.from('veicoli').select('*').order('nome'),
           supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
-          supabase.from('clienti').select('cognome, telefono').eq('nome', 'UFFICIO'),
+          supabase.from('clienti').select('id, cognome, telefono').eq('nome', 'UFFICIO'),
           supabase.from('appuntamenti').select('istruttore_id, clienti!inner(cognome, telefono)').eq('clienti.nome', 'UFFICIO')
         ]);
 
@@ -565,24 +565,28 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }));
   };
 
-  const executeDeleteImpegnoName = async (name: string) => {
+  const executeDeleteImpegnoName = async (name: string, id?: string) => {
     try {
-      const { data: client, error: findError } = await supabase
-        .from('clienti')
-        .select('id')
-        .eq('nome', 'UFFICIO')
-        .eq('cognome', name.toUpperCase())
-        .single();
-        
-      if (findError || !client) {
-        showToast("Impossibile trovare l'impegno da eliminare.", "error");
-        return;
+      let clientId = id;
+      
+      if (!clientId) {
+        const { data: matchedClients, error: findError } = await supabase
+          .from('clienti')
+          .select('id')
+          .eq('nome', 'UFFICIO')
+          .eq('cognome', name.toUpperCase());
+          
+        if (findError || !matchedClients || matchedClients.length === 0) {
+          showToast("Impossibile trovare l'impegno da eliminare.", "error");
+          return;
+        }
+        clientId = matchedClients[0].id;
       }
       
       const { count, error: countError } = await supabase
         .from('appuntamenti')
         .select('*', { count: 'exact', head: true })
-        .eq('cliente_id', client.id);
+        .eq('cliente_id', clientId);
         
       if (countError) {
         showToast("Errore durante la verifica dell'utilizzo.", "error");
@@ -597,7 +601,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       const { error: deleteError } = await supabase
         .from('clienti')
         .delete()
-        .eq('id', client.id);
+        .eq('id', clientId);
         
       if (deleteError) {
         showToast("Errore durante l'eliminazione dell'impegno: " + deleteError.message, "error");
@@ -654,8 +658,6 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   
   const dropdownItems = useMemo(() => {
     const targetInstrId = form.istruttore_id || istruttoreId;
-    const myCommitments = targetInstrId ? (impegnoInstructorMap[targetInstrId] || []) : [];
-    const mySet = new Set(myCommitments.map(n => n.toUpperCase()));
     const searchString = nomeImpegno.trim().toLowerCase();
     
     // Filter base list of all unique names
@@ -663,76 +665,89 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       ? impegniNames.filter(name => name.toLowerCase().includes(searchString))
       : impegniNames;
       
-    // Distinguish defaults and specific
-    const defaults = filteredBase.filter(name => {
-      const client = clientiUfficio.find(c => c.cognome.toUpperCase() === name.toUpperCase());
-      return client?.telefono === 'DEFAULT' || !client?.telefono;
-    });
-
-    const specific = filteredBase.filter(name => {
-      const client = clientiUfficio.find(c => c.cognome.toUpperCase() === name.toUpperCase());
-      return client?.telefono !== 'DEFAULT' && client?.telefono;
-    });
-
-    // Mine
-    const mine = specific.filter(name => mySet.has(name.toUpperCase()));
-    const others = specific.filter(name => !mySet.has(name.toUpperCase()));
+    // Set of instructor IDs for verification
+    const instructorIdsSet = new Set(istruttori.map(i => i.id));
     
-    const items: Array<{ type: 'header'; label: string } | { type: 'commitment'; name: string; isMine: boolean }> = [];
+    // Grouping structure
+    const defaults: Array<{ name: string; id?: string }> = [];
+    const groupedByInstructor: Record<string, Array<{ name: string; id?: string }>> = {}; // instructorId -> array of commitments
+    const uncategorized: Array<{ name: string; id?: string }> = [];
+
+    // Initialize arrays for all instructors
+    istruttori.forEach(inst => {
+      groupedByInstructor[inst.id] = [];
+    });
+
+    filteredBase.forEach(name => {
+      const nameUpper = name.toUpperCase();
+      
+      // Find all client records for this name
+      const clients = clientiUfficio.filter(c => c.cognome.toUpperCase() === nameUpper);
+      
+      // 1. Is it DEFAULT?
+      const defaultClient = clients.find(c => c.telefono === 'DEFAULT');
+      if (defaultClient) {
+        defaults.push({ name, id: defaultClient.id });
+        return;
+      }
+      
+      // 2. Does it have a specific instructor ID as owner in clienti table?
+      const ownerClient = clients.find(c => c.telefono && instructorIdsSet.has(c.telefono));
+      if (ownerClient && ownerClient.telefono) {
+        groupedByInstructor[ownerClient.telefono].push({ name, id: ownerClient.id });
+        return;
+      }
+      
+      // 3. Fallback: check who has used this commitment in appointments
+      let foundOwner = false;
+      for (const instId of Object.keys(impegnoInstructorMap)) {
+        const hasUsed = impegnoInstructorMap[instId]?.some(n => n.toUpperCase() === nameUpper);
+        if (hasUsed) {
+          // Find any client record we can use for ID
+          const anyClient = clients.length > 0 ? clients[0] : undefined;
+          groupedByInstructor[instId].push({ name, id: anyClient?.id });
+          foundOwner = true;
+          break; // Assign to the first instructor who used it
+        }
+      }
+      
+      if (!foundOwner) {
+        const anyClient = clients.length > 0 ? clients[0] : undefined;
+        uncategorized.push({ name, id: anyClient?.id });
+      }
+    });
+
+    const items: Array<
+      | { type: 'header'; label: string } 
+      | { type: 'commitment'; name: string; id?: string; isMine: boolean }
+    > = [];
     
     // 1. Add Default FIRST at the very top!
     if (defaults.length > 0) {
       items.push({ type: 'header', label: '---- Default ----' });
-      defaults.forEach(name => {
-        items.push({ type: 'commitment', name, isMine: false });
+      defaults.forEach(item => {
+        items.push({ type: 'commitment', name: item.name, id: item.id, isMine: false });
       });
     }
 
-    // 2. Add mine
-    if (mine.length > 0) {
-      items.push({ type: 'header', label: '---- Tuoi ----' });
-      mine.forEach(name => {
-        items.push({ type: 'commitment', name, isMine: true });
-      });
-    }
-    
-    // 3. Add others grouped by instructor
-    if (others.length > 0) {
-      // Group others by instructor
-      const otherInstructors = istruttori.filter(i => i.id !== targetInstrId);
-      const groupedOthers: Record<string, string[]> = {};
-      const categorizedSet = new Set<string>();
-      
-      otherInstructors.forEach(inst => {
-        const instId = inst.id;
-        const instCommitments = impegnoInstructorMap[instId] || [];
-        const instCommitmentsSet = new Set(instCommitments.map(n => n.toUpperCase()));
-        
-        const matches = others.filter(name => instCommitmentsSet.has(name.toUpperCase()));
-        if (matches.length > 0) {
-          const instFullName = `${inst.cognome} ${inst.nome}`;
-          groupedOthers[instFullName] = matches;
-          matches.forEach(m => categorizedSet.add(m.toUpperCase()));
-        }
-      });
-      
-      const uncategorized = others.filter(name => !categorizedSet.has(name.toUpperCase()));
-      
-      // Add grouped instructors
-      Object.keys(groupedOthers).forEach(instName => {
-        items.push({ type: 'header', label: `---- ${instName} ----` });
-        groupedOthers[instName].forEach(name => {
-          items.push({ type: 'commitment', name, isMine: false });
-        });
-      });
-      
-      // Add uncategorized (general commitments)
-      if (uncategorized.length > 0) {
-        items.push({ type: 'header', label: '---- Altri ----' });
-        uncategorized.forEach(name => {
-          items.push({ type: 'commitment', name, isMine: false });
+    // 2. Add target instructor's commitments only
+    const targetInst = istruttori.find(inst => inst.id === targetInstrId);
+    if (targetInst) {
+      const list = groupedByInstructor[targetInst.id] || [];
+      if (list.length > 0) {
+        items.push({ type: 'header', label: `---- ${targetInst.nome} ${targetInst.cognome} ----` });
+        list.forEach(item => {
+          items.push({ type: 'commitment', name: item.name, id: item.id, isMine: true });
         });
       }
+    }
+    
+    // 3. Add uncategorized (general commitments)
+    if (uncategorized.length > 0) {
+      items.push({ type: 'header', label: '---- Altri ----' });
+      uncategorized.forEach(item => {
+        items.push({ type: 'commitment', name: item.name, id: item.id, isMine: false });
+      });
     }
     
     return items;
@@ -973,7 +988,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                             title="Elimina definitivamente"
                             message={`Sei sicuro di voler eliminare l'impegno "${item.name}"?`}
                             confirmLabel="Elimina"
-                            onConfirm={() => executeDeleteImpegnoName(item.name)}
+                            onConfirm={() => executeDeleteImpegnoName(item.name, item.id)}
                             trigger={
                               <button
                                 type="button"
@@ -1029,6 +1044,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           ) : (
             <div className="flex items-center gap-2">
               <ClientAutocomplete 
+                key={selectedCliente?.id || 'none'}
                 clients={clienti}
                 onSelect={handleClienteChange}
                 defaultValue={selectedCliente}

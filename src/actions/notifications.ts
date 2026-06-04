@@ -74,7 +74,9 @@ function getItalyTimeStr(dateString: string) {
               ? `La tua guida del ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })} è stata ELIMINATA`
               : isModification
                 ? `La tua guida è stata MODIFICATA per il ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min`
-                : `Ricorda la guida programmata per ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min`
+                : isReminder
+                  ? `Ricordati la guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time}`
+                  : `La guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time} è stata prenotata correttamente`
             }
           </div>
 
@@ -234,7 +236,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
 
   try {
     const html = getEmailTemplate({
-      title: 'Promemoria',
+      title: 'Promemoria Guida Prenotata',
       name: clientName,
       date: dateStr,
       time: timeStr,
@@ -254,7 +256,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
     const { data, error: resendError } = await resend.emails.send({
       from: SENDER,
       to: cliente.email,
-      subject: `Promemoria: Lezione di Guida - ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr} (${apt.durata} min)`,
+      subject: 'Promemoria Guida Prenotata',
       html,
       attachments: [
         {

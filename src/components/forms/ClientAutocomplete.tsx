@@ -20,7 +20,7 @@ export const ClientAutocomplete = ({
   placeholder = "Cerca cliente...",
   className
 }: ClientAutocompleteProps) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(defaultValue ? `${defaultValue.cognome} ${defaultValue.nome}` : '');
   const [isOpen, setIsOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Cliente | null>(defaultValue || null);
   const containerRef = useRef<HTMLDivElement>(null);
