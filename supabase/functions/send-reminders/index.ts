@@ -7,6 +7,23 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
+const getItalyTimeStr = (dateString: string) => {
+  return new Intl.DateTimeFormat('it-IT', {
+    timeZone: 'Europe/Rome',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(dateString));
+}
+
+const getItalyDateStr = (dateString: string) => {
+  return new Intl.DateTimeFormat('it-IT', {
+    timeZone: 'Europe/Rome',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(new Date(dateString));
+}
+
 serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
@@ -72,16 +89,16 @@ serve(async (req) => {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: 'Autoscuola Toscana Fauglia <onboarding@resend.dev>',
+          from: 'Autoscuola Toscana <notifiche@guide.autoscuolatoscanasnc.it>',
           to: apt.clienti.email,
           subject: mode === '24h' ? 'Promemoria Guida Prenotata' : 'Promemoria: Lezione di Guida Oggi',
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333; text-align: center; border: 1px solid #f3f4f6; border-radius: 24px; padding: 40px;">
               <h2 style="color: #6b7280; font-size: 18px; font-weight: 700; margin-bottom: 24px;">Promemoria Guida Prenotata</h2>
-              <p style="font-size: 20px; color: #111827; margin-bottom: 40px; font-weight: 600;">
+              <p style="font-size: 20px; color: #111827; margin-bottom: 40px; font-weight: 600; line-height: 1.6;">
                 ${mode === '24h'
-                  ? `Ricordati la guida per il giorno <strong>${format(new Date(apt.inizio), "dd/MM/yyyy", { locale: it })}</strong> alle ore <strong>${format(new Date(apt.inizio), "HH:mm")}</strong>`
-                  : `Ricorda la guida programmata per <strong>${format(new Date(apt.inizio), "EEEE d MMMM 'alle' HH:mm", { locale: it })}</strong>`
+                  ? `Ricordati la guida per il giorno <strong>${getItalyDateStr(apt.inizio)}</strong> alle ore <strong>${getItalyTimeStr(apt.inizio)}</strong><br/>Durata: <strong>${apt.durata || 60} min</strong>`
+                  : `Ricorda la guida programmata per <strong>${getItalyDateStr(apt.inizio)}</strong> alle ore <strong>${getItalyTimeStr(apt.inizio)}</strong><br/>Durata: <strong>${apt.durata || 60} min</strong>`
                 }
               </p>
               

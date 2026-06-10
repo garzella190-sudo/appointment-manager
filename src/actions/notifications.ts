@@ -75,8 +75,8 @@ function getItalyTimeStr(dateString: string) {
               : isModification
                 ? `La tua guida è stata MODIFICATA per il ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min`
                 : isReminder
-                  ? `Ricordati la guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time}`
-                  : `La guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time} è stata prenotata correttamente`
+                  ? `Ricordati la guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time}\nDurata: ${duration} min`
+                  : `La guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time} è stata prenotata correttamente\nDurata: ${duration} min`
             }
           </div>
 
