@@ -1271,30 +1271,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           )}
         </div>
 
-        {/* Modal Quick-Add Cliente */}
-        <Modal 
-          isOpen={addingCliente} 
-          onClose={() => setAddingCliente(false)} 
-          title="Veloce: Nuovo Cliente"
-        >
-          <SchedaClienteForm
-            patenti={patenti}
-            onCancel={() => setAddingCliente(false)}
-            onSuccess={async (newId) => {
-              // Refresh client list
-              const { data } = await supabase.from('clienti').select('*').order('cognome');
-              const sorted = data ?? [];
-              setClienti(sorted);
-              
-              const newClient = (sorted as Cliente[]).find((c: Cliente) => c.id === newId);
-              if (newClient) {
-                handleClienteChange(newClient);
-              }
-              setAddingCliente(false);
-              showToast('Cliente aggiunto e selezionato', 'success');
-            }}
-          />
-        </Modal>
+
 
         {/* DATA E ORARI */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-end">
@@ -1664,18 +1641,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         <div className="pt-6">
           {isView ? (
             <div className="flex flex-col gap-3">
-              {/* Pronto per Esame Modal */}
-              {!isImpegno && (
-                  <AssignExamSessionModal 
-                    isOpen={isExamModalOpen}
-                    onClose={() => setIsExamModalOpen(false)}
-                    clienteId={form.cliente_id}
-                    onSuccess={() => {
-                      showToast('Allievo pronto per esame!', 'success');
-                      onSuccess();
-                    }}
-                  />
-              )}
+
               
               {isCompleted && (
                 <div className="text-center pt-2">
@@ -1705,6 +1671,44 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           )}
         </div>
       </form>
+
+      {/* Modal Quick-Add Cliente */}
+      <Modal 
+        isOpen={addingCliente} 
+        onClose={() => setAddingCliente(false)} 
+        title="Veloce: Nuovo Cliente"
+      >
+        <SchedaClienteForm
+          patenti={patenti}
+          onCancel={() => setAddingCliente(false)}
+          onSuccess={async (newId) => {
+            // Refresh client list
+            const { data } = await supabase.from('clienti').select('*').order('cognome');
+            const sorted = data ?? [];
+            setClienti(sorted);
+            
+            const newClient = (sorted as Cliente[]).find((c: Cliente) => c.id === newId);
+            if (newClient) {
+              handleClienteChange(newClient);
+            }
+            setAddingCliente(false);
+            showToast('Cliente aggiunto e selezionato', 'success');
+          }}
+        />
+      </Modal>
+
+      {/* Pronto per Esame Modal */}
+      {!isImpegno && (
+        <AssignExamSessionModal 
+          isOpen={isExamModalOpen}
+          onClose={() => setIsExamModalOpen(false)}
+          clienteId={form.cliente_id}
+          onSuccess={() => {
+            showToast('Allievo pronto per esame!', 'success');
+            onSuccess();
+          }}
+        />
+      )}
     </div>
   );
 };

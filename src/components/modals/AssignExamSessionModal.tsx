@@ -75,6 +75,7 @@ export function AssignExamSessionModal({ isOpen, onClose, clienteId, onSuccess }
           ) : sessions.map((s) => (
             <button
               key={s.id}
+              type="button"
               onClick={() => handleAssign(s.id)}
               disabled={isSaving}
               className="w-full flex items-center justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-2xl hover:border-sky-500 hover:shadow-md transition-all group"
@@ -105,6 +106,7 @@ export function AssignExamSessionModal({ isOpen, onClose, clienteId, onSuccess }
 
         <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
           <button
+            type="button"
             onClick={() => handleAssign(null)}
             disabled={isSaving}
             className="w-full py-4 flex items-center justify-center gap-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all border border-zinc-200 dark:border-zinc-700"
@@ -115,6 +117,7 @@ export function AssignExamSessionModal({ isOpen, onClose, clienteId, onSuccess }
         </div>
 
         <button
+          type="button"
           onClick={onClose}
           disabled={isSaving}
           className="w-full py-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 text-[10px] font-black uppercase tracking-widest transition-all"
