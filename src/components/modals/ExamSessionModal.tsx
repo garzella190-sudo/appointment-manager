@@ -155,6 +155,8 @@ export default function ExamSessionModal({
           const startDate = new Date(`${editForm.data}T${editForm.ora_inizio}`);
           const endDate = new Date(startDate.getTime() + editForm.durata * 60000);
           await supabase.from('appuntamenti').update({
+            data: startDate.toISOString(),
+            data_solo: editForm.data,
             inizio: startDate.toISOString(),
             fine: endDate.toISOString(),
             durata: editForm.durata
