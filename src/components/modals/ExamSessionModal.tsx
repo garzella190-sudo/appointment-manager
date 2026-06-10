@@ -60,7 +60,7 @@ export default function ExamSessionModal({
   const [allVeicoli, setAllVeicoli] = useState<Veicolo[]>([]);
   
   // Refined states
-  const [activeSection, setActiveSection] = useState<Section>('info');
+  const [activeSection, setActiveSection] = useState<Section | null>('info');
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editForm, setEditForm] = useState({
     nome: '',
@@ -320,7 +320,7 @@ export default function ExamSessionModal({
     if (isEditingInfo && activeSection === 'info' && section !== 'info') {
       saveSessionInfo();
     }
-    setActiveSection(section);
+    setActiveSection(prev => prev === section ? null : section);
   };
 
   const LABEL_CLS = "text-[11px] font-black uppercase tracking-widest text-zinc-400 mb-2 block ml-1";
