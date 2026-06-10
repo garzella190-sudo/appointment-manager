@@ -79,7 +79,7 @@ export default async function RootLayout({
       <body className={`${inter.className} antialiased h-full overflow-hidden`}>
         <ToastProvider>
           <div className="flex flex-col h-full relative">
-            <main className="flex-1 overflow-hidden relative pt-0">
+            <main className="flex-1 overflow-hidden relative z-10 pt-0">
               {children}
             </main>
             <BottomNav />
