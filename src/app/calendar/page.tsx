@@ -322,6 +322,43 @@ export default function CalendarPage() {
     };
   }, [isFullScreen]);
 
+  // Handle scroll in fullscreen to hide/show BottomNav
+  useEffect(() => {
+    if (!isFullScreen) {
+      window.dispatchEvent(new CustomEvent('toggle-bottom-nav', { detail: { show: true } }));
+      return;
+    }
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let lastScrollTop = container.scrollTop;
+    let isNavVisible = true;
+
+    const handleScroll = () => {
+      const scrollTop = container.scrollTop;
+      
+      // Determine scroll direction
+      if (scrollTop > lastScrollTop && scrollTop > 50) {
+        if (isNavVisible) {
+          isNavVisible = false;
+          window.dispatchEvent(new CustomEvent('toggle-bottom-nav', { detail: { show: false } }));
+        }
+      } else if (scrollTop < lastScrollTop) {
+        if (!isNavVisible) {
+          isNavVisible = true;
+          window.dispatchEvent(new CustomEvent('toggle-bottom-nav', { detail: { show: true } }));
+        }
+      }
+      lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [isFullScreen]);
+
   // Handle fullscreen navigation events from BottomNav
   useEffect(() => {
     if (!isFullScreen) return;

@@ -20,6 +20,7 @@ const BottomNav = () => {
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isCalendarFullScreen, setIsCalendarFullScreen] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true);
 
   useEffect(() => {
     const handleFullScreenChange = (e: Event) => {
@@ -34,8 +35,25 @@ const BottomNav = () => {
   }, []);
 
   useEffect(() => {
+    const handleToggleNav = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setIsNavVisible(!!customEvent.detail?.show);
+    };
+
+    window.addEventListener('toggle-bottom-nav', handleToggleNav);
+    return () => {
+      window.removeEventListener('toggle-bottom-nav', handleToggleNav);
+    };
+  }, []);
+
+  useEffect(() => {
     setIsCalendarFullScreen(false);
+    setIsNavVisible(true);
   }, [pathname]);
+
+  useEffect(() => {
+    setIsNavVisible(true);
+  }, [isCalendarFullScreen]);
 
   if (pathname === '/login') {
     return null;
@@ -94,7 +112,10 @@ const BottomNav = () => {
 
   return (
     <>
-      <nav className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-[96vw] md:max-w-2xl z-50 flex justify-center items-end pointer-events-none print:hidden">
+      <nav className={cn(
+        "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-[96vw] md:max-w-2xl z-50 flex justify-center items-end pointer-events-none print:hidden transition-all duration-300 transform",
+        !isNavVisible && "translate-y-24 opacity-0 pointer-events-none"
+      )}>
         {isCalendarFullScreen ? (
           <>
             {/* Left Segment: Plus + Home */}
