@@ -1075,7 +1075,7 @@ export default function CalendarPage() {
                         {ist.cognome?.[0] || '?'}{ist.nome?.[0] || ''}
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 truncate w-full px-1">
-                        {ist.cognome}
+                        {ist.cognome} {ist.nome ? `${ist.nome[0]}.` : ''}
                       </span>
                     </div>
                   );

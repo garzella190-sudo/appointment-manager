@@ -644,7 +644,9 @@ export default function ExamSessionModal({
                         )}
                       >
                         <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: isAssigned ? 'white' : istr.colore }} />
-                        <span className="text-xs font-black uppercase truncate">{istr.cognome}</span>
+                        <span className="text-xs font-black uppercase truncate">
+                          {istr.cognome} {istr.nome ? `${istr.nome[0]}.` : ''}
+                        </span>
                       </button>
                     );
                   })}
