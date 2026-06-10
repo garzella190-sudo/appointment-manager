@@ -109,6 +109,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   const [durationMode, setDurationMode] = useState<'30' | '60' | 'custom'>(initialTime ? '30' : '60');
   const [serverError, setServerError] = useState<string | null>(null);
   const [addingCliente, setAddingCliente] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [availableSlots, setAvailableSlots] = useState<{ instructor_ids: string[], vehicle_ids: string[], busy_client_ids: string[] }>({ 
     instructor_ids: [], 
     vehicle_ids: [],
@@ -1047,6 +1048,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 key={selectedCliente?.id || 'none'}
                 clients={clienti}
                 onSelect={handleClienteChange}
+                onQueryChange={setSearchQuery}
                 defaultValue={selectedCliente}
                 className="flex-1"
                 placeholder="Cerca per cognome o nome..."
@@ -1678,8 +1680,17 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         onClose={() => setAddingCliente(false)} 
         title="Veloce: Nuovo Cliente"
       >
-        <SchedaClienteForm
-          patenti={patenti}
+        {addingCliente && (
+          <SchedaClienteForm
+            patenti={patenti}
+          defaultValues={searchQuery ? {
+            cognome: searchQuery.split(' ')[0] || '',
+            nome: searchQuery.split(' ').slice(1).join(' ') || '',
+            telefono: '',
+            email: '',
+            patente_richiesta_id: null,
+            preferenza_cambio: null
+          } : undefined}
           onCancel={() => setAddingCliente(false)}
           onSuccess={async (newId) => {
             // Refresh client list
@@ -1695,6 +1706,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             showToast('Cliente aggiunto e selezionato', 'success');
           }}
         />
+        )}
       </Modal>
 
       {/* Pronto per Esame Modal */}

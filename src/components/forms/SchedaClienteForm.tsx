@@ -58,6 +58,9 @@ export const SchedaClienteForm = ({
   const [serverError, setServerError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  const selectedPatente = patenti.find(p => p.id === form.patente_richiesta_id);
+  const isMotoPatente = selectedPatente && ['AM', 'A1', 'A2', 'A'].includes(selectedPatente.tipo.toUpperCase());
+
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }));
 
@@ -198,18 +201,20 @@ export const SchedaClienteForm = ({
           />
         </div>
 
-        <div className="space-y-1.5">
-          <label className={LABEL_CLS}>Tipo Cambio</label>
-          <Select
-            options={[
-              { id: 'manuale', label: 'Meccanico (Manuale)' },
-              { id: 'automatico', label: 'Automatico' }
-            ]}
-            value={form.preferenza_cambio || ''}
-            onChange={(val) => setForm(prev => ({ ...prev, preferenza_cambio: val }))}
-            placeholder="Seleziona Preferenza Cambio"
-          />
-        </div>
+        {isMotoPatente && (
+          <div className="space-y-1.5">
+            <label className={LABEL_CLS}>Tipo Cambio</label>
+            <Select
+              options={[
+                { id: 'manuale', label: 'Meccanico (Manuale)' },
+                { id: 'automatico', label: 'Automatico' }
+              ]}
+              value={form.preferenza_cambio || ''}
+              onChange={(val) => setForm(prev => ({ ...prev, preferenza_cambio: val }))}
+              placeholder="Seleziona Preferenza Cambio"
+            />
+          </div>
+        )}
       </div>
 
       {/* Notification Preferences */}

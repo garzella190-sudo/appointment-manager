@@ -11,6 +11,7 @@ interface ClientAutocompleteProps {
   defaultValue?: Cliente | null;
   placeholder?: string;
   className?: string;
+  onQueryChange?: (query: string) => void;
 }
 
 export const ClientAutocomplete = ({
@@ -18,7 +19,8 @@ export const ClientAutocomplete = ({
   onSelect,
   defaultValue,
   placeholder = "Cerca cliente...",
-  className
+  className,
+  onQueryChange
 }: ClientAutocompleteProps) => {
   const [query, setQuery] = useState(defaultValue ? `${defaultValue.cognome} ${defaultValue.nome}` : '');
   const [isOpen, setIsOpen] = useState(false);
@@ -76,7 +78,9 @@ export const ClientAutocomplete = ({
           placeholder={placeholder}
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
+            const newQuery = e.target.value;
+            setQuery(newQuery);
+            if (onQueryChange) onQueryChange(newQuery);
             setIsOpen(true);
             if (selectedClient) setSelectedClient(null);
           }}
