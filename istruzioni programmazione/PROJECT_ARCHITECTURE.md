@@ -49,7 +49,8 @@ Tutte le interazioni con il database Supabase devono utilizzare esclusivamente l
 È il modulo universale per la **Creazione** e **Modifica** delle guide.
 - **Logica Durata**: Gestisce step predefiniti (30, 60 min) o "Personalizzato".
 - **Auto-selezione e Ricalcolo**: Quando si seleziona il cliente, l'istruttore, il tipo patente o il tipo di cambio, il sistema ricalcola e seleziona automaticamente il veicolo compatibile ottimale (Priorità: veicolo default istruttore -> primo veicolo compatibile libero per quello slot -> primo veicolo compatibile globale).
-- **Auto-selezione Nuovo Cliente**: Quando viene registrato un nuovo cliente tramite il pulsante `+`, il sistema lo seleziona automaticamente compilando la barra di ricerca del modulo con il suo nome.
+- **Auto-selezione Nuovo Cliente**: Quando viene registrato un nuovo cliente tramite il pulsante `+` dopo una ricerca infruttuosa, il sistema precompila automaticamente il nome e cognome estratti dalla barra di ricerca.
+- **Dinamismo "Tipo Cambio"**: Il selettore per specificare il tipo di cambio (manuale o automatico) nel form cliente compare solo ed esclusivamente per le patenti moto ('AM', 'A1', 'A2', 'A').
 - **Privacy e Suddivisione Impegni ("Altro Impegno")**: Nella tendina di ricerca per gli impegni di ufficio, gli impegni vengono suddivisi in:
   - `---- Default ----`: contenente gli impegni definiti nelle impostazioni (identificati da `telefono: 'DEFAULT'`).
   - `---- [Nome Istruttore] ----`: contenente esclusivamente gli impegni personalizzati inseriti o utilizzati dall'istruttore attivo (identificati da `telefono` uguale al suo ID o presenti nei suoi appuntamenti in `impegnoInstructorMap`). Gli impegni personalizzati di altri istruttori rimangono nascosti.
@@ -63,8 +64,9 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 - **Prefisso**: Il prefisso internazionale `39` viene gestito automaticamente.
 
 ### 🎓 Gestione Esami & Sedute
-- **Automazione Impegni**: La creazione di una "Seduta d'Esame" permette di selezionare gli istruttori partecipanti (`istruttori_ids`) e un orario di inizio. Il sistema crea automaticamente un blocco di **3 ore** (Impegno di tipo 'Esame') per ogni istruttore coinvolto.
-- **Sincronizzazione**: La cancellazione di una seduta d'esame comporta la rimozione automatica di tutti i blocchi d'impegno associati nei calendari degli istruttori.
+- **Automazione Impegni e Durate Dinamiche**: La creazione di una "Seduta d'Esame" permette di selezionare gli istruttori e assegnare i candidati. L'orario di inizio e la **durata dell'esame per ogni singolo istruttore** vengono calcolati in modo dinamico e progressivo: ogni candidato inserito aumenta la durata dell'esame del rispettivo istruttore di **20 minuti**.
+- **Gestione Manuale Orari**: All'interno del modale di seduta d'esame è comunque possibile modificare manualmente l'ora di inizio e la durata (in minuti) per ciascun istruttore in modo indipendente.
+- **Sincronizzazione**: La cancellazione di una seduta d'esame comporta la rimozione automatica di tutti i blocchi d'impegno associati nei calendari degli istruttori, così come la rimozione/aggiunta di un istruttore crea o elimina dinamicamente il rispettivo impegno in agenda.
 - **Assegnazione Allievi & Tendina Alfabetica**: Gli allievi pronti per l'esame possono essere cercati tramite un menu a tendina filtrabile che si apre all'istante all'attivazione del campo di ricerca, visualizzando i candidati ordinati alfabeticamente. La sezione **Candidati** è posizionata in alto (subito dopo le Info Generali) per favorire la leggibilità e lo spazio della tendina. Al click su un allievo, questo viene aggiunto ed il menu si chiude in automatico.
 - **Automazione Veicoli Impegnati**: 
   - **Auto**: All'aggiunta di un istruttore alla seduta, il sistema assegna automaticamente il suo veicolo predefinito (colonna `veicolo_id` della tabella `istruttori`) al database e lo associa all'impegno di guida a calendario.
