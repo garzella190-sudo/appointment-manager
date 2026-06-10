@@ -610,6 +610,9 @@ export default function CalendarPage() {
         type: 'success'
       });
 
+      const targetApt = appointments.find(a => a.id === active.id);
+      if (!targetApt) return;
+
       setAppointments(prev => prev.map(apt => {
         if (apt.id === active.id) {
           return { 
@@ -619,11 +622,15 @@ export default function CalendarPage() {
             trainer_id: newInstructorId || apt.trainer_id 
           };
         }
+        if (targetApt.sessione_esame_id && apt.sessione_esame_id === targetApt.sessione_esame_id) {
+          return {
+            ...apt,
+            appointment_date: dateStr,
+            appointment_time: timeStr
+          };
+        }
         return apt;
       }));
-
-      const targetApt = appointments.find(a => a.id === active.id);
-      if (!targetApt) return;
 
       const duration = targetApt.duration || 30;
       const startDateTime = new Date(`${dateStr}T${timeStr}`);
@@ -645,19 +652,88 @@ export default function CalendarPage() {
         updatePayload.istruttore_id = newInstructorId;
       }
 
-      const { error: dragError } = await supabase
-        .from('appuntamenti')
-        .update(updatePayload)
-        .eq('id', active.id as string);
+      let updateError = null;
 
-      if (dragError) {
-        console.error('Drag & Drop save error:', dragError);
+      if (targetApt.sessione_esame_id) {
+        // 1. Update sessioni_esame table (data and ora_inizio)
+        const { error: sessionError } = await supabase
+          .from('sessioni_esame')
+          .update({
+            data: dateStr,
+            ora_inizio: timeStr
+          })
+          .eq('id', targetApt.sessione_esame_id);
+
+        if (sessionError) {
+          console.error('Error updating exam session time:', sessionError);
+          updateError = sessionError;
+        }
+
+        // 2. Update ALL appointments linked to this session
+        const { error: sessionAptsError } = await supabase
+          .from('appuntamenti')
+          .update({
+            data: startISO,
+            inizio: startISO,
+            fine: endISO,
+            data_solo: dateStr,
+          })
+          .eq('sessione_esame_id', targetApt.sessione_esame_id);
+
+        if (sessionAptsError) {
+          console.error('Error updating exam session appointments:', sessionAptsError);
+          updateError = updateError || sessionAptsError;
+        }
+
+        // 3. If instructor changed, update this specific appointment's instructor AND the instructors array in sessioni_esame
+        if (newInstructorId && newInstructorId !== targetApt.trainer_id) {
+          const { error: instError } = await supabase
+            .from('appuntamenti')
+            .update({ istruttore_id: newInstructorId })
+            .eq('id', active.id as string);
+
+          if (instError) {
+            console.error('Error updating dragged exam appointment instructor:', instError);
+            updateError = updateError || instError;
+          }
+
+          // Fetch current session instructors list
+          const { data: sessionData } = await supabase
+            .from('sessioni_esame')
+            .select('istruttori_ids')
+            .eq('id', targetApt.sessione_esame_id)
+            .single();
+
+          if (sessionData) {
+            const currentIds: string[] = sessionData.istruttori_ids || [];
+            const newIds = currentIds.map(id => id === targetApt.trainer_id ? newInstructorId : id);
+            await supabase
+              .from('sessioni_esame')
+              .update({ istruttori_ids: newIds })
+              .eq('id', targetApt.sessione_esame_id);
+          }
+        }
+      } else {
+        // Normal appointment drag
+        const { error: dragError } = await supabase
+          .from('appuntamenti')
+          .update(updatePayload)
+          .eq('id', active.id as string);
+
+        if (dragError) {
+          console.error('Drag & Drop save error:', dragError);
+          updateError = dragError;
+        }
+      }
+
+      if (updateError) {
         setToast({
           message: 'Errore durante il salvataggio dello spostamento. Riprova.',
           type: 'error'
         });
-        if (mounted) fetchWeekAppointments();
       }
+      
+      if (mounted) fetchWeekAppointments();
     }
   };
 
