@@ -140,12 +140,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             
           if (ufficioClienti) {
             const defaultNames = ['FERIE', 'QUIZ B', 'ESAME', 'TEORIA B', 'TEST IMPEGNO'];
-            const toMigrate = ufficioClienti.filter((c: any) => 
-              defaultNames.includes(c.cognome.toUpperCase()) && c.telefono !== 'DEFAULT'
-            );
+            const clientsToUpdate = ufficioClienti.filter(c => {
+              if (!c.telefono) return false;
+              const cleanPhone = c.telefono.replace(/^\+39/, '').trim();
+              return defaultNames.includes(c.cognome.toUpperCase()) && cleanPhone !== 'DEFAULT';
+            });
             
-            if (toMigrate.length > 0) {
-              await Promise.all(toMigrate.map((c: any) => 
+            if (clientsToUpdate.length > 0) {
+              await Promise.all(clientsToUpdate.map((c: any) => 
                 supabase.from('clienti').update({ telefono: 'DEFAULT' }).eq('id', c.id)
               ));
             }
@@ -686,17 +688,31 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       const clients = clientiUfficio.filter(c => c.cognome.toUpperCase() === nameUpper);
       
       // 1. Is it DEFAULT?
-      const defaultClient = clients.find(c => c.telefono === 'DEFAULT');
+      const defaultClient = clients.find(c => {
+        if (!c.telefono) return false;
+        const cleanPhone = c.telefono.replace(/^\+39/, '').trim();
+        return cleanPhone === 'DEFAULT';
+      });
       if (defaultClient) {
         defaults.push({ name, id: defaultClient.id });
         return;
       }
       
       // 2. Does it have a specific instructor ID as owner in clienti table?
-      const ownerClient = clients.find(c => c.telefono && instructorIdsSet.has(c.telefono));
+      const ownerClient = clients.find(c => {
+        if (!c.telefono) return false;
+        const cleanPhone = c.telefono.replace(/^\+39/, '').trim();
+        if (cleanPhone.length < 5) return false;
+        return Array.from(instructorIdsSet).some(id => id.startsWith(cleanPhone));
+      });
+      
       if (ownerClient && ownerClient.telefono) {
-        groupedByInstructor[ownerClient.telefono].push({ name, id: ownerClient.id });
-        return;
+        const cleanPhone = ownerClient.telefono.replace(/^\+39/, '').trim();
+        const fullOwnerId = Array.from(instructorIdsSet).find(id => id.startsWith(cleanPhone));
+        if (fullOwnerId) {
+          groupedByInstructor[fullOwnerId].push({ name, id: ownerClient.id });
+          return;
+        }
       }
       
       // 3. Fallback: check who has used this commitment in appointments
