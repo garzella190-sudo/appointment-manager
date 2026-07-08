@@ -140,7 +140,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             
           if (ufficioClienti) {
             const defaultNames = ['FERIE', 'QUIZ B', 'ESAME', 'TEORIA B', 'TEST IMPEGNO'];
-            const clientsToUpdate = ufficioClienti.filter(c => {
+            const clientsToUpdate = ufficioClienti.filter((c: any) => {
               if (!c.telefono) return false;
               const cleanPhone = c.telefono.replace(/^\+39/, '').trim();
               return defaultNames.includes(c.cognome.toUpperCase()) && cleanPhone !== 'DEFAULT';

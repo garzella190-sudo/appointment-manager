@@ -40,7 +40,11 @@ export async function createAppointmentAction(payload: {
       .select('id')
       .eq('nome', 'UFFICIO')
       .eq('cognome', payload.nome_impegno.toUpperCase())
-      .in('telefono', ['DEFAULT', payload.istruttore_id.substring(0, 15)])
+      .in('telefono', [
+        'DEFAULT', '+39DEFAULT', 
+        payload.istruttore_id.substring(0, 15), 
+        '+39' + payload.istruttore_id.substring(0, 15)
+      ])
       .limit(1)
       .maybeSingle();
     
@@ -263,7 +267,11 @@ export async function updateAppointmentAction(id: string, payload: any) {
       .select('id')
       .eq('nome', 'UFFICIO')
       .eq('cognome', payload.nome_impegno.toUpperCase())
-      .in('telefono', ['DEFAULT', payload.istruttore_id.substring(0, 15)])
+      .in('telefono', [
+        'DEFAULT', '+39DEFAULT', 
+        payload.istruttore_id.substring(0, 15), 
+        '+39' + payload.istruttore_id.substring(0, 15)
+      ])
       .limit(1)
       .maybeSingle();
     
