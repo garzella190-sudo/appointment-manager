@@ -24,12 +24,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/app_icon_512.png', media: '(prefers-color-scheme: light)' },
-      { url: '/app_icon_512_dark.png', media: '(prefers-color-scheme: dark)' }
+      { url: '/app_icon_512.png?v=11', media: '(prefers-color-scheme: light)' },
+      { url: '/app_icon_512_dark.png?v=11', media: '(prefers-color-scheme: dark)' }
     ],
     apple: [
-      { url: '/app_icon_512.png', media: '(prefers-color-scheme: light)' },
-      { url: '/app_icon_512_dark.png', media: '(prefers-color-scheme: dark)' }
+      { url: '/app_icon_512.png?v=11', media: '(prefers-color-scheme: light)' },
+      { url: '/app_icon_512_dark.png?v=11', media: '(prefers-color-scheme: dark)' }
     ]
   },
 };

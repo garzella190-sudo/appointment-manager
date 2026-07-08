@@ -83,7 +83,7 @@ export default function ExamSessionModal({
         supabase.from('clienti').select('*, patenti(tipo, veicoli_abilitati)').eq('sessione_esame_id', sessionId),
         supabase.from('istruttori').select('*').order('cognome'),
         supabase.from('veicoli').select('*').order('nome'),
-        supabase.from('appuntamenti').select('*').eq('sessione_esame_id', sessionId)
+        supabase.from('appuntamenti').select('*, clienti(id, nome, cognome, patenti(tipo))').eq('sessione_esame_id', sessionId)
       ]);
 
       if (sRes.data) {
@@ -135,45 +135,7 @@ export default function ExamSessionModal({
     }
   }, [activeSection, isOpen]);
 
-  const recalculateExamDurations = async () => {
-    if (!session) return;
-    
-    // Fetch fresh candidates and appointments for this session
-    const [{ data: currentCandidates }, { data: currentApts }] = await Promise.all([
-      supabase.from('clienti').select('id, istruttore_pronto_id').eq('sessione_esame_id', session.id),
-      supabase.from('appuntamenti').select('id, istruttore_id, inizio, durata').eq('sessione_esame_id', session.id)
-    ]);
-      
-    if (!currentCandidates || !currentApts) return;
 
-    // Group candidates by instructor
-    const candidatesPerInstructor: Record<string, number> = {};
-    for (const c of currentCandidates) {
-      if (c.istruttore_pronto_id) {
-        candidatesPerInstructor[c.istruttore_pronto_id] = (candidatesPerInstructor[c.istruttore_pronto_id] || 0) + 1;
-      }
-    }
-
-    // Update each appointment's duration
-    for (const apt of currentApts) {
-      const count = candidatesPerInstructor[apt.istruttore_id] || 0;
-      const newDurata = count > 0 ? count * 20 : 20; // Default 20 mins if assigned but 0 candidates
-      
-      if (apt.durata !== newDurata) {
-        const inizioDate = new Date(apt.inizio);
-        const fineDate = new Date(inizioDate.getTime() + newDurata * 60000);
-        
-        await supabase.from('appuntamenti')
-          .update({
-            durata: newDurata,
-            fine: fineDate.toISOString()
-          })
-          .eq('id', apt.id);
-      }
-    }
-    
-    fetchData(); // Refresh UI with updated appointments
-  };
 
   const saveSessionInfo = async () => {
     if (!session) return;
@@ -220,7 +182,6 @@ export default function ExamSessionModal({
     if (res.success) {
       showToast('Allievo segnato come respinto.', 'info');
       setCandidates(prev => prev.filter(c => c.id !== clienteId));
-      await recalculateExamDurations();
       onSuccess();
     } else {
       showToast(res.error || 'Errore', 'error');
@@ -234,7 +195,6 @@ export default function ExamSessionModal({
     if (res.success) {
       showToast('Allievo promosso e archiviato!', 'success');
       setCandidates(prev => prev.filter(c => c.id !== clienteId));
-      await recalculateExamDurations();
       onSuccess();
     } else {
       showToast(res.error || 'Errore', 'error');
@@ -248,7 +208,6 @@ export default function ExamSessionModal({
     if (res.success) {
       showToast('Allievo segnato come assente.', 'info');
       setCandidates(prev => prev.filter(c => c.id !== clienteId));
-      await recalculateExamDurations();
       onSuccess();
     } else {
       showToast(res.error || 'Errore', 'error');
@@ -290,7 +249,7 @@ export default function ExamSessionModal({
         nome_impegno: 'Esame di guida',
         data: startDate.toISOString(),
         data_solo: session.data,
-        durata: 60, // Default to 60, will be recalculated immediately
+        durata: session.durata || 180,
         stato: 'programmato',
         veicolo_id: istr?.veicolo_id || null,
         importo: null,
@@ -306,12 +265,11 @@ export default function ExamSessionModal({
     if (!error) {
       setSession({ ...session, istruttori_ids: newIds, veicoli_ids: newVehicles });
       showToast(isAssigned ? 'Istruttore rimosso' : 'Istruttore aggiunto', 'success');
-      await recalculateExamDurations();
       onSuccess();
     }
   };
 
-  const updateInstructorTime = async (aptId: string, field: 'inizio' | 'durata', value: string | number) => {
+  const updateInstructorTime = async (aptId: string, field: 'inizio' | 'durata' | 'fine', value: string | number) => {
     const apt = sessionAppointments.find(a => a.id === aptId);
     if (!apt) return;
 
@@ -325,6 +283,18 @@ export default function ExamSessionModal({
        const newInizio = new Date(`${baseDate}T${value}`);
        updates.inizio = newInizio.toISOString();
        updates.fine = new Date(newInizio.getTime() + apt.durata * 60000).toISOString();
+    } else if (field === 'fine') {
+       const baseDate = session!.data;
+       let newFine = new Date(`${baseDate}T${value}`);
+       const newInizio = new Date(apt.inizio);
+       let diffMins = Math.round((newFine.getTime() - newInizio.getTime()) / 60000);
+       if (diffMins < 0) {
+           // Handle crossing midnight
+           newFine = new Date(newFine.getTime() + 24 * 60 * 60 * 1000);
+           diffMins = Math.round((newFine.getTime() - newInizio.getTime()) / 60000);
+       }
+       updates.fine = newFine.toISOString();
+       updates.durata = diffMins > 0 ? diffMins : 0;
     }
     
     setSessionAppointments(prev => prev.map(a => a.id === aptId ? { ...a, ...updates } : a));
@@ -380,7 +350,6 @@ export default function ExamSessionModal({
       showToast('Allievo aggiunto alla seduta', 'success');
       setShowCandidateSearch(false);
       setCandidateSearch('');
-      await recalculateExamDurations();
       onSuccess();
     }
   };
@@ -540,7 +509,7 @@ export default function ExamSessionModal({
                   </h3>
                   {activeSection !== 'candidati' && (
                     <p className="text-[10px] font-bold text-zinc-400 mt-1 uppercase">
-                      {candidates.length} Assegnati
+                      {candidates.length + sessionAppointments.filter(a => a.note?.startsWith('ESITO ESAME:')).length} Totali
                     </p>
                   )}
                 </div>
@@ -629,7 +598,6 @@ export default function ExamSessionModal({
                             const { error } = await supabase.from('clienti').update({ sessione_esame_id: null }).eq('id', c.id);
                             if (!error) {
                                setCandidates(prev => prev.filter(cand => cand.id !== c.id));
-                               await recalculateExamDurations();
                                onSuccess();
                             }
                           }}
@@ -666,6 +634,36 @@ export default function ExamSessionModal({
                       </div>
                     </div>
                   ))}
+
+                  {/* Evaluated Candidates */}
+                  {sessionAppointments.filter(a => a.note?.startsWith('ESITO ESAME:')).map(apt => {
+                    const cand = apt.clienti;
+                    if (!cand) return null;
+                    const esito = apt.note.replace('ESITO ESAME: ', '');
+                    let badgeColor = 'bg-zinc-100 text-zinc-500';
+                    if (esito === 'PROMOSSO') badgeColor = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400';
+                    else if (esito === 'RESPINTO') badgeColor = 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400';
+                    else if (esito === 'ASSENTE') badgeColor = 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
+
+                    return (
+                      <div key={apt.id} className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 p-4 rounded-[28px] flex items-center justify-between opacity-80">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-[18px] bg-zinc-200 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center shrink-0">
+                            <GraduationCap size={24} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase flex items-center gap-2">
+                              {cand.cognome} {cand.nome}
+                            </h4>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mt-0.5">Patente {cand.patenti?.tipo || '?'}</p>
+                          </div>
+                        </div>
+                        <div className={cn("px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider", badgeColor)}>
+                          {esito}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -707,46 +705,46 @@ export default function ExamSessionModal({
                     {allIstruttori.filter(istr => session?.istruttori_ids.includes(istr.id)).map(istr => {
                       const apt = sessionAppointments.find(a => a.istruttore_id === istr.id);
                       const oraInizioApt = apt ? format(new Date(apt.inizio), 'HH:mm') : session?.ora_inizio;
-                      const durataApt = apt ? apt.durata : 0;
-                      
-                      return (
-                        <div key={istr.id} className="bg-white dark:bg-zinc-800 border border-amber-500/30 rounded-3xl p-4 shadow-sm relative overflow-hidden">
-                          <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: istr.colore }} />
-                          <div className="pl-3 flex flex-col gap-4">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase">
-                                {istr.cognome} {istr.nome}
-                              </h4>
-                              <button
-                                onClick={() => toggleInstructor(istr.id)}
-                                className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-all"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                            
-                            {apt && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1 block mb-1">Ora Inizio</label>
-                                  <input 
-                                    type="time"
-                                    value={oraInizioApt}
-                                    onChange={e => updateInstructorTime(apt.id, 'inizio', e.target.value)}
-                                    className="w-full bg-zinc-100 dark:bg-zinc-900 border-none rounded-xl px-3 h-10 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-sky-500 transition-all"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1 block mb-1">Durata (min)</label>
-                                  <input 
-                                    type="number"
-                                    value={durataApt}
-                                    onChange={e => updateInstructorTime(apt.id, 'durata', parseInt(e.target.value))}
-                                    className="w-full bg-zinc-100 dark:bg-zinc-900 border-none rounded-xl px-3 h-10 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-sky-500 transition-all"
-                                  />
-                                </div>
-                              </div>
-                            )}
+                              const oraFineApt = apt && apt.fine ? format(new Date(apt.fine), 'HH:mm') : '';
+                              
+                              return (
+                                <div key={istr.id} className="bg-white dark:bg-zinc-800 border border-amber-500/30 rounded-3xl p-4 shadow-sm relative overflow-hidden">
+                                  <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: istr.colore }} />
+                                  <div className="pl-3 flex flex-col gap-4">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase">
+                                        {istr.cognome} {istr.nome}
+                                      </h4>
+                                      <button
+                                        onClick={() => toggleInstructor(istr.id)}
+                                        className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-all"
+                                      >
+                                        <X size={16} />
+                                      </button>
+                                    </div>
+                                    
+                                    {apt && (
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1 block mb-1">Ora Inizio</label>
+                                          <input 
+                                            type="time"
+                                            value={oraInizioApt}
+                                            onChange={e => updateInstructorTime(apt.id, 'inizio', e.target.value)}
+                                            className="w-full bg-zinc-100 dark:bg-zinc-900 border-none rounded-xl px-3 h-10 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1 block mb-1">Ora Fine</label>
+                                          <input 
+                                            type="time"
+                                            value={oraFineApt}
+                                            onChange={e => updateInstructorTime(apt.id, 'fine', e.target.value)}
+                                            className="w-full bg-zinc-100 dark:bg-zinc-900 border-none rounded-xl px-3 h-10 text-xs font-black uppercase outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
                           </div>
                         </div>
                       );
