@@ -106,7 +106,7 @@ const BottomNav = () => {
 
   const navRight = [
     { name: 'Clienti',  href: '/clienti',  icon: UserCircle },
-    { name: 'Esami',     href: '/esami',    icon: GraduationCap },
+    // { name: 'Esami',     href: '/esami',    icon: GraduationCap },
     { name: 'Gestione', href: '/gestione', icon: Wrench },
   ];
 
@@ -245,7 +245,7 @@ const BottomNav = () => {
 
             {/* Right Segment */}
             <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2 px-2 sm:px-5 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-1 sm:ml-2 pointer-events-auto transition-all">
-              <div className="flex items-center gap-1 sm:gap-4 w-full justify-between sm:justify-end overflow-hidden">
+              <div className="flex items-center gap-1 sm:gap-4 w-full justify-center overflow-hidden">
                 {navRight.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
