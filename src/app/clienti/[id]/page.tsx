@@ -448,7 +448,8 @@ export default function SchedaClientePage() {
                   </div>
 
                   {/* Sezione Esame prenotato */}
-                  {false && pageData.sessione_esame && (
+                  {/*
+                  pageData.sessione_esame && (
                     <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
                       <p className={LABEL_CLS}>
                         <GraduationCap size={13} strokeWidth={2.5} />
@@ -478,7 +479,8 @@ export default function SchedaClientePage() {
                         </Link>
                       </div>
                     </div>
-                  )}
+                  )
+                  */}
 
                   {/* Sezione Archiviazione */}
                   <div className="mt-12 pt-8 border-t border-zinc-100 dark:border-zinc-800">
