@@ -1,0 +1,47 @@
+name: Database Backup (Supabase)
+
+on:
+  schedule:
+    # Esegue il backup ogni notte alle 02:00 UTC (03:00 / 04:00 ora italiana)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Permette di avviare il backup manualmente da GitHub in qualsiasi momento con 1 clic
+
+jobs:
+  backup:
+    name: Supabase Full Backup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Execute Supabase Backup
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          BACKUP_DIR: ./backup_export
+        run: |
+          node backups/backup_db.js
+
+      - name: Compress Backup Archive
+        run: |
+          DATE=$(date +'%Y-%m-%d_%H%M%S')
+          tar -czf "supabase_backup_${DATE}.tar.gz" -C ./backup_export .
+          echo "ARCHIVE_NAME=supabase_backup_${DATE}.tar.gz" >> $GITHUB_ENV
+
+      - name: Upload Backup Artifact to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCHIVE_NAME }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: 90 # Conserva ogni backup per 90 giorni gratuitamente

@@ -42,3 +42,8 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# Backups
+backups/backup_*
+backups/*/*.json
+backups/*.tar.gz
