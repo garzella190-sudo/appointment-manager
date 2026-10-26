@@ -10,8 +10,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-   const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -21,6 +22,12 @@ export default function LoginPage() {
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberMe(true);
+    }
+    // Carica la password salvata se presente all'avvio
+    const savedPassword = localStorage.getItem('autoscuola_remembered_password');
+    if (savedPassword) {
+      setPassword(savedPassword);
+      setRememberPassword(true);
     }
   }, []);
 
@@ -41,6 +48,13 @@ export default function LoginPage() {
         localStorage.setItem('autoscuola_remembered_email', email);
       } else {
         localStorage.removeItem('autoscuola_remembered_email');
+      }
+
+      // Salva o rimuove la password in base al checkbox
+      if (rememberPassword) {
+        localStorage.setItem('autoscuola_remembered_password', password);
+      } else {
+        localStorage.removeItem('autoscuola_remembered_password');
       }
 
       // Se è tutto ok, ti spedisce al calendario!
@@ -70,6 +84,8 @@ export default function LoginPage() {
             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wide ml-1">Email</label>
             <input 
               type="email" 
+              name="email"
+              autoComplete="username"
               required 
               value={email} 
               onChange={(e) => setEmail(e.target.value)}
@@ -83,6 +99,8 @@ export default function LoginPage() {
             <div className="relative group">
               <input 
                 type={showPassword ? "text" : "password"} 
+                name="password"
+                autoComplete="current-password"
                 required 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)}
@@ -100,16 +118,43 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              id="remember"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded-md border-zinc-700 bg-zinc-800 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-zinc-900"
-            />
-            <label htmlFor="remember" className="text-sm font-medium text-zinc-400 select-none cursor-pointer">
-              Ricorda la mia email
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+            <label htmlFor="remember" className="flex items-center gap-2 select-none cursor-pointer group">
+              <input
+                type="checkbox"
+                id="remember"
+                checked={rememberMe}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setRememberMe(val);
+                  if (!val && rememberPassword) {
+                    setRememberPassword(false);
+                  }
+                }}
+                className="w-4 h-4 rounded-md border-zinc-700 bg-zinc-800 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-zinc-900 cursor-pointer"
+              />
+              <span className="text-sm font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                Ricorda email
+              </span>
+            </label>
+
+            <label htmlFor="rememberPassword" className="flex items-center gap-2 select-none cursor-pointer group">
+              <input
+                type="checkbox"
+                id="rememberPassword"
+                checked={rememberPassword}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setRememberPassword(val);
+                  if (val && !rememberMe) {
+                    setRememberMe(true);
+                  }
+                }}
+                className="w-4 h-4 rounded-md border-zinc-700 bg-zinc-800 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-zinc-900 cursor-pointer"
+              />
+              <span className="text-sm font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                Ricorda password
+              </span>
             </label>
           </div>
 
