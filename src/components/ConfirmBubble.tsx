@@ -16,6 +16,9 @@ interface ConfirmBubbleProps {
   cancelLabel?: string;
   isLoading?: boolean;
   fullWidth?: boolean;
+  variant?: 'danger' | 'warning' | 'emerald';
+  confirmIcon?: React.ReactNode;
+  headerIcon?: React.ReactNode;
 }
 
 export const ConfirmBubble = ({
@@ -28,7 +31,10 @@ export const ConfirmBubble = ({
   confirmLabel = 'Elimina',
   cancelLabel = 'Annulla',
   isLoading = false,
-  fullWidth = false
+  fullWidth = false,
+  variant = 'danger',
+  confirmIcon,
+  headerIcon
 }: ConfirmBubbleProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -71,8 +77,13 @@ export const ConfirmBubble = ({
       >
         <div className="space-y-4">
           <div className="flex flex-col items-center text-center gap-3">
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-red-500 shrink-0 mb-1">
-              <AlertCircle size={32} />
+            <div className={cn(
+              "p-4 rounded-2xl shrink-0 mb-1",
+              variant === 'warning' && "bg-amber-50 dark:bg-amber-900/20 text-amber-500",
+              variant === 'emerald' && "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500",
+              variant === 'danger' && "bg-red-50 dark:bg-red-900/20 text-red-500"
+            )}>
+              {headerIcon || <AlertCircle size={32} />}
             </div>
             <div>
               <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{title}</h4>
@@ -91,12 +102,17 @@ export const ConfirmBubble = ({
                 onConfirm();
                 setIsOpen(false);
               }}
-              className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-wider bg-red-600 text-white shadow-lg shadow-red-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+              className={cn(
+                "w-full h-14 rounded-2xl text-sm font-black uppercase tracking-wider text-white shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2",
+                variant === 'warning' && "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20",
+                variant === 'emerald' && "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20",
+                variant === 'danger' && "bg-red-600 hover:bg-red-700 shadow-red-500/20"
+              )}
             >
               {isLoading ? (
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                <Trash2 size={18} />
+                confirmIcon || <Trash2 size={18} />
               )}
               {confirmLabel}
             </button>

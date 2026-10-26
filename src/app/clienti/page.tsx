@@ -7,8 +7,8 @@ const supabase = createClient();
 import { Cliente, Patente } from '@/lib/database.types';
 import { Modal } from '@/components/Modal';
 import { SchedaClienteForm } from '@/components/forms/SchedaClienteForm';
-import { deleteClienteAction } from '@/actions/clienti';
-import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2, Trash2, Archive, Users } from 'lucide-react';
+import { deleteClienteAction, archiveClienteAction } from '@/actions/clienti';
+import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2, Trash2, Archive, Users, RotateCcw } from 'lucide-react';
 import { isAfter, isBefore, isSameDay, startOfDay, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
@@ -170,11 +170,16 @@ export default function ClientiPage() {
                   : null;
                 const initials = `${cliente.nome[0] ?? ''}${cliente.cognome[0] ?? ''}`.toUpperCase();
 
+                const today = startOfDay(new Date());
+                const examDate = (cliente as any).sessioni_esame?.data ? startOfDay(parseISO((cliente as any).sessioni_esame.data)) : null;
+                const isPastExam = examDate && isBefore(examDate, today);
+                const isEffectivelyArchived = !!(cliente.archiviato || isPastExam);
+
                 return (
                 <div 
                   key={cliente.id}
                   onClick={() => router.push(`/clienti/${cliente.id}`)}
-                  className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/5 transition-all text-left pr-14"
+                  className="relative bg-white dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/5 transition-all text-left pr-24"
                 >
                   <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
                     <div className="w-12 h-12 rounded-xl bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 font-bold text-lg flex items-center justify-center shrink-0 shadow-inner">
@@ -207,11 +212,48 @@ export default function ClientiPage() {
                     </div>
                   </div>
 
-                  <div className="absolute top-3 right-3 z-10">
+                  <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                    {/* Tasto Archivia / Ripristina Pratica */}
+                    <ConfirmBubble
+                      title={isEffectivelyArchived ? "Ripristina Pratica" : "Archivia Pratica"}
+                      message={
+                        isEffectivelyArchived 
+                          ? `Vuoi ripristinare la pratica di ${cliente.cognome} ${cliente.nome}? Tornerà visibile nell'elenco dei clienti attivi.`
+                          : `Vuoi archiviare la pratica di ${cliente.cognome} ${cliente.nome}? Verrà spostata nella sezione Archivio e non comparirà più tra i clienti attivi.`
+                      }
+                      confirmLabel={isEffectivelyArchived ? "Ripristina" : "Archivia"}
+                      variant={isEffectivelyArchived ? "emerald" : "warning"}
+                      headerIcon={isEffectivelyArchived ? <RotateCcw size={32} /> : <Archive size={32} />}
+                      confirmIcon={isEffectivelyArchived ? <RotateCcw size={18} /> : <Archive size={18} />}
+                      onConfirm={async () => {
+                        const result = await archiveClienteAction(cliente.id, !isEffectivelyArchived);
+                        if (result.success) {
+                          await fetchData();
+                        } else {
+                          alert(result.error || "Errore durante l'archiviazione.");
+                        }
+                      }}
+                      trigger={
+                        <button
+                          className={cn(
+                            "p-1.5 rounded-lg transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80",
+                            isEffectivelyArchived 
+                              ? "text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-900/50" 
+                              : "text-zinc-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-200 dark:hover:border-amber-900/50"
+                          )}
+                          title={isEffectivelyArchived ? "Ripristina pratica" : "Archivia pratica"}
+                        >
+                          {isEffectivelyArchived ? <RotateCcw size={16} /> : <Archive size={16} />}
+                        </button>
+                      }
+                    />
+
+                    {/* Tasto Cestino / Elimina Cliente */}
                     <ConfirmBubble
                       title="Elimina Cliente"
                       message="Sei sicuro di voler eliminare questo cliente? L'azione è definitiva."
                       confirmLabel="Elimina"
+                      variant="danger"
                       onConfirm={async () => {
                         const result = await deleteClienteAction(cliente.id);
                         if (result.success) {
