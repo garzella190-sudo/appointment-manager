@@ -7,6 +7,7 @@ import { Loader2, Phone, Mail, BadgeCheck, AlertCircle, Trash2 } from 'lucide-re
 import { useToast } from '@/hooks/useToast';
 import { Cliente, Patente, TipoPatente, TipoCambio } from '@/lib/database.types';
 import Select from './Select';
+import PatentePicker from './PatentePicker';
 import { ConfirmBubble } from '../ConfirmBubble';
 import { 
   createClienteAction, 
@@ -197,12 +198,10 @@ export const SchedaClienteForm = ({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className={LABEL_CLS}>Patente Richiesta</label>
-          <Select
-            searchable={true}
+          <PatentePicker
             options={sortedPatenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
             value={form.patente_richiesta_id || ''}
             onChange={(val) => setForm(prev => ({ ...prev, patente_richiesta_id: val }))}
-            icon={BadgeCheck}
             placeholder="Seleziona Patente"
           />
         </div>
