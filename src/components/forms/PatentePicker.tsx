@@ -60,7 +60,7 @@ export const PatentePicker = ({
 
   const modal = isOpen && mounted ? createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-4"
       onClick={handleClose}
     >
       {/* Backdrop */}
