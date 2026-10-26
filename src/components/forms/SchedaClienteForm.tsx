@@ -58,6 +58,12 @@ export const SchedaClienteForm = ({
   const [serverError, setServerError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  const sortedPatenti = [...patenti].sort((a, b) => {
+    if (a.tipo === 'B') return -1;
+    if (b.tipo === 'B') return 1;
+    return (a.nome_visualizzato || a.tipo).localeCompare(b.nome_visualizzato || b.tipo, 'it');
+  });
+
   const selectedPatente = patenti.find(p => p.id === form.patente_richiesta_id);
   const isMotoPatente = selectedPatente && ['AM', 'A1', 'A2', 'A'].includes(selectedPatente.tipo.toUpperCase());
 
@@ -193,7 +199,7 @@ export const SchedaClienteForm = ({
           <label className={LABEL_CLS}>Patente Richiesta</label>
           <Select
             searchable={true}
-            options={patenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
+            options={sortedPatenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
             value={form.patente_richiesta_id || ''}
             onChange={(val) => setForm(prev => ({ ...prev, patente_richiesta_id: val }))}
             icon={BadgeCheck}

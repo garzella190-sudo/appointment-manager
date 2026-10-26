@@ -18,6 +18,7 @@ import Select from '@/components/forms/Select';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
 import DatePickerModal from '@/components/modals/DatePickerModal';
+import { ConfirmMultiInstructorModal } from '@/components/modals/ConfirmMultiInstructorModal';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Home() {
@@ -37,6 +38,15 @@ export default function Home() {
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [confirmMultiModal, setConfirmMultiModal] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    onConfirm: () => {}
+  });
 
   // Popup state
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -339,6 +349,19 @@ export default function Home() {
                 ]}
                 value={selectedInstructorId}
                 onChange={(val) => {
+                  if (val === '' && selectedInstructorId !== '') {
+                    setConfirmMultiModal({
+                      isOpen: true,
+                      title: "Visualizza Tutti gli Istruttori",
+                      message: "Sei sicuro di voler visualizzare le guide di tutti gli istruttori contemporaneamente?",
+                      onConfirm: () => {
+                        setSelectedInstructorId('');
+                        setShowFilter(false);
+                        setConfirmMultiModal(prev => ({ ...prev, isOpen: false }));
+                      }
+                    });
+                    return;
+                  }
                   setSelectedInstructorId(val);
                   setShowFilter(false); // Nascondi dopo aver scelto
                 }}
@@ -547,6 +570,14 @@ export default function Home() {
         onClose={() => setIsDatePickerOpen(false)}
         selectedDate={currentDate}
         onSelect={(date) => setCurrentDate(date)}
+      />
+
+      <ConfirmMultiInstructorModal
+        isOpen={confirmMultiModal.isOpen}
+        title={confirmMultiModal.title}
+        message={confirmMultiModal.message}
+        onConfirm={confirmMultiModal.onConfirm}
+        onCancel={() => setConfirmMultiModal(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

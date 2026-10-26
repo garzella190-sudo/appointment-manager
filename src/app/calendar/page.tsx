@@ -47,6 +47,7 @@ import DetailsModal from '@/components/modals/DetailsModal';
 import ExamSessionModal from '@/components/modals/ExamSessionModal';
 
 import DatePickerModal from '@/components/modals/DatePickerModal';
+import { ConfirmMultiInstructorModal } from '@/components/modals/ConfirmMultiInstructorModal';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 import { ConflictsAlert } from '@/components/ConflictsAlert';
 
@@ -136,6 +137,15 @@ export default function CalendarPage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [confirmMultiModal, setConfirmMultiModal] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    onConfirm: () => {}
+  });
 
   // Usa l'hook per gestire responsive in modo solido dopo l'idratazione
   const [mounted, setMounted] = useState(false);
@@ -945,7 +955,23 @@ export default function CalendarPage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-1.5">
                   <button
-                    onClick={() => { setSelectedInstructorIds([]); setViewMode('resource'); }}
+                    onClick={() => {
+                      if (selectedInstructorIds.length === 1) {
+                        setConfirmMultiModal({
+                          isOpen: true,
+                          title: "Visualizza Più Istruttori",
+                          message: "Sei sicuro di voler visualizzare il calendario di tutti gli istruttori contemporaneamente? La schermata passerà alla vista a colonne.",
+                          onConfirm: () => {
+                            setSelectedInstructorIds([]);
+                            setViewMode('resource');
+                            setConfirmMultiModal(prev => ({ ...prev, isOpen: false }));
+                          }
+                        });
+                        return;
+                      }
+                      setSelectedInstructorIds([]);
+                      setViewMode('resource');
+                    }}
                     className={cn(
                       "px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
                       selectedInstructorIds.length === 0
@@ -965,25 +991,39 @@ export default function CalendarPage() {
                         <button
                           key={i.id}
                           onClick={() => {
-                              setSelectedInstructorIds(prev => {
-                                let next: string[];
-                                if (prev.length === 0) {
-                                  next = [i.id];
-                                } else if (prev.includes(i.id)) {
-                                  next = prev.filter(id => id !== i.id);
-                                  if (next.length === 0) next = [];
-                                } else {
-                                  next = [...prev, i.id];
-                                }
-                                
-                                // Auto-switch view mode: se 1 solo istruttore → week, altrimenti → resource
-                                if (next.length === 1) {
-                                  setViewMode('week');
-                                } else {
+                            if (selectedInstructorIds.length === 1 && !selectedInstructorIds.includes(i.id)) {
+                              setConfirmMultiModal({
+                                isOpen: true,
+                                title: "Visualizza Più Istruttori",
+                                message: `Vuoi visualizzare il calendario di più istruttori contemporaneamente? I calendari verranno affiancati nella vista a colonne.`,
+                                onConfirm: () => {
+                                  setSelectedInstructorIds(prev => [...prev, i.id]);
                                   setViewMode('resource');
+                                  setConfirmMultiModal(prev => ({ ...prev, isOpen: false }));
                                 }
-                                return next;
                               });
+                              return;
+                            }
+
+                            setSelectedInstructorIds(prev => {
+                              let next: string[];
+                              if (prev.length === 0) {
+                                next = [i.id];
+                              } else if (prev.includes(i.id)) {
+                                next = prev.filter(id => id !== i.id);
+                                if (next.length === 0) next = [];
+                              } else {
+                                next = [...prev, i.id];
+                              }
+                              
+                              // Auto-switch view mode: se 1 solo istruttore → week, altrimenti → resource
+                              if (next.length === 1) {
+                                setViewMode('week');
+                              } else {
+                                setViewMode('resource');
+                              }
+                              return next;
+                            });
                           }}
                           className={cn(
                             "px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center gap-1.5",
@@ -1008,7 +1048,24 @@ export default function CalendarPage() {
                     })}
                 </div>
                 <button
-                  onClick={() => { setViewMode('resource'); setShowFilter(false); }}
+                  onClick={() => {
+                    if (selectedInstructorIds.length === 1) {
+                      setConfirmMultiModal({
+                        isOpen: true,
+                        title: "Visualizza Più Istruttori",
+                        message: "Vuoi visualizzare il calendario di tutti gli istruttori contemporaneamente? La schermata passerà alla vista a colonne.",
+                        onConfirm: () => {
+                          setSelectedInstructorIds([]);
+                          setViewMode('resource');
+                          setShowFilter(false);
+                          setConfirmMultiModal(prev => ({ ...prev, isOpen: false }));
+                        }
+                      });
+                      return;
+                    }
+                    setViewMode('resource');
+                    setShowFilter(false);
+                  }}
                   className="h-10 px-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-md border border-indigo-500 active:scale-95 transition-all flex items-center gap-2 justify-center w-full sm:w-auto"
                 >
                   <Users size={14} />
@@ -1488,6 +1545,14 @@ export default function CalendarPage() {
         }}
         selectedDate={currentDate}
         onSelect={(date) => setCurrentDate(date)}
+      />
+
+      <ConfirmMultiInstructorModal
+        isOpen={confirmMultiModal.isOpen}
+        title={confirmMultiModal.title}
+        message={confirmMultiModal.message}
+        onConfirm={confirmMultiModal.onConfirm}
+        onCancel={() => setConfirmMultiModal(prev => ({ ...prev, isOpen: false }))}
       />
     </>
   );

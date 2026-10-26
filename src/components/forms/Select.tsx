@@ -34,7 +34,9 @@ const Select = ({
 }: SelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Normalize options to a standard format
   const normalizedOptions = options.map(opt => {
@@ -53,6 +55,8 @@ const Select = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setSearchActive(false);
+        setQuery('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -76,13 +80,14 @@ const Select = ({
     onChange(val);
     setIsOpen(false);
     setQuery('');
+    setSearchActive(false);
   };
 
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen); if (isOpen) { setSearchActive(false); setQuery(''); } }}
         className={cn(
           "w-full bg-[#F4F4F4] dark:bg-zinc-900 border-transparent rounded-[16px] px-4 flex items-center h-12 text-sm font-semibold transition-all outline-none focus:ring-4 focus:ring-blue-500/5",
           isOpen ? "border-blue-400 ring-4 ring-blue-500/5" : "",
@@ -109,17 +114,26 @@ const Select = ({
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
-                  autoFocus
+                  ref={searchInputRef}
                   type="text"
-                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-xl pl-9 pr-10 py-2.5 text-base font-semibold outline-none focus:ring-2 focus:ring-blue-500/10"
+                  inputMode={searchActive ? 'text' : 'none'}
+                  readOnly={!searchActive}
+                  autoFocus
+                  className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-none rounded-xl pl-9 pr-10 py-2.5 text-base font-semibold outline-none focus:ring-2 focus:ring-blue-500/10 cursor-pointer"
                   placeholder="Cerca..."
                   value={query}
+                  onClick={() => setSearchActive(true)}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    setSearchActive(true);
+                    searchInputRef.current?.focus();
+                  }}
                   onChange={(e) => setQuery(e.target.value)}
                 />
                 {query && (
                   <button 
                     type="button"
-                    onClick={() => setQuery('')}
+                    onClick={() => { setQuery(''); setSearchActive(false); }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 transition-colors"
                   >
                     <X size={14} />

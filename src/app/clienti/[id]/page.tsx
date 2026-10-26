@@ -365,7 +365,13 @@ export default function SchedaClientePage() {
                       <label htmlFor="patente" className={LABEL_CLS}>Patente Richiesta</label>
                       <Select
                         searchable={true}
-                        options={patenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
+                        options={[...patenti]
+                          .sort((a, b) => {
+                            if (a.tipo === 'B') return -1;
+                            if (b.tipo === 'B') return 1;
+                            return (a.nome_visualizzato || a.tipo).localeCompare(b.nome_visualizzato || b.tipo, 'it');
+                          })
+                          .map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
                         value={formState.patente_richiesta_id}
                         onChange={(val) => setFormState(p => ({ ...p, patente_richiesta_id: val }))}
                         placeholder="Seleziona Patente"
