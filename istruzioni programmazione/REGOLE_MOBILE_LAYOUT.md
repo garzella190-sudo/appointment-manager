@@ -108,6 +108,32 @@ un altro modo?* Se no, deve restare visibile (eventualmente compattata).
 
 ---
 
+## 6-ter. Agenda — raggruppamento per istruttore e dati sempre visibili
+
+- Il tasto **people** apre un picker **multi-istruttore** (stesso `OptionPicker` in modalità
+  `multiple`): si spuntano più nomi, il modale resta aperto e mostra `Conferma (n)`.
+  Nessuna selezione = tutti gli istruttori. Il tasto porta un **badge col conteggio** attivo.
+- Le guide sono **raggruppate per istruttore**: intestazione con pallino del colore, nome in
+  maiuscolo, conteggio e linea separatrice; dentro il gruppo **ordine cronologico**
+  (`appointment_time`), gruppi in ordine alfabetico italiano, non assegnate nel gruppo
+  "Non assegnato".
+- La griglia delle card resta `grid grid-cols-1` **dentro ogni gruppo**: il raggruppamento non
+  deve reintrodurre righe orizzontali o colonne implicite (regola 1).
+
+**Regola dei dettagli minimi (obbligatoria):** senza aprire l'appuntamento devono essere
+leggibili **orario, patente e veicolo in uso**.
+
+| Dove | Come |
+|---|---|
+| Agenda | chip in card: `ORARIO` + `PAT. X` + `🚗 Nome (TARGA)` |
+| Calendario, vista normale | riga 2 del blocco: `09:30 — 10:30 · A · 🚗 AG723AG` |
+| Calendario, vista compressa (più colonne) | resta l'**orario** e la **targa** |
+
+Il veicolo si stampa con la **targa** se presente (`Liberty (ES59409)` → `ES59409`), altrimenti
+col nome; i valori vuoti o `Nessuno` non producono alcun chip.
+
+---
+
 ## 7. Stessi controlli = stesso gruppo tra pagine
 
 Il gruppo `‹ OGGI › | 📅` deve essere **identico** su Agenda e Calendario: stessi tasti,
@@ -193,6 +219,8 @@ Rimuovere sempre script temporanei, route di prova e screenshot generati.
 - [ ] Tutti i tasti ≥ 32px (36–40 su mobile)
 - [ ] Nessun wrapper `absolute` a larghezza piena senza `pointer-events-none`
 - [ ] Azioni necessarie visibili anche sotto 640px
+- [ ] Agenda/calendario mostrano **orario, patente e veicolo** senza aprire l'appuntamento
+- [ ] Le card dell'agenda restano raggruppate per istruttore, `grid-cols-1` per gruppo
 - [ ] Misura a 320/360/390/412/430px: 0 elementi fuori schermo
 - [ ] `npm run build` e `npx tsc --noEmit` puliti
 - [ ] Conteggio ESLint non peggiorato rispetto a `HEAD`

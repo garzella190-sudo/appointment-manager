@@ -14,11 +14,10 @@ import { ConflictsAlert } from '@/components/ConflictsAlert';
 import NewAppointmentModal from '@/components/modals/NewAppointmentModal';
 import DetailsModal from '@/components/modals/DetailsModal';
 import ExamSessionModal from '@/components/modals/ExamSessionModal';
-import Select from '@/components/forms/Select';
+import { OptionPicker } from '@/components/forms/OptionPicker';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
 import DatePickerModal from '@/components/modals/DatePickerModal';
-import { ConfirmMultiInstructorModal } from '@/components/modals/ConfirmMultiInstructorModal';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Home() {
@@ -30,23 +29,14 @@ export default function Home() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [showFilter, setShowFilter] = useState(false);
   const lastScrollY = useRef(0);
   const hasAutoScrolled = useRef(false);
   const [hasAppliedAutoFilter, setHasAppliedAutoFilter] = useState(false);
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
-  const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
+  const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
+  const [isInstructorPickerOpen, setIsInstructorPickerOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [confirmMultiModal, setConfirmMultiModal] = useState<{
-    isOpen: boolean;
-    title?: string;
-    message?: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    onConfirm: () => {}
-  });
 
   // Popup state
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -148,7 +138,7 @@ export default function Home() {
   // Auto-filter: si applica a qualunque ruolo se l'account è associato a un istruttore
   useEffect(() => {
     if (!authLoading && istruttoreId && !hasAppliedAutoFilter) {
-      setSelectedInstructorId(istruttoreId);
+      setSelectedInstructorIds([istruttoreId]);
       setHasAppliedAutoFilter(true);
     } else if (!authLoading && !hasAppliedAutoFilter) {
       setHasAppliedAutoFilter(true); // marca comunque per evitare loop
@@ -197,8 +187,8 @@ export default function Home() {
   const filteredAppointments = useMemo(() => {
     let result = appointments;
 
-    if (selectedInstructorId) {
-      result = result.filter(a => a.trainer_id === selectedInstructorId);
+    if (selectedInstructorIds.length > 0) {
+      result = result.filter(a => selectedInstructorIds.includes(a.trainer_id));
     }
     
     if (searchQuery) {
@@ -211,7 +201,29 @@ export default function Home() {
     }
     
     return result;
-  }, [appointments, searchQuery, selectedInstructorId]);
+  }, [appointments, searchQuery, selectedInstructorIds]);
+
+  // Guide raggruppate per istruttore, ognuna in ordine cronologico
+  const gruppiIstruttori = useMemo(() => {
+    const mappa = new Map<string, { id: string; nome: string; colore?: string; items: Appointment[] }>();
+
+    for (const apt of filteredAppointments) {
+      const chiave = apt.trainer_id || 'non-assegnato';
+      if (!mappa.has(chiave)) {
+        mappa.set(chiave, {
+          id: chiave,
+          nome: apt.istruttore?.name?.trim() || 'Non assegnato',
+          colore: apt.istruttore?.color,
+          items: [],
+        });
+      }
+      mappa.get(chiave)!.items.push(apt);
+    }
+
+    const gruppi = [...mappa.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+    gruppi.forEach(g => g.items.sort((a, b) => a.appointment_time.localeCompare(b.appointment_time)));
+    return gruppi;
+  }, [filteredAppointments]);
 
   const handleSuccess = () => {
     setIsModalOpen(false);
@@ -227,7 +239,6 @@ export default function Home() {
     const currentY = e.currentTarget.scrollTop;
     if (currentY > lastScrollY.current && currentY > 50) {
       if (showSearch) setShowSearch(false);
-      if (showFilter) setShowFilter(false);
     }
     lastScrollY.current = currentY;
   };
@@ -282,18 +293,23 @@ export default function Home() {
 
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <button
-                onClick={() => { setShowSearch(!showSearch); setShowFilter(false); }}
+                onClick={() => { setShowSearch(!showSearch); }}
                 title="Cerca appuntamento"
                 className={cn("h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0", showSearch ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-inner" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
               >
                 <Search size={16} />
               </button>
               <button
-                onClick={() => { setShowFilter(!showFilter); setShowSearch(false); }}
-                title="Filtra Istruttori"
-                className={cn("h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0", showFilter || selectedInstructorId ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
+                onClick={() => { setIsInstructorPickerOpen(true); setShowSearch(false); }}
+                title="Scegli gli istruttori da visualizzare"
+                className={cn("relative h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0", selectedInstructorIds.length > 0 ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
               >
                 <Users size={16} />
+                {selectedInstructorIds.length > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-sky-500 text-white text-[9px] font-black flex items-center justify-center leading-none">
+                    {selectedInstructorIds.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => setIsModalOpen(true)}
@@ -345,7 +361,7 @@ export default function Home() {
 
         <div className={cn(
           "transition-all duration-300 ease-in-out origin-top",
-          (showSearch || showFilter) ? "max-h-[400px] opacity-100 mb-3 overflow-visible" : "max-h-0 opacity-0 mb-0 overflow-hidden"
+          showSearch ? "max-h-[400px] opacity-100 mb-3 overflow-visible" : "max-h-0 opacity-0 mb-0 overflow-hidden"
         )}>
           {showSearch && (
             <div className="relative group w-full">
@@ -357,42 +373,6 @@ export default function Home() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full h-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all text-sm shadow-sm appearance-none"
-              />
-            </div>
-          )}
-          {showFilter && (
-            <div className="w-full">
-              <Select
-                options={[
-                  { id: '', label: 'Tutti gli Istruttori' },
-                  ...[...istruttori]
-                    .sort((a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'))
-                    .map(i => ({ 
-                      id: i.id, 
-                      label: `${i.cognome} ${i.nome}`
-                    }))
-                ]}
-                value={selectedInstructorId}
-                onChange={(val) => {
-                  if (val === '' && selectedInstructorId !== '') {
-                    setConfirmMultiModal({
-                      isOpen: true,
-                      title: "Visualizza Tutti gli Istruttori",
-                      message: "Sei sicuro di voler visualizzare le guide di tutti gli istruttori contemporaneamente?",
-                      onConfirm: () => {
-                        setSelectedInstructorId('');
-                        setShowFilter(false);
-                        setConfirmMultiModal(prev => ({ ...prev, isOpen: false }));
-                      }
-                    });
-                    return;
-                  }
-                  setSelectedInstructorId(val);
-                  setShowFilter(false); // Nascondi dopo aver scelto
-                }}
-                icon={Users}
-                placeholder="Filtra Istruttore"
-                searchable
               />
             </div>
           )}
@@ -417,8 +397,24 @@ export default function Home() {
               <p className="text-sm font-medium">Sincronizzazione...</p>
             </div>
           ) : filteredAppointments.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3">
-              {filteredAppointments.map((apt, index) => {
+            <div className="space-y-5">
+              {gruppiIstruttori.map((gruppo, groupIdx) => (
+                <div key={gruppo.id} className="space-y-2">
+                  {/* Intestazione istruttore */}
+                  <div className="flex items-center gap-2 px-1">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
+                    />
+                    <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 truncate">
+                      {gruppo.nome}
+                    </h3>
+                    <span className="text-[10px] font-bold text-zinc-400 shrink-0">{gruppo.items.length}</span>
+                    <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+              {gruppo.items.map((apt, index) => {
                 const initials = apt.client_name
                   .split(' ')
                   .filter(Boolean)
@@ -430,7 +426,7 @@ export default function Home() {
                 const now = new Date();
                 const isToday = isSameDay(currentDate, now);
                 const currentTimeStr = format(now, 'HH:mm');
-                const nextApt = filteredAppointments[index + 1];
+                const nextApt = gruppo.items[index + 1];
                 
                 let insertLineBefore = false;
                 let insertLineAfter = false;
@@ -444,7 +440,7 @@ export default function Home() {
                 }
 
                 const CurrentTimeLine = ({ time }: { time: string }) => (
-                  <div className="flex items-center gap-2 my-1 -mx-2 px-2 relative" id={insertLineAfter || insertLineBefore ? "current-time-line" : undefined}>
+                  <div className="flex items-center gap-2 my-1 -mx-2 px-2 relative" id={(insertLineAfter || insertLineBefore) && groupIdx === 0 ? "current-time-line" : undefined}>
                     <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] border-2 border-white dark:border-zinc-900 z-10 shrink-0"></div>
                     <div className="flex-1 h-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] rounded-full"></div>
                     <div className="text-[10px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800 shadow-sm shrink-0">
@@ -520,6 +516,16 @@ export default function Home() {
                                 Pat. {apt.license_type}
                               </span>
                             )}
+                            {apt.vehicle_id && apt.vehicle_id.trim() !== '' && apt.vehicle_id !== 'Nessuno' && (
+                              <span
+                                className="flex items-center gap-1 px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider min-w-0 max-w-full"
+                                title={apt.vehicle_id}
+                                style={apt.vehicle_color ? { color: apt.vehicle_color } : undefined}
+                              >
+                                <Car size={10} className="shrink-0" />
+                                <span className="truncate">{apt.vehicle_id}</span>
+                              </span>
+                            )}
                           </div>
                           {apt.notes && apt.notes.trim() !== '' && (
                             <div className="flex items-center gap-1 mt-2 text-zinc-400 italic">
@@ -551,6 +557,9 @@ export default function Home() {
                   </React.Fragment>
                 );
               })}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="p-12 text-center bg-zinc-50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-3">
@@ -597,12 +606,23 @@ export default function Home() {
         onSelect={(date) => setCurrentDate(date)}
       />
 
-      <ConfirmMultiInstructorModal
-        isOpen={confirmMultiModal.isOpen}
-        title={confirmMultiModal.title}
-        message={confirmMultiModal.message}
-        onConfirm={confirmMultiModal.onConfirm}
-        onCancel={() => setConfirmMultiModal(prev => ({ ...prev, isOpen: false }))}
+      {/* Selettore istruttori (multi) — aperto dal tasto people */}
+      <OptionPicker
+        options={[...istruttori]
+          .sort((a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'))
+          .map(i => ({ id: i.id, label: `${i.cognome} ${i.nome}`.trim() }))}
+        title="Istruttori"
+        searchPlaceholder="Cerca istruttore..."
+        icon={<Users size={18} className="text-purple-500" />}
+        multiple
+        selectedValues={selectedInstructorIds}
+        onToggle={(id) => setSelectedInstructorIds(prev =>
+          prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        )}
+        isOpen={isInstructorPickerOpen}
+        onOpenChange={setIsInstructorPickerOpen}
+        hideTrigger
+        confirmLabel="Conferma"
       />
     </div>
   );

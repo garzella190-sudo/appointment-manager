@@ -3,7 +3,8 @@
 Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco veicoli, ottimizzata per un utilizzo "Mobile-First" ed ultra-compatto.
 
 ## 🚀 Funzionalità Principali
-- **Agenda Giornaliera**: Vista lista con scroll automatico all'orario attuale.
+- **Agenda Giornaliera**: Vista lista con scroll automatico all'orario attuale, **guide raggruppate per istruttore** (ordine cronologico dentro il gruppo) e **filtro multi-istruttore** dal tasto *people*.
+- **Dati sempre visibili**: senza aprire l'appuntamento si leggono subito **orario, patente e veicolo in uso**, sia in Agenda (chip) sia in Calendario (riga del blocco).
 - **Calendario Interattivo**: Griglia multi-giorno (1, 3, 5, 7 giorni) con granularità variabile (15, 30, 60 minuti).
 - **Gestione Master**: Anagrafica clienti, istruttori e veicoli con controllo scadenze.
 - **PWA Ready**: Installabile su dispositivi mobili con supporto offline di base.
@@ -39,7 +40,7 @@ Le regole di scelta del mezzo sono in
 - Fonte di verità: `patenti.veicoli_abilitati`.
 - Prima la memoria del cliente, poi la patente richiesta, poi il default istruttore.
 - Patenti A: mai auto. Nessun appuntamento senza veicolo.
-- Selettore veicolo = modale `PatentePicker`.
+- Selettore veicolo = modale `VehiclePicker` (base condivisa `OptionPicker`).
 
 
 ## 📦 Installazione

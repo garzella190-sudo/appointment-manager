@@ -13,8 +13,9 @@ export interface PickerOption {
 
 interface OptionPickerProps {
   options: PickerOption[];
-  value: string;
-  onChange: (val: string) => void;
+  /** Selezione singola. */
+  value?: string;
+  onChange?: (val: string) => void;
   /** Titolo del modale (es. "Veicolo"). */
   title: string;
   placeholder?: string;
@@ -24,13 +25,25 @@ interface OptionPickerProps {
   /** Icona piccola del tasto che apre il modale. */
   triggerIcon?: React.ReactNode;
   emptyLabel?: string;
+  /** Selezione multipla: il modale resta aperto e mostra le spunte. */
+  multiple?: boolean;
+  selectedValues?: string[];
+  onToggle?: (id: string) => void;
+  /** Etichetta del tasto primario in modalità multipla. */
+  confirmLabel?: string;
+  /** Apertura controllata dall'esterno (insieme a onOpenChange). */
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Nasconde il tasto interno: il modale si apre da un comando esterno. */
+  hideTrigger?: boolean;
 }
 
 /**
- * Selettore generico in modale (bottom-sheet su mobile, card centrata su desktop).
+ * Selettore generico in modale (sempre centrato a schermo).
  *
- * Base condivisa di `PatentePicker` e `VehiclePicker`: stessa grafica, stessa ricerca,
- * stesso comportamento. Non duplicare questo markup in altri componenti.
+ * Base condivisa di `PatentePicker`, `VehiclePicker` e del filtro istruttori:
+ * stessa grafica, stessa ricerca, stesso comportamento. Non duplicare questo markup.
+ * Supporta selezione singola (`value`/`onChange`) e multipla (`multiple`+`onToggle`).
  */
 export const OptionPicker = ({
   options,
@@ -42,23 +55,44 @@ export const OptionPicker = ({
   icon,
   triggerIcon,
   emptyLabel = 'Nessun risultato',
+  multiple = false,
+  selectedValues = [],
+  onToggle,
+  confirmLabel = 'Conferma',
+  isOpen: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
 }: OptionPickerProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const isOpen = isControlled ? !!controlledOpen : internalOpen;
+  const setIsOpen = (v: boolean) => {
+    if (!isControlled) setInternalOpen(v);
+    onOpenChange?.(v);
+  };
   const [query, setQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
 
+  // Guardia di idratazione: il portale può essere creato solo lato client
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   const selected = options.find(o => o.id === value);
+  const selectedCount = selectedValues.length;
+  const isChecked = (id: string) => multiple ? selectedValues.includes(id) : id === value;
 
   const filtered = query.trim() === ''
     ? options
     : options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()));
 
   const handleSelect = (id: string) => {
-    onChange(id);
+    if (multiple) {
+      onToggle?.(id);
+      return; // in multipla il modale resta aperto
+    }
+    onChange?.(id);
     setIsOpen(false);
     setQuery('');
     setSearchActive(false);
@@ -137,7 +171,7 @@ export const OptionPicker = ({
             <p className="py-6 text-center text-xs text-zinc-400 italic">{emptyLabel}</p>
           ) : (
             filtered.map(opt => {
-              const isSelected = opt.id === value;
+              const isSelected = isChecked(opt.id);
               return (
                 <button
                   key={opt.id}
@@ -167,28 +201,52 @@ export const OptionPicker = ({
             })
           )}
         </div>
+
+        {/* Conferma (solo selezione multipla) */}
+        {multiple && (
+          <div className="px-3 pb-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="w-full h-12 rounded-[16px] bg-purple-600 hover:bg-purple-700 text-white text-sm font-black uppercase tracking-wider active:scale-95 transition-all"
+            >
+              {confirmLabel}{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.body
   ) : null;
 
+  const triggerLabel = multiple
+    ? (selectedCount === 0
+        ? placeholder
+        : selectedCount === 1
+          ? (options.find(o => o.id === selectedValues[0])?.label || placeholder)
+          : `${selectedCount} selezionati`)
+    : (selected ? selected.label : placeholder);
+  const hasSelection = multiple ? selectedCount > 0 : !!selected;
+
   return (
     <>
-      {/* Tasto che apre il modale */}
+      {/* Tasto che apre il modale (nascosto se l'apertura è esterna) */}
+      {!hideTrigger && (
       <button
         type="button"
         onClick={() => setIsOpen(true)}
         className={cn(
           'w-full bg-[#F4F4F4] dark:bg-zinc-900 rounded-[16px] px-4 h-12 flex items-center gap-3 text-sm font-semibold transition-all outline-none focus:ring-4 focus:ring-purple-500/5',
-          selected ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'
+          hasSelection ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'
         )}
       >
         {triggerIcon || icon}
         <span className="flex-1 text-left truncate">
-          {selected ? selected.label : placeholder}
+          {triggerLabel}
         </span>
         <ChevronRight size={16} className="text-zinc-400 shrink-0" />
       </button>
+      )}
 
       {modal}
     </>

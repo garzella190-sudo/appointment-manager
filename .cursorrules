@@ -17,6 +17,8 @@
 - Interazioni: 'readOnly' su input datepicker.
 - Modali e picker SEMPRE centrati a schermo ('items-center' non 'items-end'): mai ancorati in basso.
 - Calendario vista risorse (piu' istruttori): i giorni sono AFFIANCATI IN ORIZZONTALE (fascia giorni + fascia istruttori come sotto-colonne). Larghezza minima per colonna 132px istruttore / 110px giorno, con scroll orizzontale invece di compressione. Su mobile massimo 3 istruttori (bloccato con messaggio; 'Tutti' = primi 3). Separatore verticale marcato (border-l-2) all'inizio di ogni gruppo-giorno, in header e in ogni riga.
+- Agenda (home): il tasto people apre il picker MULTI-istruttore (OptionPicker multiple). Le guide sono raggruppate per istruttore (intestazione con colore+nome+conteggio) e in ordine CRONOLOGICO dentro ogni gruppo.
+- Dettagli sempre visibili senza aprire l'appuntamento: ORARIO, PATENTE e VEICOLO (in agenda come chip, nel calendario nella riga orario/colonna compressa).
 
 ## Layout Responsivo (OBBLIGATORIO)
 Vedi 'istruzioni programmazione/REGOLE_MOBILE_LAYOUT.md' per il dettaglio e la procedura di misura.

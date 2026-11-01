@@ -3,7 +3,7 @@
 Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-Compact".
 
 ## 🛣️ Percorsi App Router (Core)
-- `/src/app/page.tsx` -> **Agenda** (Home Page, scroll automatico a "Now").
+- `/src/app/page.tsx` -> **Agenda** (Home Page, scroll automatico a "Now", guide raggruppate per istruttore + picker multi-istruttore dal tasto *people*).
 - `/src/app/calendar/page.tsx` -> **Calendario** (Griglia interattiva con granularità 15/30/60m).
 - `/src/app/clienti/page.tsx` -> Lista e gestione anagrafiche.
 - `/src/app/esami/page.tsx` -> **Esami** (Creazione sedute, assegnazione allievi pronti e istruttori).
@@ -34,5 +34,7 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 ## 🧱 Componenti trasversali condivisi
 - `/src/components/Modal.tsx` -> Modale unico dell'app (portale, `z-[9999]`): chiudibile con ✕ `shrink-0`, titolo e padding adattivi su mobile. Ogni nuovo modale DEVE usarlo.
 - `/src/components/forms/Select.tsx` -> Select custom condiviso.
+- `/src/components/forms/OptionPicker.tsx` -> Base di **tutti** i picker (tasto + modale centrato): supporta singola e **multipla** selezione (`multiple` / `selectedValues` / `onToggle`), apertura controllata (`isOpen` / `onOpenChange`) e `hideTrigger`. Patente, veicolo e istruttori passano da qui.
+- `/src/components/DraggableAppointment.tsx` -> Card del calendario: in riga mostra **orario, patente e veicolo** (targa preferita); in vista compressa resta la targa.
 - Gruppo `‹ OGGI › | data` -> identico su `/` e `/calendar` (148x44 mobile, 192x40 desktop, centrato).
 

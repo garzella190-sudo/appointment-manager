@@ -89,13 +89,23 @@ Architettura a tre livelli, **nessun dropdown** e nessuna duplicazione:
 
 | Componente | Ruolo |
 |---|---|
-| `forms/OptionPicker.tsx` | Base condivisa: tasto + modale con ricerca (bottom-sheet su mobile, card centrata su desktop), colori, chiusura con Esc/backdrop |
+| `forms/OptionPicker.tsx` | Base condivisa: tasto + modale **centrato** con ricerca, colori, chiusura con Esc/backdrop. Supporta anche selezione **multipla** (`multiple`, `selectedValues`, `onToggle`, `confirmLabel`) e apertura controllata (`isOpen` / `onOpenChange` / `hideTrigger`) — usata dal picker istruttori in Agenda |
 | `forms/PatentePicker.tsx` | Wrapper per la patente (titolo "Patente Richiesta", icona badge, `Cerca patente...`) |
 | `forms/VehiclePicker.tsx` | Wrapper per il veicolo (titolo "Veicolo", icona auto, `Cerca veicolo...`) |
 
 Regole:
 - In `AppointmentForm` i campi **PATENTE** e **VEICOLO** usano questi modali, mai il `<Select>` a tendina.
 - Per un nuovo selettore sul modello "lista di opzioni con ricerca" → usare `OptionPicker`, non copiare il markup.
+  Se serve scelta multipla o apertura da un tasto esterno, usare le prop esistenti: **non** creare un secondo modale.
+
+### Visibilità del veicolo fuori dal form
+
+Il mezzo assegnato è un'informazione operativa: deve essere visibile **senza aprire** l'appuntamento.
+- **Agenda**: chip `🚗 Nome (TARGA)` nella card, accanto al chip patente.
+- **Calendario**: nella riga orario del blocco (`09:30 — 10:30 · A · 🚗 AG723AG`); nelle viste
+  compresse resta la targa, che è il dato più corto e univoco.
+- Etichetta: targa se il valore la contiene (`Nome (TARGA)`), altrimenti il nome intero;
+  `''`/`Nessuno` ⇒ nessun chip.
 
 ---
 

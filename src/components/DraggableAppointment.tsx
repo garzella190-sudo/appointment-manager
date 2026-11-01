@@ -3,7 +3,7 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle, StickyNote, Trash2, GraduationCap } from 'lucide-react';
+import { AlertTriangle, StickyNote, Trash2, GraduationCap, Car } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 import { isSameDay, parseISO, format } from 'date-fns';
@@ -50,6 +50,12 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
 
   const instructorColor = appointment.istruttore?.color || '#3b82f6';
   const instructorInitial = appointment.istruttore?.name ? appointment.istruttore.name.trim().charAt(0).toUpperCase() : '?';
+
+  // Veicolo in uso: la targa se presente (più compatta), altrimenti il nome
+  const veicoloRaw = (appointment.vehicle_id || '').trim();
+  const veicoloLabel = (!veicoloRaw || veicoloRaw.toLowerCase() === 'nessuno')
+    ? null
+    : (veicoloRaw.match(/\(([^)]+)\)/)?.[1] || veicoloRaw);
 
   return (
     <div 
@@ -124,7 +130,7 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
           )}
         </div>
         
-        {/* Riga 2: orario + tipo patente (nascosto in modalità molto compressa) */}
+        {/* Riga 2: orario + tipo patente + veicolo (nascosto in modalità molto compressa) */}
         {totalColumns === 1 && (
           <div className="flex items-center gap-1 mt-0.5 opacity-80">
             <span className={cn("font-bold text-zinc-800 dark:text-zinc-300", totalColumns > 1 ? "text-[9px]" : "text-[10px]")}>
@@ -137,8 +143,31 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
                 <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
                   {appointment.license_type}
                 </span>
+                {veicoloLabel && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-zinc-400 dark:bg-zinc-600" />
+                    <span
+                      className="flex items-center gap-0.5 min-w-0 text-[10px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400"
+                      title={veicoloRaw}
+                      style={appointment.vehicle_color ? { color: appointment.vehicle_color } : undefined}
+                    >
+                      <Car size={10} className="shrink-0" />
+                      <span className="truncate">{veicoloLabel}</span>
+                    </span>
+                  </>
+                )}
               </>
             )}
+          </div>
+        )}
+
+        {/* Modalità compressa (vista a colonne): solo veicolo essenziale */}
+        {totalColumns > 1 && veicoloLabel && (
+          <div className="flex items-center gap-0.5 mt-0.5 opacity-80 min-w-0" title={veicoloRaw}>
+            <Car size={9} className="shrink-0" style={appointment.vehicle_color ? { color: appointment.vehicle_color } : undefined} />
+            <span className="text-[9px] font-black uppercase tracking-tight truncate text-zinc-600 dark:text-zinc-400">
+              {veicoloLabel}
+            </span>
           </div>
         )}
         
