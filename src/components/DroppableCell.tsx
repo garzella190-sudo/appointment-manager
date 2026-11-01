@@ -7,9 +7,10 @@ import { cn } from '@/lib/utils';
 interface DroppableCellProps {
   id: string;
   children?: React.ReactNode;
+  className?: string;
 }
 
-export const DroppableCell = ({ id, children }: DroppableCellProps) => {
+export const DroppableCell = ({ id, children, className }: DroppableCellProps) => {
   const { isOver, setNodeRef } = useDroppable({
     id: id,
   });
@@ -19,7 +20,8 @@ export const DroppableCell = ({ id, children }: DroppableCellProps) => {
       ref={setNodeRef}
       className={cn(
         "border-r border-zinc-200 dark:border-zinc-800 last:border-0 relative h-10 transition-colors",
-        isOver ? "bg-blue-500/5 ring-2 ring-blue-500/20 ring-inset" : ""
+        isOver ? "bg-blue-500/5 ring-2 ring-blue-500/20 ring-inset" : "",
+        className
       )}
     >
       {children}

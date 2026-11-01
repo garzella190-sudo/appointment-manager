@@ -16,7 +16,7 @@
 - Calendario: Giorno selezionato 'z-index: 10' e 'text-white'.
 - Interazioni: 'readOnly' su input datepicker.
 - Modali e picker SEMPRE centrati a schermo ('items-center' non 'items-end'): mai ancorati in basso.
-- Calendario vista risorse (piu' istruttori): supporta N giorni (1/3/5/7) impilati verticalmente con intestazione per giorno; il selettore giorni resta attivo anche in modalita' resource.
+- Calendario vista risorse (piu' istruttori): i giorni sono AFFIANCATI IN ORIZZONTALE (fascia giorni + fascia istruttori come sotto-colonne). Larghezza minima per colonna 132px istruttore / 110px giorno, con scroll orizzontale invece di compressione. Su mobile massimo 3 istruttori (bloccato con messaggio; 'Tutti' = primi 3). Separatore verticale marcato (border-l-2) all'inizio di ogni gruppo-giorno, in header e in ogni riga.
 
 ## Layout Responsivo (OBBLIGATORIO)
 Vedi 'istruzioni programmazione/REGOLE_MOBILE_LAYOUT.md' per il dettaglio e la procedura di misura.

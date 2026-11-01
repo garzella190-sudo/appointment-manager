@@ -139,6 +139,8 @@ export default function CalendarPage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  // Su schermi piccoli troppe colonne renderebbero illeggibili le card: massimo 3 istruttori.
+  const MAX_ISTRUTTORI_MOBILE = 3;
   const [confirmMultiModal, setConfirmMultiModal] = useState<{
     isOpen: boolean;
     title?: string;
@@ -186,27 +188,25 @@ export default function CalendarPage() {
       }
     }
 
-    const handleResize = () => {
-      const width = window.innerWidth;
-      let newViewDays: 1 | 3 | 5 | 7 = 7;
-      
-      if (width < 640) { // Mobile
-        newViewDays = savedViewDays === '1' ? 1 : 3;
-      } else if (width < 1024) { // Tablet
-        newViewDays = (savedViewDays === '1' || savedViewDays === '3') ? parseInt(savedViewDays) as 1 | 3 : 5;
-      } else { // Desktop
-        newViewDays = savedViewDays ? parseInt(savedViewDays) as 1 | 3 | 5 | 7 : 7;
-      }
-      
-      setViewDays(newViewDays);
+    // Giorni visibili: si rispetta SEMPRE la scelta salvata dall'utente.
+    // Il default legato alla larghezza dello schermo si applica solo al primo avvio.
+    const defaultViewDaysFor = (width: number): 1 | 3 | 5 | 7 => {
+      if (width < 640) return 3;
+      if (width < 1024) return 5;
+      return 7;
     };
+    const savedViewDaysNum = savedViewDays ? parseInt(savedViewDays) : NaN;
+    if ([1, 3, 5, 7].includes(savedViewDaysNum)) {
+      setViewDays(savedViewDaysNum as 1 | 3 | 5 | 7);
+    } else {
+      setViewDays(defaultViewDaysFor(window.innerWidth));
+    }
 
-    handleResize(); // Chiamata iniziale
+    // NB: nessun reset di viewDays al resize, altrimenti la scelta dell'utente
+    // verrebbe sovrascritta dal valore letto al montaggio.
     const handleMobileCheck = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
     window.addEventListener('resize', handleMobileCheck);
     return () => {
-      window.removeEventListener('resize', handleResize);
       window.removeEventListener('resize', handleMobileCheck);
     };
   }, []);
@@ -767,6 +767,15 @@ export default function CalendarPage() {
     ? istruttori.filter(i => selectedInstructorIds.includes(i.id))
     : istruttori;
 
+  // Larghezza minima per colonna: sotto questa soglia le card non sarebbero leggibili,
+  // quindi la griglia scorre in orizzontale invece di comprimersi.
+  const MIN_COL_WEEK = 110;      // px per giorno nella vista settimana
+  const MIN_COL_RESOURCE = 132;  // px per istruttore nella vista a colonne
+  const gridColumnsCount = viewMode === 'week'
+    ? displayDays.length
+    : Math.max(1, displayDays.length * displayIstruttori.length);
+  const minGridWidth = 60 + gridColumnsCount * (viewMode === 'week' ? MIN_COL_WEEK : MIN_COL_RESOURCE);
+
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newModalInitialData, setNewModalInitialData] = useState<{ date: string; time: string } | null>(null);
 
@@ -914,7 +923,12 @@ export default function CalendarPage() {
                   </div>
                   {viewMode === 'resource' && (
                     <p className="text-[10px] text-zinc-400 font-bold mt-2 ml-1">
-                      Vista più istruttori: i giorni vengono mostrati in sequenza verticale (fino a 7 = una settimana).
+                      Vista più istruttori: giorni affiancati in orizzontale; se le colonne sono tante la griglia scorre.
+                    </p>
+                  )}
+                  {isMobile && (
+                    <p className="text-[10px] text-amber-500 font-bold mt-1 ml-1">
+                      Su mobile puoi selezionare al massimo {MAX_ISTRUTTORI_MOBILE} istruttori.
                     </p>
                   )}
                 </div>
@@ -925,6 +939,19 @@ export default function CalendarPage() {
                   <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => {
+                      if (isMobile) {
+                        // Su mobile "Tutti" seleziona al massimo i primi 3 istruttori
+                        const primi = [...istruttori]
+                          .sort((a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'))
+                          .slice(0, MAX_ISTRUTTORI_MOBILE)
+                          .map(x => x.id);
+                        setSelectedInstructorIds(primi);
+                        setViewMode('resource');
+                        if (istruttori.length > MAX_ISTRUTTORI_MOBILE) {
+                          setToast({ message: `Su mobile puoi visualizzare al massimo ${MAX_ISTRUTTORI_MOBILE} istruttori`, type: 'error' });
+                        }
+                        return;
+                      }
                       if (selectedInstructorIds.length === 1) {
                         setConfirmMultiModal({
                           isOpen: true,
@@ -960,39 +987,38 @@ export default function CalendarPage() {
                         <button
                           key={i.id}
                           onClick={() => {
+                            const applica = (next: string[]) => {
+                              if (isMobile && next.length > MAX_ISTRUTTORI_MOBILE) {
+                                setToast({ message: `Su mobile puoi visualizzare al massimo ${MAX_ISTRUTTORI_MOBILE} istruttori`, type: 'error' });
+                                return;
+                              }
+                              setSelectedInstructorIds(next);
+                              // Auto-switch view mode: se 1 solo istruttore → week, altrimenti → resource
+                              setViewMode(next.length === 1 ? 'week' : 'resource');
+                            };
+
                             if (selectedInstructorIds.length === 1 && !selectedInstructorIds.includes(i.id)) {
                               setConfirmMultiModal({
                                 isOpen: true,
                                 title: "Visualizza Più Istruttori",
                                 message: `Vuoi visualizzare il calendario di più istruttori contemporaneamente? I calendari verranno affiancati nella vista a colonne.`,
                                 onConfirm: () => {
-                                  setSelectedInstructorIds(prev => [...prev, i.id]);
-                                  setViewMode('resource');
+                                  applica([...selectedInstructorIds, i.id]);
                                   setConfirmMultiModal(prev => ({ ...prev, isOpen: false }));
                                 }
                               });
                               return;
                             }
 
-                            setSelectedInstructorIds(prev => {
-                              let next: string[];
-                              if (prev.length === 0) {
-                                next = [i.id];
-                              } else if (prev.includes(i.id)) {
-                                next = prev.filter(id => id !== i.id);
-                                if (next.length === 0) next = [];
-                              } else {
-                                next = [...prev, i.id];
-                              }
-                              
-                              // Auto-switch view mode: se 1 solo istruttore → week, altrimenti → resource
-                              if (next.length === 1) {
-                                setViewMode('week');
-                              } else {
-                                setViewMode('resource');
-                              }
-                              return next;
-                            });
+                            let next: string[];
+                            if (selectedInstructorIds.length === 0) {
+                              next = [i.id];
+                            } else if (selectedInstructorIds.includes(i.id)) {
+                              next = selectedInstructorIds.filter(id => id !== i.id);
+                            } else {
+                              next = [...selectedInstructorIds, i.id];
+                            }
+                            applica(next);
                           }}
                           className={cn(
                             "h-10 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center gap-1.5",
@@ -1080,14 +1106,46 @@ export default function CalendarPage() {
 
           <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col">
             <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px] scrollbar-hide">
-              <div className="w-full flex flex-col h-full">
-              <div 
-                className="grid border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0"
-                style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayIstruttori.length)}, minmax(0, 1fr))` } as React.CSSProperties}
-              >
-                <div className="p-1 sm:p-4 border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
-                  <Clock size={16} className="text-zinc-400" />
-                </div>
+              <div className="w-full flex flex-col h-full overflow-x-auto">
+                <div className="flex flex-col h-full" style={{ minWidth: minGridWidth }}>
+              <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0">
+                {/* Fascia giorni — vista risorse con più giorni: giorni affiancati in orizzontale */}
+                {viewMode === 'resource' && displayDays.length > 1 && (
+                  <div
+                    className="grid border-b border-zinc-200 dark:border-zinc-800"
+                    style={{ gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))` } as React.CSSProperties}
+                  >
+                    <div className="border-r border-zinc-200 dark:border-zinc-800" />
+                    {displayDays.map((day: Date) => {
+                      const isHoliday = isItalianHoliday(day) || isWeekend(day);
+                      const isToday = isSameDay(day, new Date());
+                      return (
+                        <div
+                          key={`giorno-${day.toString()}`}
+                          className={cn(
+                            "py-1 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 border-l-2 border-l-zinc-400 dark:border-l-zinc-600",
+                            isToday ? "bg-blue-50/60 dark:bg-blue-500/10" : ""
+                          )}
+                        >
+                          <span className={cn(
+                            "text-[10px] font-black uppercase tracking-wider",
+                            isHoliday ? "text-red-500" : isToday ? "text-blue-600 dark:text-blue-400" : "text-zinc-500"
+                          )}>
+                            {format(day, 'EEE d MMM', { locale: it })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div 
+                  className="grid"
+                  style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayDays.length * displayIstruttori.length)}, minmax(0, 1fr))` } as React.CSSProperties}
+                >
+                  <div className="p-1 sm:p-4 border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
+                    <Clock size={16} className="text-zinc-400" />
+                  </div>
                 {viewMode === 'week' ? displayDays.map((day: Date) => {
                   const isHoliday = isItalianHoliday(day) || isWeekend(day);
                   const isToday = isSameDay(day, new Date());
@@ -1125,19 +1183,28 @@ export default function CalendarPage() {
                       )}
                     </div>
                   );
-                }) : displayIstruttori.map((ist: any) => {
+                }) : displayDays.flatMap((day: Date) => displayIstruttori.map((ist: any, istIdx: number) => {
                   const istColor = appointments.find(a => a.trainer_id === ist.id)?.istruttore?.color || '#3b82f6';
+                  const isTodayCol = isSameDay(day, new Date());
                   return (
-                    <div key={ist.id} className="p-1 sm:p-2 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center">
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md mb-1" style={{ backgroundColor: istColor }}>
+                    <div
+                      key={`${day.toString()}-${ist.id}`}
+                      className={cn(
+                        "py-1 px-0.5 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center",
+                        isTodayCol && "bg-blue-50/40 dark:bg-blue-500/5",
+                        istIdx === 0 && "border-l-2 border-l-zinc-400 dark:border-l-zinc-600"
+                      )}
+                    >
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black text-white shadow-sm mb-0.5" style={{ backgroundColor: istColor }}>
                         {ist.cognome?.[0] || '?'}{ist.nome?.[0] || ''}
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 truncate w-full px-1">
-                        {ist.cognome} {ist.nome ? `${ist.nome[0]}.` : ''}
+                      <span className="text-[9px] font-black uppercase tracking-tight text-zinc-700 dark:text-zinc-300 truncate w-full leading-tight">
+                        {ist.cognome}
                       </span>
                     </div>
                   );
-                })}
+                }))}
+                </div>
               </div>
 
               {/* Corpo Scorrevole */}
@@ -1151,20 +1218,6 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-                {(viewMode === 'resource' ? displayDays : [null]).map((resourceDay: Date | null, dayIdx: number) => {
-                  const resourceDateStr = format(resourceDay || currentDate, 'yyyy-MM-dd');
-                  return (
-                  <React.Fragment key={resourceDateStr}>
-                  {viewMode === 'resource' && displayDays.length > 1 && resourceDay && (
-                    <div className="sticky top-0 z-[90] flex items-center justify-between px-3 py-1.5 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm border-y border-zinc-200 dark:border-zinc-800">
-                      <span className="text-[11px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300 capitalize">
-                        {format(resourceDay, 'EEEE d MMMM', { locale: it })}
-                      </span>
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                        {appointments.filter(a => a.appointment_date === resourceDateStr).length} guide
-                      </span>
-                    </div>
-                  )}
                 {timeSlots.map((slot) => {
                   const isFullHour = slot.endsWith(':00');
                   const [slotH, slotM] = slot.split(':').map(Number);
@@ -1180,13 +1233,13 @@ export default function CalendarPage() {
                   return (
                       <div 
                         key={slot} 
-                        id={dayIdx === 0 ? `slot-${slot}` : undefined}
+                        id={`slot-${slot}`}
                         className={cn(
                           "grid min-h-[40px] transition-colors relative",
                           isFullHour ? "border-zinc-300 dark:border-zinc-700 border-b" : "border-zinc-200 dark:border-zinc-800/60 border-b"
                         )}
                         style={{ 
-                          gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayIstruttori.length)}, minmax(0, 1fr))`,
+                          gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayDays.length * displayIstruttori.length)}, minmax(0, 1fr))`,
                           zIndex: isCurrentSlot ? 80 : timeSlots.length - timeSlots.indexOf(slot),
                         } as React.CSSProperties}
                       >
@@ -1213,6 +1266,7 @@ export default function CalendarPage() {
                       {viewMode === 'week' ? displayDays.map((day: Date) => {
                         const dateStr = format(day, 'yyyy-MM-dd');
                         const cellId = `${dateStr}|${slot}`;
+                        const cellBorderClass = undefined;
                         
                         const dayAppointments = appointments.filter(a => a.appointment_date === dateStr);
                         const slotStartTime = slot; // "HH:mm"
@@ -1286,7 +1340,7 @@ export default function CalendarPage() {
                         const sortedTimes = Object.keys(appointmentsByTime).sort();
 
                         return (
-                          <DroppableCell key={cellId} id={cellId}>
+                          <DroppableCell key={cellId} id={cellId} className={cellBorderClass}>
                             <div 
                               className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px] select-none"
                               onClick={(e) => {
@@ -1331,9 +1385,11 @@ export default function CalendarPage() {
                             </div>
                           </DroppableCell>
                         );
-                      }) : displayIstruttori.map((ist: any) => {
-                        const dateStr = resourceDateStr;
+                      }) : displayDays.flatMap((day: Date) => displayIstruttori.map((ist: any, istIdx: number) => {
+                        const dateStr = format(day, 'yyyy-MM-dd');
                         const cellId = `${dateStr}|${slot}|${ist.id}`;
+                        // Separatore verticale marcato all'inizio di ogni gruppo-giorno
+                        const cellBorderClass = istIdx === 0 ? 'border-l-2 border-l-zinc-400 dark:border-l-zinc-600' : undefined;
                         
                         const dayAppointments = appointments.filter(a => a.appointment_date === dateStr);
                         const slotStartTime = slot;
@@ -1407,7 +1463,7 @@ export default function CalendarPage() {
                         const sortedTimes = Object.keys(appointmentsByTime).sort();
 
                         return (
-                          <DroppableCell key={cellId} id={cellId}>
+                          <DroppableCell key={cellId} id={cellId} className={cellBorderClass}>
                             <div 
                               className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px] select-none"
                               onClick={(e) => {
@@ -1452,14 +1508,12 @@ export default function CalendarPage() {
                             </div>
                           </DroppableCell>
                         );
-                      })}
+                      }))}
                     </div>
                   );
                 })}
-                  </React.Fragment>
-                  );
-                })}
             </div>
+                </div>
           </div>
         </div>
         <DragOverlay adjustScale={false} zIndex={100}>

@@ -91,6 +91,23 @@ un altro modo?* Se no, deve restare visibile (eventualmente compattata).
 
 ---
 
+## 6-bis. Calendario — vista più istruttori
+
+- I giorni sono **affiancati in orizzontale**: fascia giorni in alto, poi gli istruttori come
+  sotto-colonne dentro ogni giorno.
+- **Mai comprimere le colonne**: larghezza minima **132px per istruttore** (110px per giorno
+  in vista settimana). Sotto quella soglia la griglia **scorre in orizzontale** invece di
+  rimpicciolire le card — un contenitore unico contiene header e righe, così scorrono insieme.
+- Su **mobile massimo 3 istruttori**: la selezione eccedente va rifiutata con messaggio;
+  il tasto "Tutti" seleziona i primi 3.
+- **Separatore verticale marcato** (`border-l-2 border-l-zinc-400 dark:border-l-zinc-600`)
+  all'inizio di ogni gruppo-giorno, applicato in modo allineato su fascia giorni, fascia
+  istruttori e ogni riga oraria (via `className` di `DroppableCell`).
+- Le preferenze utente (`calendar_viewDays`) **non** vanno sovrascritte al `resize`:
+  il default legato allo schermo si applica solo al primo avvio.
+
+---
+
 ## 7. Stessi controlli = stesso gruppo tra pagine
 
 Il gruppo `‹ OGGI › | 📅` deve essere **identico** su Agenda e Calendario: stessi tasti,
