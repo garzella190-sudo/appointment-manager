@@ -185,10 +185,10 @@ export const InstallPWA = ({ onDismiss }: { onDismiss?: () => void }) => {
           {onDismiss && (
             <button 
               onClick={handleDontShowAgain}
-              className="flex items-center gap-2 group cursor-pointer"
+              className="flex items-center gap-3 group cursor-pointer min-h-[40px] py-1 -mx-1 px-1 rounded-lg"
             >
               <div className={cn(
-                "w-5 h-5 rounded-lg border-2 transition-all flex items-center justify-center",
+                "w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center shrink-0",
                 dontShowAgain 
                   ? "bg-blue-500 border-blue-500 text-white" 
                   : "border-zinc-200 dark:border-zinc-700 group-hover:border-blue-400"

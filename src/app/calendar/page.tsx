@@ -19,8 +19,10 @@ import {
   ChevronDown,
   StickyNote,
   Maximize2,
-  Minimize2
+  Minimize2,
+  SlidersHorizontal
 } from 'lucide-react';
+import { Modal } from '@/components/Modal';
 import Select from '@/components/forms/Select';
 import {
   DndContext,
@@ -794,7 +796,7 @@ export default function CalendarPage() {
             </button>
           )}
           <header className={cn(
-            "px-2 sm:px-4 md:px-6 py-2 pb-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 flex-shrink-0",
+            "relative px-2 sm:px-4 md:px-6 py-2 pb-2 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4 flex-shrink-0",
             isFullScreen && "hidden"
           )}>
             <div>
@@ -810,7 +812,7 @@ export default function CalendarPage() {
                 <Maximize2 size={16} />
               </button>
             </div>
-              <p className="text-zinc-500 dark:text-zinc-400 mt-0.5 capitalize text-xs font-medium">
+              <p className="text-zinc-600 dark:text-zinc-300 mt-1 capitalize text-base sm:text-lg font-bold tracking-tight leading-none">
                 {viewMode === 'resource' 
                   ? format(currentDate, 'EEEE d MMMM yyyy', { locale: it })
                   : format(weekStart, 'MMMM yyyy', { locale: it })
@@ -819,118 +821,52 @@ export default function CalendarPage() {
             </div>
 
             {/* Row 1: View mode + day selector */}
-            <div className="flex flex-row items-center gap-1.5 sm:gap-3 w-full lg:w-auto mt-2 lg:mt-0">
-              {/* Vista Giorni: Dropdown su mobile */}
-              <div className="relative shrink-0 sm:hidden flex items-center h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
-                <select
-                  value={viewDays}
-                  onChange={(e) => setViewDays(parseInt(e.target.value) as 1 | 3 | 5 | 7)}
-                  className="appearance-none bg-transparent h-8 w-[48px] px-2 text-center text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all cursor-pointer outline-none border-none shadow-none"
-                >
-                  <option value={1}>1 G</option>
-                  <option value={3}>3 G</option>
-                  <option value={5}>5 G</option>
-                  <option value={7}>7 G</option>
-                </select>
-              </div>
-              
-              <div className="flex shrink-0 items-center gap-1 sm:gap-2 h-10 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
-                <button
-                  onClick={() => { if (selectedInstructorIds.length === 1) setViewMode('week'); }}
-                  disabled={selectedInstructorIds.length !== 1}
-                  title={selectedInstructorIds.length !== 1 ? 'Seleziona 1 solo istruttore per la vista Settimana' : 'Vista Settimana'}
+            <div className="relative lg:static flex flex-row items-center justify-center gap-1.5 sm:gap-3 w-full lg:flex-1 mt-1 lg:mt-0">
+              {/* Tasto unico: apre il sottomenu con chi / quanti giorni / weekend */}
+              <button
+                type="button"
+                onClick={() => setShowFilter(!showFilter)}
+                title="Scegli chi visualizzare, quanti giorni e il weekend"
+                className={cn(
+                  "h-10 sm:h-9 shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all shadow-sm border whitespace-nowrap absolute left-0 lg:static lg:ml-auto",
+                  showFilter || selectedInstructorIds.length > 0 || viewMode === 'resource'
+                    ? "bg-sky-100 dark:bg-sky-900 border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400"
+                    : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600"
+                )}
+              >
+                <SlidersHorizontal size={16} className="shrink-0" />
+                <span className="hidden sm:inline">Visualizzazione</span>
+                <span
                   className={cn(
-                    "px-2.5 sm:px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
-                    viewMode === 'week' && selectedInstructorIds.length === 1
-                      ? "bg-blue-600 text-white border-blue-500 shadow-md" 
-                      : selectedInstructorIds.length !== 1
-                        ? "opacity-30 cursor-not-allowed text-zinc-400 border-transparent"
-                        : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent"
+                    "rounded-md px-1.5 py-0.5 text-[9px] font-black",
+                    showFilter || selectedInstructorIds.length > 0 || viewMode === 'resource'
+                      ? "bg-white/70 dark:bg-zinc-900/60"
+                      : "bg-zinc-100 dark:bg-zinc-800"
                   )}
                 >
-                  Settimana
-                </button>
-                <div className="hidden sm:block w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
-                <div className="hidden sm:flex items-center gap-1">
-                  {[1, 3, 5, 7].map((days) => (
-                    <button
-                      key={days}
-                      disabled={viewMode === 'resource'}
-                      onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap uppercase tracking-wider border",
-                        viewDays === days && viewMode === 'week'
-                          ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800 shadow-sm" 
-                          : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800",
-                        viewMode === 'resource' && "opacity-30 cursor-not-allowed"
-                      )}
-                    >
-                      {days} G
-                    </button>
-                  ))}
-                </div>
-              </div>
+                  {viewMode === 'resource' ? 'COL' : `${viewDays}G`}
+                </span>
+              </button>
 
-              {/* Weekend + Istruttori toggle + Nav */}
-              <div className="flex items-center gap-1.5 ml-auto">
-                {viewDays !== 7 && (
-                  <button
-                    onClick={() => setShowWeekends(!showWeekends)}
-                    title={!showWeekends ? "Mostra Weekend" : "Nascondi Weekend"}
-                    className={cn(
-                      "h-10 px-2.5 sm:px-4 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap shadow-sm border",
-                      !showWeekends
-                        ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800"
-                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-red-500"
-                    )}
-                  >
-                    WE
-                  </button>
-                )}
-
-                <button
-                  onClick={() => {
-                    if (viewMode === 'resource') {
-                      if (resolvedIstruttoreId) {
-                        setSelectedInstructorIds([resolvedIstruttoreId]);
-                      } else if (istruttori.length > 0) {
-                        setSelectedInstructorIds([istruttori[0].id]);
-                      }
-                      setViewMode('week');
-                    } else {
-                      setShowFilter(!showFilter);
-                    }
-                  }}
-                  title={viewMode === 'resource' ? "Torna a Settimana" : "Filtra / Vista Istruttori"}
-                  className={cn("h-10 w-10 shrink-0 flex items-center justify-center rounded-xl transition-all shadow-sm border", 
-                    viewMode === 'resource'
-                      ? "bg-indigo-600 border-indigo-500 text-white shadow-md"
-                      : showFilter || selectedInstructorIds.length > 0 
-                        ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" 
-                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
-                >
-                  <Users size={16} />
-                </button>
-
-                <div className="flex items-center shrink-0 h-10 gap-0.5 sm:gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+                <div className="flex items-center shrink-0 h-11 sm:h-10 gap-0.5 sm:gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 sm:p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner lg:absolute lg:left-1/2 lg:-translate-x-1/2">
                   <button
                     onClick={() => navigateWeek(-1)}
                     title="Settimana precedente"
-                    className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+                    className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
                   >
                     <ChevronLeft size={18} />
                   </button>
                   <button
                     onClick={() => setCurrentDate(new Date())}
                     title="Vai a oggi"
-                    className="px-1.5 sm:px-3 h-8 text-[10px] sm:text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all flex items-center"
+                    className="px-1.5 sm:px-3 h-9 sm:h-8 text-[10px] sm:text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-blue-600 transition-all flex items-center whitespace-nowrap"
                   >
                     {displayDays.some(d => isToday(d)) ? 'Oggi' : format(currentDate, 'd MMM', { locale: it })}
                   </button>
                   <button
                     onClick={() => navigateWeek(1)}
                     title="Settimana successiva"
-                    className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+                    className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
                   >
                     <ChevronRight size={18} />
                   </button>
@@ -939,21 +875,52 @@ export default function CalendarPage() {
                   
                   <button
                     onClick={() => setIsDatePickerOpen(true)}
-                    className="hidden sm:flex h-8 w-8 items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
+                    className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-blue-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
                     title="Scegli una data"
                   >
                     <CalendarIcon size={18} />
                   </button>
                 </div>
-              </div>
             </div>
 
-            <div className={cn(
-               "transition-all duration-300 ease-in-out origin-top",
-               showFilter ? "max-h-[400px] opacity-100 mt-2 overflow-visible" : "max-h-0 opacity-0 mt-0 overflow-hidden"
-            )}>
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap gap-1.5">
+            <Modal
+              isOpen={showFilter}
+              onClose={() => setShowFilter(false)}
+              title="Visualizzazione"
+            >
+              <div className="space-y-5 pb-1">
+                {/* QUANTI GIORNI */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2 ml-1">Quanti giorni</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 3, 5, 7].map((days) => (
+                      <button
+                        key={days}
+                        disabled={viewMode === 'resource'}
+                        onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
+                        className={cn(
+                          "h-11 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border active:scale-95",
+                          viewDays === days && viewMode === 'week'
+                            ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800 shadow-sm"
+                            : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500",
+                          viewMode === 'resource' && "opacity-40 cursor-not-allowed"
+                        )}
+                      >
+                        {days} G
+                      </button>
+                    ))}
+                  </div>
+                  {viewMode === 'resource' && (
+                    <p className="text-[10px] text-zinc-400 font-bold mt-2 ml-1">
+                      Seleziona un solo istruttore per scegliere quanti giorni vedere.
+                    </p>
+                  )}
+                </div>
+
+                {/* CHI VISUALIZZARE */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2 ml-1">Chi visualizzare</p>
+                  <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => {
                       if (selectedInstructorIds.length === 1) {
@@ -973,7 +940,7 @@ export default function CalendarPage() {
                       setViewMode('resource');
                     }}
                     className={cn(
-                      "px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
+                      "h-10 px-4 flex items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95",
                       selectedInstructorIds.length === 0
                         ? "bg-sky-500 text-white border-sky-400 shadow-md"
                         : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
@@ -1026,7 +993,7 @@ export default function CalendarPage() {
                             });
                           }}
                           className={cn(
-                            "px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center gap-1.5",
+                            "h-10 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center gap-1.5",
                             selectedInstructorIds.includes(i.id)
                               ? "bg-sky-500 text-white border-sky-400 shadow-md"
                               : selectedInstructorIds.length === 0
@@ -1046,7 +1013,32 @@ export default function CalendarPage() {
                         </button>
                       );
                     })}
+                  </div>
                 </div>
+
+                {/* WEEKEND */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2 ml-1">Weekend</p>
+                  <button
+                    onClick={() => setShowWeekends(!showWeekends)}
+                    disabled={viewDays === 7}
+                    className={cn(
+                      "h-11 w-full rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center justify-center gap-2",
+                      !showWeekends
+                        ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800"
+                        : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500",
+                      viewDays === 7 && "opacity-40 cursor-not-allowed"
+                    )}
+                  >
+                    {showWeekends ? 'Nascondi weekend' : 'Mostra weekend'}
+                  </button>
+                  {viewDays === 7 && (
+                    <p className="text-[10px] text-zinc-400 font-bold mt-2 ml-1">
+                      Con la vista a 7 giorni il weekend è sempre visibile.
+                    </p>
+                  )}
+                </div>
+
                 <button
                   onClick={() => {
                     if (selectedInstructorIds.length === 1) {
@@ -1066,13 +1058,20 @@ export default function CalendarPage() {
                     setViewMode('resource');
                     setShowFilter(false);
                   }}
-                  className="h-10 px-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-md border border-indigo-500 active:scale-95 transition-all flex items-center gap-2 justify-center w-full sm:w-auto"
+                  className="h-11 px-4 w-full bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-xl text-[10px] font-black uppercase tracking-wider border border-zinc-200 dark:border-zinc-700 active:scale-95 transition-all flex items-center gap-2 justify-center"
                 >
                   <Users size={14} />
-                  Vista Istruttori
+                  Vista istruttori a colonne
+                </button>
+
+                <button
+                  onClick={() => setShowFilter(false)}
+                  className="h-12 px-4 w-full bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md border border-indigo-500 active:scale-95 transition-all flex items-center gap-2 justify-center"
+                >
+                  Conferma
                 </button>
               </div>
-            </div>
+            </Modal>
           </header>
 
           <ConflictsAlert />

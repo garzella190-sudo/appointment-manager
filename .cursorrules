@@ -16,6 +16,18 @@
 - Calendario: Giorno selezionato 'z-index: 10' e 'text-white'.
 - Interazioni: 'readOnly' su input datepicker.
 
+## Layout Responsivo (OBBLIGATORIO)
+Vedi 'istruzioni programmazione/REGOLE_MOBILE_LAYOUT.md' per il dettaglio e la procedura di misura.
+- Griglie a colonna singola: SEMPRE 'grid grid-cols-1 gap-X' (mai solo 'grid gap-X': la colonna implicita 'auto' si dimensiona al max-content e sfora lo schermo).
+- 'truncate' sempre accompagnato da 'min-w-0' sul contenitore dell'elemento troncato.
+- Touch target: minimo 32x32, 36-40 su mobile, 40-48 per le azioni primarie. Mai 'p-1.5' con icone 16px.
+- Contenitori centrati con 'absolute' a larghezza piena: aggiungere 'pointer-events-none' al wrapper e 'pointer-events-auto' al contenuto, altrimenti bloccano i click dei tasti sottostanti.
+- Non usare 'hidden sm:*' su azioni necessarie da telefono: devono restare raggiungibili (eventualmente compattate).
+- Header: 1 riga su desktop (>=1024px), 2 righe su mobile. Blocco sinistro con 'lg:max-w-[...]' quando accanto c'e' un elemento centrato in absolute.
+- Il gruppo '< OGGI > | [data]' deve essere identico (tasti, misure, posizione centrata) su Agenda e Calendario.
+- 'overflow-x: hidden' e' solo un paracadute: non e' una soluzione, nasconde il bug.
+- Verifica prima del commit con playwright-core (Chrome headless, viewport via API: il flag '--window-size' viene clampato a ~500px) a 320/360/390/412/430px: zero elementi con right > clientWidth e nessun tasto < 32px. Rimuovere poi la dipendenza con 'npm rm --no-save playwright-core'.
+
 ## Logica di Business Universale
 - Sovrapposizioni: Non consentire sovrapposizioni anche di 1 minuto tra risorse (Istruttore, Cliente, Veicolo).
 - Stato "Svolto": Visualizzare come "Svolto" gli appuntamenti passati (currentTime > endTime) non annullati.

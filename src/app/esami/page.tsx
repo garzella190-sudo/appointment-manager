@@ -833,7 +833,7 @@ export default function EsamiPage() {
                 <button 
                   type="button"
                   onClick={() => setFormData({ ...formData, istruttori_ids: [] })}
-                  className="text-[10px] font-black uppercase text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 px-2 py-1 rounded-lg transition-colors"
+                  className="h-8 px-3 flex items-center rounded-lg text-[10px] font-black uppercase text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                 >
                   Nessuno
                 </button>
@@ -923,7 +923,7 @@ export default function EsamiPage() {
       >
         <div className="space-y-4 pt-4 pb-4">
           <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest ml-1">Seleziona una seduta disponibile</p>
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {/* Opzione per Rimuovere Seduta */}
             <button
               onClick={() => {

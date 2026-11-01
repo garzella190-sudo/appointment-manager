@@ -113,17 +113,17 @@ const BottomNav = () => {
   return (
     <>
       <nav className={cn(
-        "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-[96vw] md:max-w-2xl z-50 flex justify-center items-end pointer-events-none print:hidden transition-all duration-300 transform",
+        "fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 w-[96%] max-w-[96vw] md:max-w-2xl z-50 flex justify-center items-end pointer-events-none print:hidden transition-all duration-300 transform",
         !isNavVisible && "translate-y-24 opacity-0 pointer-events-none"
       )}>
         {isCalendarFullScreen ? (
           <>
             {/* Left Segment: Plus + Home */}
-            <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center gap-3 py-2 px-3 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-1 sm:mr-2 pointer-events-auto transition-all">
+            <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center gap-1.5 sm:gap-3 py-1.5 px-2 sm:py-2 sm:px-3 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-1 sm:mr-2 pointer-events-auto transition-all">
               <button 
                 onClick={() => setIsModalOpen(true)}
                 title="Nuovo Appuntamento"
-                className="relative flex flex-col items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0 text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/10 cursor-pointer"
+                className="relative flex flex-col items-center justify-center w-9 h-9 sm:w-12 sm:h-12 rounded-[14px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0 text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-500/10 cursor-pointer"
               >
                 <PlusCircle size={20} strokeWidth={2.5} className="transition-transform duration-300 sm:w-[22px] sm:h-[22px] group-hover:scale-110" />
               </button>
@@ -133,20 +133,20 @@ const BottomNav = () => {
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent('home-reset-today'));
                 }}
-                className="relative flex flex-col items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-[16px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                className="relative flex flex-col items-center justify-center w-9 h-9 sm:w-12 sm:h-12 rounded-[14px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
               >
                 <Home size={18} className="transition-transform duration-300 sm:w-[20px] sm:h-[20px] group-hover:scale-110" />
               </Link>
             </div>
 
             {/* Right Segment: < Oggi > navigation block */}
-            <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2 px-3 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-1 sm:ml-2 pointer-events-auto transition-all">
-              <div className="flex items-center w-full justify-between gap-1 sm:gap-2">
+            <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-1.5 px-1.5 sm:py-2 sm:px-3 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-1 sm:ml-2 pointer-events-auto transition-all">
+              <div className="flex items-center w-full justify-between gap-0.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('calendar-prev'))}
                   title="Precedente"
-                  className="h-10 w-10 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[16px] transition-all text-zinc-600 dark:text-zinc-400 active:scale-95 cursor-pointer border border-zinc-200/30 dark:border-zinc-700/30"
+                  className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[14px] sm:rounded-[16px] transition-all text-zinc-600 dark:text-zinc-400 active:scale-95 cursor-pointer border border-zinc-200/30 dark:border-zinc-700/30"
                 >
                   <ChevronLeft size={20} strokeWidth={2.5} />
                 </button>
@@ -155,7 +155,7 @@ const BottomNav = () => {
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('calendar-today'))}
                   title="Vai a oggi"
-                  className="flex-1 h-10 px-4 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-[16px] font-black text-xs uppercase tracking-wider hover:bg-sky-100 dark:hover:bg-sky-500/20 transition-all active:scale-95 cursor-pointer border border-sky-100 dark:border-sky-900/30 text-center"
+                  className="flex-1 min-w-0 h-9 sm:h-10 px-2 sm:px-4 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-[14px] sm:rounded-[16px] font-black text-xs uppercase tracking-wider hover:bg-sky-100 dark:hover:bg-sky-500/20 transition-all active:scale-95 cursor-pointer border border-sky-100 dark:border-sky-900/30 text-center whitespace-nowrap"
                 >
                   Oggi
                 </button>
@@ -164,7 +164,7 @@ const BottomNav = () => {
                   type="button"
                   onClick={() => window.dispatchEvent(new CustomEvent('calendar-next'))}
                   title="Successiva"
-                  className="h-10 w-10 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[16px] transition-all text-zinc-600 dark:text-zinc-400 active:scale-95 cursor-pointer border border-zinc-200/30 dark:border-zinc-700/30"
+                  className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[14px] sm:rounded-[16px] transition-all text-zinc-600 dark:text-zinc-400 active:scale-95 cursor-pointer border border-zinc-200/30 dark:border-zinc-700/30"
                 >
                   <ChevronRight size={20} strokeWidth={2.5} />
                 </button>
@@ -174,13 +174,13 @@ const BottomNav = () => {
         ) : (
           <>
             {/* Left Segment */}
-            <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2 px-2 sm:px-5 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-1 sm:mr-2 pointer-events-auto transition-all">
+            <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-1.5 px-1.5 sm:py-2 sm:px-5 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 mr-1 sm:mr-2 pointer-events-auto transition-all">
               <button 
                 onClick={() => setIsPermissionsModalOpen(true)}
-                className="flex items-center gap-2 shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-1 sm:p-1.5 rounded-[16px] sm:rounded-[20px] transition-all active:scale-95 text-left border-none outline-none"
+                className="flex items-center gap-2 shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-0.5 sm:p-1.5 rounded-[16px] sm:rounded-[20px] transition-all active:scale-95 text-left border-none outline-none"
               >
                 <div className={cn(
-                  "w-8 h-8 sm:w-9 sm:h-9 rounded-[12px] sm:rounded-[14px] flex items-center justify-center shrink-0 shadow-inner",
+                  "w-7 h-7 sm:w-9 sm:h-9 rounded-[10px] sm:rounded-[14px] flex items-center justify-center shrink-0 shadow-inner",
                   role === 'AdminDev' ? "bg-gradient-to-tr from-zinc-800 to-zinc-900 text-amber-400" :
                   role === 'admin' ? "bg-gradient-to-tr from-amber-100 to-amber-200 text-amber-600" : 
                   "bg-gradient-to-tr from-sky-100 to-sky-200 text-sky-600"
@@ -200,7 +200,7 @@ const BottomNav = () => {
                 </div>
               </button>
               
-              <div className="flex items-center gap-1 sm:gap-4 overflow-hidden">
+              <div className="flex items-center gap-0.5 sm:gap-4 overflow-hidden">
                 {navLeft.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -237,15 +237,15 @@ const BottomNav = () => {
               <div className="absolute inset-0 bg-gradient-to-tr from-sky-400 to-sky-600 rounded-[22px] blur-md opacity-40 dark:opacity-60 scale-90 translate-y-1"></div>
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="relative bg-gradient-to-tr from-sky-400 to-sky-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-[18px] sm:rounded-[22px] shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer outline-none ring-offset-2 dark:ring-offset-zinc-950 focus:ring-2 focus:ring-sky-500 flex items-center justify-center border border-white/20"
+                className="relative bg-gradient-to-tr from-sky-400 to-sky-600 text-white w-11 h-11 sm:w-14 sm:h-14 rounded-[16px] sm:rounded-[22px] shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer outline-none ring-offset-2 dark:ring-offset-zinc-950 focus:ring-2 focus:ring-sky-500 flex items-center justify-center border border-white/20"
               >
                 <PlusCircle size={24} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
               </button>
             </div>
 
             {/* Right Segment */}
-            <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-2 px-2 sm:px-5 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-1 sm:ml-2 pointer-events-auto transition-all">
-              <div className="flex items-center gap-1 sm:gap-4 w-full justify-center overflow-hidden">
+            <div className="flex-1 min-w-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl flex items-center justify-between py-1.5 px-1.5 sm:py-2 sm:px-5 rounded-[24px] sm:rounded-[28px] shadow-xl dark:shadow-2xl border border-zinc-200/50 dark:border-zinc-800/50 ml-1 sm:ml-2 pointer-events-auto transition-all">
+              <div className="flex items-center gap-0.5 sm:gap-4 w-full justify-center overflow-hidden">
                 {navRight.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -313,7 +313,7 @@ const BottomNav = () => {
 
           <div className="space-y-3">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Cosa puoi fare:</p>
-            <div className="grid gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {getPermissions().map((perm, i) => (
                 <div key={i} className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl shadow-sm">
                   <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">

@@ -162,7 +162,7 @@ export default function ClientiPage() {
               )}
             </div>
           ) : (
-            <div className="grid gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {filtered.map(cliente => {
                 const patenteName = patenteLabel(cliente.patente_richiesta_id);
                 const patenteDisplay = patenteName 
@@ -236,7 +236,7 @@ export default function ClientiPage() {
                       trigger={
                         <button
                           className={cn(
-                            "p-1.5 rounded-lg transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80",
+                            "h-9 w-9 flex items-center justify-center rounded-lg transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80",
                             isEffectivelyArchived 
                               ? "text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200 dark:hover:border-emerald-900/50" 
                               : "text-zinc-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-200 dark:hover:border-amber-900/50"
@@ -264,7 +264,7 @@ export default function ClientiPage() {
                       }}
                       trigger={
                         <button
-                          className="p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50"
+                          className="h-9 w-9 flex items-center justify-center rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50"
                           title="Elimina cliente"
                         >
                           <Trash2 size={16} />

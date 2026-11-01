@@ -119,10 +119,27 @@
 }
 
 @layer base {
+  html {
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
   * {
     border-color: hsl(var(--border));
     outline-color: hsla(var(--ring), 0.5);
     -webkit-tap-highlight-color: transparent;
+  }
+  /* Nessun controllo deve poter generare scroll orizzontale su telefoni stretti (320px) */
+  button,
+  a,
+  [role="button"],
+  input,
+  select {
+    max-width: 100%;
+  }
+  img,
+  svg,
+  canvas {
+    max-width: 100%;
   }
   body {
     @apply bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100;
@@ -355,4 +372,13 @@
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ── Fix autoimpaginazione mobile ─────────────────────────
+   `truncate` impone white-space:nowrap, che fa crescere la
+   larghezza minima (min-content) di un elemento dentro flex/grid.
+   Senza min-width:0 la card (e i suoi tasti) non può comprimersi
+   e sfora lo schermo. Questa regola permette il troncamento reale. */
+.truncate {
+  min-width: 0;
 }

@@ -137,7 +137,7 @@ const TabVeicoli = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number,
             </p>
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {filtered.map(v => {
               const initials = v.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
               return (
@@ -298,7 +298,7 @@ const TabIstruttori = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: numb
             <p className="text-zinc-500 font-medium font-display">Nessun istruttore registrato.</p>
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {filtered.map(i => {
               const initials = `${i.cognome?.[0] || ''}${i.nome?.[0] || ''}`.toUpperCase();
               return (
@@ -647,7 +647,7 @@ const TabUtenti = ({ refreshKey, sectionColor, isAdmin }: { refreshKey: number, 
             <p className="text-zinc-500 font-medium font-display">Nessun utente trovato.</p>
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {users.map((user) => {
               const role = user.user_metadata?.role || 'user';
               const fullName = user.user_metadata?.full_name || 'Utente';
@@ -1200,7 +1200,7 @@ const TabImpegni = ({ refreshKey, sectionColor, role, istruttoreId }: { refreshK
                     
                     {isExpanded && (
                       <div className="p-4 pt-0 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-zinc-100 dark:border-zinc-800/50">
-                        <div className="grid gap-3 mt-4">
+                        <div className="grid grid-cols-1 gap-3 mt-4">
                           {group.list.map(i => (
                             <div 
                               key={i.id} 
@@ -1551,7 +1551,7 @@ const TabReport = ({ refreshKey, role, istruttoreId, permissions }: { refreshKey
                     <button
                       onClick={() => setSelectedIstruttori([])}
                       className={cn(
-                        "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all",
+                        "h-9 px-3 flex items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all",
                         selectedIstruttori.length === 0 
                         ? "bg-zinc-900 text-white border-zinc-900 shadow-lg" 
                         : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400"
@@ -1564,7 +1564,7 @@ const TabReport = ({ refreshKey, role, istruttoreId, permissions }: { refreshKey
                         key={ist.id}
                         onClick={() => toggleIstruttore(ist.id)}
                         className={cn(
-                          "px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all flex items-center gap-1.5",
+                          "h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all flex items-center gap-1.5",
                           selectedIstruttori.includes(ist.id)
                           ? "bg-sky-50 text-sky-600 border-sky-200 shadow-sm"
                           : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-sky-200"
@@ -1597,7 +1597,7 @@ const TabReport = ({ refreshKey, role, istruttoreId, permissions }: { refreshKey
 
       {/* RISULTATI REPORT */}
       <div className="print:p-0">
-        <div className="grid gap-6">
+        <div className="grid grid-cols-1 gap-6">
           
           {/* Header Stampa (Solo print) */}
           <div className="hidden print:block mb-8 border-b-2 border-zinc-900 pb-4">
@@ -1667,7 +1667,7 @@ const TabReport = ({ refreshKey, role, istruttoreId, permissions }: { refreshKey
             {Object.keys(impegniTimeByType).length === 0 ? (
               <p className="text-center py-8 text-zinc-400 font-medium">Nessun impegno extra registrato nel periodo.</p>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {Object.entries(impegniTimeByType).map(([tipo, mins]) => (
                   <div key={tipo} className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-100 dark:border-zinc-800 print:bg-white print:border-zinc-200">
                     <div>
@@ -1766,7 +1766,7 @@ const TabImpostazioni = () => {
           </div>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Granularità */}
           <div className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
             <div>

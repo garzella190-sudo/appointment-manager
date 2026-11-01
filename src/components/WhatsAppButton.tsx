@@ -95,15 +95,15 @@ export const WhatsAppButton = ({
 
   return (
     <>
-    <div className={cn("inline-flex items-stretch overflow-hidden group border border-transparent hover:border-emerald-200/50 dark:hover:border-emerald-800/50 rounded-xl transition-all", className)}>
+    <div className={cn("inline-flex items-stretch min-h-[34px] overflow-hidden group border border-transparent hover:border-emerald-200/50 dark:hover:border-emerald-800/50 rounded-xl transition-all", className)}>
       <button
         type="button"
         onClick={handleClick}
         className={cn(
           "flex items-center gap-1.5 transition-all font-semibold h-full",
           variant === 'primary' && "px-4 bg-emerald-600 text-white group-hover:bg-emerald-700",
-          variant === 'secondary' && "px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs group-hover:bg-emerald-100 dark:group-hover:bg-emerald-800/40",
-          variant === 'ghost' && "p-2 bg-transparent text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20",
+          variant === 'secondary' && "px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs group-hover:bg-emerald-100 dark:group-hover:bg-emerald-800/40",
+          variant === 'ghost' && "p-2.5 bg-transparent text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20",
           !className?.includes('p-') && !className?.includes('px-') && "px-3"
         )}
         title={`WhatsApp (${(preference || 'standard') === 'business' ? 'Business' : 'Personale'})`}
@@ -119,7 +119,7 @@ export const WhatsAppButton = ({
           setShowModal(true);
         }}
         className={cn(
-          "px-2 flex items-center justify-center transition-all border-l",
+          "px-2.5 flex items-center justify-center transition-all border-l",
           variant === 'primary' && "bg-emerald-600 text-white group-hover:bg-emerald-700 border-white/20",
           variant === 'secondary' && "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-800/50 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-800/40",
           variant === 'ghost' && "bg-transparent text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20",

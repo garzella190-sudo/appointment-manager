@@ -51,3 +51,6 @@ backups/*.tar.gz
 # Documenti riservati
 documenti_pdf/
 
+
+# log e file temporanei locali
+tmp/

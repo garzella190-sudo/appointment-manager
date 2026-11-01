@@ -237,84 +237,109 @@ export default function Home() {
   return (
     <div className="flex flex-col h-full animate-fade-in overflow-hidden">
       <div className="pt-2 px-4 md:px-6 pb-1 max-w-2xl mx-auto w-full flex-shrink-0">
-        <header className="mb-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-3">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-none">Agenda</h1>
-              <span className="text-[10px] font-black bg-sky-100 dark:bg-sky-900 text-sky-600 px-1.5 py-0.5 rounded-md tracking-tighter">V10</span>
-              <RefreshButton onRefresh={fetchAppointments} className="h-8 w-8 p-0" />
-            </div>
-            <div className="flex items-center gap-3 mt-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-zinc-500 dark:text-zinc-400 capitalize text-sm font-semibold">
-                  {format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}
-                </p>
+        <header className="relative mb-2 flex flex-col gap-2 lg:gap-0">
+          {/* Riga 1 — Titolo, data e azioni rapide */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col min-w-0 lg:max-w-[236px]">
+              <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-none truncate">
+                  Agenda
+                </h1>
+                <span className="text-[10px] font-black bg-sky-100 dark:bg-sky-900 text-sky-600 px-1.5 py-0.5 rounded-md tracking-tighter shrink-0">
+                  V10
+                </span>
+                <RefreshButton onRefresh={fetchAppointments} className="h-9 w-9 sm:h-8 sm:w-8 p-0 shrink-0" />
+              </div>
+              <div className="flex items-center gap-1.5 min-w-0 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsDatePickerOpen(true)}
+                  title="Tocca per scegliere una data"
+                  className="flex items-center min-w-0 text-left active:opacity-50 transition-opacity"
+                >
+                  <span className="block min-w-0 truncate text-zinc-600 dark:text-zinc-300 capitalize text-base sm:text-lg font-bold tracking-tight leading-none">
+                    <span className="sm:hidden">{format(currentDate, 'EEE d MMM yyyy', { locale: it })}</span>
+                    <span className="hidden sm:inline lg:hidden">{format(currentDate, 'EEEE d MMMM yyyy', { locale: it })}</span>
+                    <span className="hidden lg:inline">
+                      {format(
+                        currentDate,
+                        currentDate.getFullYear() === new Date().getFullYear() ? 'EEEE d MMMM' : 'EEEE d MMMM yyyy',
+                        { locale: it }
+                      )}
+                    </span>
+                  </span>
+                </button>
                 {appointments.some(a =>
                   a.is_impegno &&
-                  (a as any).tipo_impegno?.toUpperCase().includes('ESAME')
+                  a.tipo_impegno?.toUpperCase().includes('ESAME')
                 ) && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-400 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm shadow-amber-400/30">
+                  <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 bg-amber-400 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm shadow-amber-400/30 shrink-0">
                     🎓 Esame
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/50 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
-                <button
-                  onClick={(e) => { e.preventDefault(); navigateDay(-1); }}
-                  title="Giorno precedente"
-                  className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
-                  onClick={(e) => { e.preventDefault(); setCurrentDate(new Date()); }}
-                  title="Vai a oggi"
-                  className="px-3 py-1 text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider"
-                >
-                  Oggi
-                </button>
-                <button
-                  onClick={(e) => { e.preventDefault(); navigateDay(1); }}
-                  title="Giorno successivo"
-                  className="p-1.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
-                >
-                  <ChevronRight size={18} />
-                </button>
-                
-                <div className="w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
-                
-                <button
-                  onClick={() => setIsDatePickerOpen(true)}
-                  className="h-8 w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-sky-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
-                  title="Scegli una data"
-                >
-                  <CalendarIconSmall size={18} />
-                </button>
-              </div>
+            </div>
+
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <button
+                onClick={() => { setShowSearch(!showSearch); setShowFilter(false); }}
+                title="Cerca appuntamento"
+                className={cn("h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0", showSearch ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-inner" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
+              >
+                <Search size={16} />
+              </button>
+              <button
+                onClick={() => { setShowFilter(!showFilter); setShowSearch(false); }}
+                title="Filtra Istruttori"
+                className={cn("h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0", showFilter || selectedInstructorId ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
+              >
+                <Users size={16} />
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-sky-500 px-2.5 sm:px-4 h-9 rounded-xl text-white font-black shadow-lg shadow-sky-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-[11px] uppercase tracking-wider shrink-0"
+              >
+                <Plus size={16} className="shrink-0" />
+                <span className="hidden sm:inline">Nuovo</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <button
-              onClick={() => { setShowSearch(!showSearch); setShowFilter(false); }}
-              title="Cerca appuntamento"
-              className={cn("p-2 h-9 rounded-xl transition-all shadow-sm flex items-center justify-center", showSearch ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-inner" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
-            >
-              <Search size={16} />
-            </button>
-            <button
-              onClick={() => { setShowFilter(!showFilter); setShowSearch(false); }}
-              title="Filtra Istruttori"
-              className={cn("p-2 h-9 rounded-xl transition-all shadow-sm flex items-center justify-center", showFilter || selectedInstructorId ? "bg-sky-100 dark:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400" : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-sky-600")}
-            >
-              <Users size={16} />
-            </button>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-sky-500 px-3 md:px-4 h-9 ml-1 rounded-xl text-white font-black shadow-lg shadow-sky-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 text-[11px] uppercase tracking-wider"
-            >
-              <Plus size={16} />
-              <span className="hidden sm:inline">Nuovo</span>
-            </button>
+
+          {/* Riga 2 — Oggi + datepicker: stesso gruppo, stesse misure e stessa posizione del Calendario */}
+          <div className="flex items-center justify-center w-full lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:pointer-events-none">
+            <div className="flex items-center shrink-0 h-11 sm:h-10 gap-0.5 sm:gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 sm:p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner pointer-events-auto">
+              <button
+                onClick={(e) => { e.preventDefault(); navigateDay(-1); }}
+                title="Giorno precedente"
+                className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                onClick={(e) => { e.preventDefault(); setCurrentDate(new Date()); }}
+                title="Vai a oggi"
+                className="px-1.5 sm:px-3 h-9 sm:h-8 text-[10px] sm:text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider hover:text-sky-600 transition-all flex items-center whitespace-nowrap"
+              >
+                Oggi
+              </button>
+              <button
+                onClick={(e) => { e.preventDefault(); navigateDay(1); }}
+                title="Giorno successivo"
+                className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
+              >
+                <ChevronRight size={18} />
+              </button>
+
+              <div className="hidden sm:block w-[1px] h-5 bg-zinc-200 dark:bg-zinc-700/50 mx-0.5"></div>
+
+              <button
+                onClick={() => setIsDatePickerOpen(true)}
+                className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 hover:text-sky-600 dark:text-zinc-400 focus:outline-none cursor-pointer"
+                title="Scegli una data"
+              >
+                <CalendarIconSmall size={18} />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -392,7 +417,7 @@ export default function Home() {
               <p className="text-sm font-medium">Sincronizzazione...</p>
             </div>
           ) : filteredAppointments.length > 0 ? (
-            <div className="grid gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {filteredAppointments.map((apt, index) => {
                 const initials = apt.client_name
                   .split(' ')
@@ -437,13 +462,13 @@ export default function Home() {
                         setSelectedAppointment(apt);
                       }}
                       className={cn(
-                        "relative border shadow-sm rounded-2xl p-4 flex items-center justify-between gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-14",
+                        "relative border shadow-sm rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-12 sm:pr-14",
                         apt.stato === 'annullato' ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60 grayscale" : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
                       )}
                     >
-                      <div className="flex items-center gap-4 min-w-0 w-full sm:w-auto">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
                         <div 
-                          className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0 shadow-inner"
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shrink-0 shadow-inner"
                           style={{ 
                             backgroundColor: apt.stato === 'annullato' ? '#f4f4f5' : `${apt.istruttore?.color}20` || '#f1f5f9',
                             color: apt.stato === 'annullato' ? '#a1a1aa' : apt.istruttore?.color || '#0ea5e9'
@@ -454,14 +479,14 @@ export default function Home() {
 
                         <div className="min-w-0 flex-1">
                           <h4 className={cn(
-                            "font-bold truncate flex items-center gap-2",
+                            "font-bold flex items-center gap-1.5 sm:gap-2 min-w-0",
                             apt.stato === 'annullato' ? "text-zinc-500 dark:text-zinc-400 line-through" : "text-zinc-900 dark:text-white"
                           )}>
                             <span className={cn(
-                              "tabular-nums text-xs font-black",
+                              "tabular-nums text-xs font-black shrink-0",
                               apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
                             )}>{apt.appointment_time}</span>
-                            {apt.client_name}
+                            <span className="truncate">{apt.client_name}</span>
                             {apt.exam_status && apt.exam_status !== 'none' && (
                               <GraduationCap 
                                 size={14} 
@@ -472,26 +497,26 @@ export default function Home() {
                               />
                             )}
                           </h4>
-                          <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-1.5">
+                          <div className="flex items-center flex-wrap gap-x-2 sm:gap-x-3 gap-y-1.5 mt-1.5 min-w-0">
                             {apt.phone && (
                               <a
                                 href={`tel:${apt.phone.replace(/\D/g, '')}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline"
+                                className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline shrink-0"
                               >
                                 <Phone size={10} />
                                 {apt.phone}
                               </a>
                             )}
-                            <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
-                              <User size={10} className="text-zinc-400" />
+                            <div className="flex items-center gap-1.5 min-w-0 max-w-full text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
+                              <User size={10} className="text-zinc-400 shrink-0" />
                               <span className="truncate">{apt.istruttore?.name}</span>
                             </div>
-                            <span className="px-2 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                            <span className="px-2 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
                               {apt.duration} min
                             </span>
                             {apt.license_type && (
-                              <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:purple-400 rounded-md text-[10px] font-black uppercase tracking-wider">
+                              <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:purple-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
                                 Pat. {apt.license_type}
                               </span>
                             )}
@@ -504,7 +529,7 @@ export default function Home() {
                           )}
                         </div>
                       </div>
-                      <div className="absolute top-3 right-3 z-10">
+                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
                         <ConfirmBubble
                           title="Elimina Guida"
                           message="Sei sicuro di voler eliminare questo appuntamento?"
@@ -515,7 +540,7 @@ export default function Home() {
                             fetchAppointments();
                           }}
                           trigger={
-                            <button className="p-1.5 rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50">
+                            <button className="h-9 w-9 flex items-center justify-center rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50">
                               <Trash2 size={16} />
                             </button>
                           }

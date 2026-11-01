@@ -19,10 +19,20 @@ Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco v
 - **Premium Look**: Colori armoniosi basati sugli istruttori, geometrie arrotondate (32px) e micro-animazioni.
 
 ## 🛠️ Tech Stack
-- **Framework**: Next.js 15 (App Router).
+- **Framework**: Next.js 16 (App Router, Turbopack).
 - **Database/Auth**: Supabase.
 - **Stile**: Tailwind CSS.
 - **Componenti**: Lucide React, Date-fns, DND-Kit.
+
+## 📐 Standard Layout Mobile (obbligatorio)
+Le regole di impaginazione responsiva e la procedura di misura sono in
+[`REGOLE_MOBILE_LAYOUT.md`](./REGOLE_MOBILE_LAYOUT.md). In sintesi:
+- Griglie a colonna singola sempre `grid grid-cols-1` (mai `grid gap-X`).
+- `truncate` sempre con `min-w-0`.
+- Touch target minimo 32px (36-40 su mobile).
+- Wrapper centrati in `absolute` sempre con `pointer-events-none`.
+- Verifica strumentata a 320/360/390/412/430px prima di ogni commit.
+
 
 ## 📦 Installazione
 1. Clona il repository.

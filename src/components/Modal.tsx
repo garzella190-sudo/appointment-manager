@@ -50,8 +50,8 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Identico a Nuovo Appuntamento */}
-        <div className="flex items-center justify-between p-8 sm:p-10 pb-4 shrink-0">
-          <h2 className="text-[28px] font-black text-zinc-900 dark:text-zinc-50 tracking-tight leading-none">{title}</h2>
+        <div className="flex items-center justify-between gap-3 p-6 sm:p-10 pb-3 sm:pb-4 shrink-0">
+          <h2 className="min-w-0 text-[20px] sm:text-[28px] font-black text-zinc-900 dark:text-zinc-50 tracking-tight leading-tight sm:leading-none break-words">{title}</h2>
           <button 
             type="button"
             onClick={(e) => {
@@ -59,7 +59,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
               e.stopPropagation();
               onClose();
             }}
-            className="p-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-[20px] transition-all hover:rotate-90 appearance-none flex items-center justify-center"
+            className="p-3 shrink-0 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-[20px] transition-all hover:rotate-90 appearance-none flex items-center justify-center"
           >
             <X size={24} />
             <span className="sr-only">Chiudi</span>
@@ -67,7 +67,7 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
         </div>
         
         {/* Content Container - Scroll interno - Padding aumentato per respiro */}
-        <div className="px-8 sm:px-10 pb-10 overflow-y-auto scrollbar-hide">
+        <div className="px-6 sm:px-10 pb-8 sm:pb-10 overflow-y-auto scrollbar-hide">
           {children}
         </div>
       </div>

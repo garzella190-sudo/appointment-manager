@@ -23,5 +23,15 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 - `/src/actions/impegni.ts` -> **Commitment Server Actions**: Logica impegni con notifiche push selettive in caso di modifiche dell'ufficio.
 
 ## 🎨 Token di Stile
-- `/src/app/globals.css` -> Definizione border-radius (32px/40px) e scrollbar overrides.
+- `/src/app/globals.css` -> Definizione border-radius (32px/40px), scrollbar overrides e regole anti-overflow (`html { overflow-x: hidden }`, `.truncate { min-width: 0 }`).
 - `tailwind.config.ts` -> Palette colori basata sugli istruttori.
+
+## 📐 Regole di Impaginazione
+- `istruzioni programmazione/REGOLE_MOBILE_LAYOUT.md` -> **Regole mobile obbligatorie** + procedura di misura con playwright-core.
+- `.cursorrules` -> Sintesi operativa delle stesse regole per l'IDE.
+
+## 🧱 Componenti trasversali condivisi
+- `/src/components/Modal.tsx` -> Modale unico dell'app (portale, `z-[9999]`): chiudibile con ✕ `shrink-0`, titolo e padding adattivi su mobile. Ogni nuovo modale DEVE usarlo.
+- `/src/components/forms/Select.tsx` -> Select custom condiviso.
+- Gruppo `‹ OGGI › | data` -> identico su `/` e `/calendar` (148x44 mobile, 192x40 desktop, centrato).
+
