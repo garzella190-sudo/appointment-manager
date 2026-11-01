@@ -16,6 +16,7 @@ import { GraduationCap, CheckCircle2, Search, Send, FileEdit, RefreshCw, XCircle
 import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
 import { ClientAutocomplete } from './ClientAutocomplete';
+import { PatentePicker } from './PatentePicker';
 import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
 import { addToOfflineQueue } from '@/lib/offlineSync';
@@ -48,6 +49,109 @@ const TIME_OPTIONS = Array.from({ length: (22 - 8) * 4 + 1 }, (_, i) => {
   const m = totalMinutes % 60;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 });
+
+/** Patenti che appartengono alla famiglia moto/scooter. */
+const MOTO_LICENSES = ['AM', 'A1', 'A2', 'A'];
+
+/**
+ * Compatibilità veicolo ↔ patente ↔ cambio richiesto.
+ *
+ * FONTE DI VERITÀ: `patenti.veicoli_abilitati` (configurata in Gestione).
+ * Es. A1 -> Liberty (automatico) + Yamaha 125 (manuale).
+ * Solo se la mappa è vuota si ricade sul tipo patente.
+ *
+ * Regola unica usata da TUTTI i punti di assegnazione (selezione cliente,
+ * cambio patente, cambio istruttore, cambio cambio-marcia e tendina veicoli),
+ * così le scelte restano coerenti.
+ */
+const isVehicleCompatible = (
+  v: Veicolo,
+  patenteTipo: string,
+  veicoliAbilitati: string[],
+  gearbox: 'manuale' | 'automatico' | string
+): boolean => {
+  const patenteMoto = MOTO_LICENSES.includes(patenteTipo);
+  const veicoloMoto = MOTO_LICENSES.includes(v.tipo_patente);
+
+  // Regola dura: una patente A non può mai guidare un'auto (e un'auto non va con patenti A),
+  // qualunque cosa ci sia scritto nella mappa veicoli_abilitati.
+  if (patenteMoto !== veicoloMoto) return false;
+
+  const licenzaOk = veicoliAbilitati.length > 0
+    ? veicoliAbilitati.includes(v.id)
+    : (patenteMoto ? veicoloMoto : v.tipo_patente === patenteTipo);
+
+  const cambioOk = v.cambio_manuale ? gearbox === 'manuale' : gearbox === 'automatico';
+
+  return licenzaOk && cambioOk;
+};
+
+/** Ordine di visualizzazione delle categorie moto: prima AM, poi A1, A2, A. */
+const MOTO_RANK: Record<string, number> = { AM: 0, A1: 1, A2: 2, A: 3 };
+
+/**
+ * Ordina le moto per categoria patente (AM → A1 → A2 → A) e, dentro la stessa
+ * categoria, prima le automatiche e poi le meccaniche.
+ */
+const sortMotoByCategory = (list: Veicolo[]): Veicolo[] =>
+  [...list].sort((a, b) => {
+    const ra = MOTO_RANK[a.tipo_patente] ?? 9;
+    const rb = MOTO_RANK[b.tipo_patente] ?? 9;
+    if (ra !== rb) return ra - rb;
+    if (a.cambio_manuale !== b.cambio_manuale) return a.cambio_manuale ? 1 : -1;
+    return a.nome.localeCompare(b.nome, 'it');
+  });
+
+/** Etichetta del veicolo nella tendina: `Nome [AM - Auto]` per le moto. */
+const veicoloLabel = (v: Veicolo): string => {
+  const nome = (v.nome || '').trim();
+  return MOTO_LICENSES.includes(v.tipo_patente)
+    ? `${nome} [${v.tipo_patente} - ${v.cambio_manuale ? 'Man' : 'Auto'}]`
+    : `${nome} (${v.targa})`;
+};
+
+const sortByEnabledOrder = (list: Veicolo[], veicoliAbilitati: string[]): Veicolo[] =>
+  veicoliAbilitati.length > 1
+    ? [...list].sort((a, b) => veicoliAbilitati.indexOf(a.id) - veicoliAbilitati.indexOf(b.id))
+    : list;
+
+/**
+ * Veicoli di categoria moto che ogni patente può guidare (copertura legale).
+ * Serve SOLO a validare lo storico: una A1 non può guidare un A2, ma una A può guidare A1/A2/AM.
+ */
+const MOTO_COVERAGE: Record<string, string[]> = {
+  AM: ['AM'],
+  A1: ['AM', 'A1'],
+  A2: ['AM', 'A1', 'A2'],
+  A: ['AM', 'A1', 'A2', 'A'],
+};
+
+/**
+ * Il veicolo usato nell'ultimo appuntamento del cliente è ancora valido come default?
+ *
+ * Per le MOTO basta che sia una moto LEGALMENTE guidabile con quella patente e con il
+ * cambio richiesto: l'istruttore può quindi scegliere un'altra moto della flotta
+ * (es. Yamaha 125 per una patente A manuale) e quella scelta viene ricordata per le
+ * guide successive dello stesso cliente.
+ * Per le AUTO resta la compatibilità piena.
+ */
+const isStoricoValido = (
+  v: Veicolo | null | undefined,
+  patenteTipo: string,
+  veicoliAbilitati: string[],
+  gearbox: 'manuale' | 'automatico' | string
+): boolean => {
+  if (!v) return false;
+
+  if (MOTO_LICENSES.includes(patenteTipo)) {
+    const cambioOk = v.cambio_manuale ? gearbox === 'manuale' : gearbox === 'automatico';
+    const copertura = MOTO_COVERAGE[patenteTipo] || MOTO_LICENSES;
+    return cambioOk && copertura.includes(v.tipo_patente);
+  }
+
+  return isVehicleCompatible(v, patenteTipo, veicoliAbilitati, gearbox);
+};
+
 
 export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
   const { role, isAdmin, isSegreteria, istruttoreId } = useAuth();
@@ -366,113 +470,113 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
       }
     }
 
-    // ─── PRIORITY 1: Storico cliente — copia istruttore e veicolo dall'ultimo appuntamento ───
+    // Contesto di compatibilità (usato da tutte le priorità sotto)
+    const patenteCorrente = patenti.find(p => p.id === updates.patente_id);
+    const veicoliAbilitatiCorrente = patenteCorrente?.veicoli_abilitati ?? [];
+    const cambioRichiesto = (updates.cambio || 'manuale') as 'manuale' | 'automatico';
+
+    /**
+     * Risolve il veicolo da assegnare.
+     * Usa il veicolo preferito solo se compatibile con patente + cambio;
+     * altrimenti il primo compatibile, privilegiando quelli liberi nello slot
+     * e l'ordine configurato in Gestione (es. A1 automatico → Liberty).
+     */
+    const migliorVeicoloCompatibile = (preferito?: Veicolo | null): Veicolo | null => {
+      if (preferito && isVehicleCompatible(preferito, currentPatenteTipo, veicoliAbilitatiCorrente, cambioRichiesto)) {
+        return preferito;
+      }
+      const compatibili = veicoli.filter(v =>
+        isVehicleCompatible(v, currentPatenteTipo, veicoliAbilitatiCorrente, cambioRichiesto)
+      );
+      const libero = (v: Veicolo) => (availableSlots?.vehicle_ids || []).includes(v.id);
+      const ordinati = sortByEnabledOrder(compatibili, veicoliAbilitatiCorrente)
+        .sort((a, b) => (libero(b) ? 1 : 0) - (libero(a) ? 1 : 0));
+      return ordinati[0] ?? null;
+    };
+
+    // ─── PRIORITY 1: storico del cliente (istruttore + veicolo dell'ultimo appuntamento) ───
+    let instrStorico: Istruttore | null = null;
+    let veicoloRicordato: Veicolo | null = null;
     try {
-      const { data: lastApt } = await supabase
+      const { data: ultimi } = await supabase
         .from('appuntamenti')
-        .select('istruttore_id, veicolo_id')
+        .select('istruttore_id, veicolo_id, data')
         .eq('cliente_id', cliente.id)
         .neq('stato', 'annullato')
         .order('data', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(12);
 
-      if (lastApt?.istruttore_id) {
-        const histInstr = istruttori.find(i => i.id === lastApt.istruttore_id);
-        const histVeh = lastApt.veicolo_id ? veicoli.find(v => v.id === lastApt.veicolo_id) : null;
+      const lista = (ultimi || []) as { istruttore_id: string | null; veicolo_id: string | null; data: string }[];
 
-        if (histInstr) {
-          setSelectedIstruttore(histInstr);
-          updates.istruttore_id = histInstr.id;
+      // Ultimo istruttore noto (anche se le guide più recenti non ne hanno uno)
+      const conIstruttore = lista.find(a => a.istruttore_id);
+      if (conIstruttore?.istruttore_id) {
+        instrStorico = istruttori.find(i => i.id === conIstruttore.istruttore_id) ?? null;
+      }
 
-          if (histVeh) {
-            setSelectedVeicolo(histVeh);
-            updates.veicolo_id = histVeh.id;
-          }
-
-          setForm(prev => ({ ...prev, ...updates }));
-          return; // Storico trovato → uscita immediata
+      // Ultimo veicolo assegnato: è la memoria della scelta fatta dall'istruttore.
+      // Se l'appuntamento più recente è senza veicolo si guarda a quello precedente.
+      const conVeicolo = lista.find(a => a.veicolo_id);
+      if (conVeicolo?.veicolo_id) {
+        const v = veicoli.find(x => x.id === conVeicolo.veicolo_id) ?? null;
+        // Valido = guidabile con la patente del cliente e con lo stesso tipo di cambio.
+        // Per le moto può essere anche di categoria diversa (es. Yamaha 125 per una A manuale).
+        if (v && isStoricoValido(v, currentPatenteTipo, veicoliAbilitatiCorrente, cambioRichiesto)) {
+          veicoloRicordato = v;
         }
       }
     } catch {
-      // Nessuno storico trovato, procedi al fallback
+      // Nessuno storico: si prosegue con le altre priorità
     }
 
-    // ─── PRIORITY 2: Profilo utente — istruttore collegato alla sessione ───
-    try {
-      const browserSupabase = createClient();
-      const { data: { user } } = await browserSupabase.auth.getUser();
-      const linkedInstrId = user?.user_metadata?.istruttore_id;
-      if (linkedInstrId) {
-        const profileInstr = istruttori.find(i => i.id === linkedInstrId);
-        if (profileInstr) {
-          setSelectedIstruttore(profileInstr);
-          updates.istruttore_id = profileInstr.id;
-
-          // Auto-select instructor's default vehicle if compatible
-          if (profileInstr.veicolo_id) {
-            const instrVeh = veicoli.find(v => v.id === profileInstr.veicolo_id);
-            if (instrVeh) {
-              const isGearboxMatch = instrVeh.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
-              const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
-              const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(instrVeh.tipo_patente) : instrVeh.tipo_patente === currentPatenteTipo;
-              if (isGearboxMatch && isLicenseMatch) {
-                setSelectedVeicolo(instrVeh);
-                updates.veicolo_id = instrVeh.id;
-              }
-            }
-          }
-
-          setForm(prev => ({ ...prev, ...updates }));
-          return; // Profilo trovato → uscita
-        }
-      }
-    } catch {
-      // Sessione non disponibile, procedi al fallback
-    }
-
-    // ─── PRIORITY 3: Matching per patente — veicolo compatibile + istruttore abilitato ───
-    // 3a. Trova un istruttore abilitato per questa patente
-    const enabledInstructors = istruttori.filter(i => 
-      i.patenti_abilitate && i.patenti_abilitate.includes(currentPatenteTipo as any)
-    );
-    if (enabledInstructors.length > 0) {
-      const bestInstr = enabledInstructors[0];
-      setSelectedIstruttore(bestInstr);
-      updates.istruttore_id = bestInstr.id;
-
-      // Se l'istruttore ha un veicolo default compatibile, usalo
-      if (bestInstr.veicolo_id) {
-        const instrVeh = veicoli.find(v => v.id === bestInstr.veicolo_id);
-        if (instrVeh) {
-          const isGearboxMatch = instrVeh.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
-          const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
-          const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(instrVeh.tipo_patente) : instrVeh.tipo_patente === currentPatenteTipo;
-          if (isGearboxMatch && isLicenseMatch) {
-            setSelectedVeicolo(instrVeh);
-            setForm(prev => ({ ...prev, ...updates, veicolo_id: instrVeh.id }));
-            return;
-          }
-        }
+    // ─── PRIORITY 2: profilo utente — istruttore collegato alla sessione ───
+    let instrProfilo: Istruttore | null = null;
+    if (!instrStorico) {
+      try {
+        const browserSupabase = createClient();
+        const { data: { user } } = await browserSupabase.auth.getUser();
+        const linkedInstrId = user?.user_metadata?.istruttore_id;
+        if (linkedInstrId) instrProfilo = istruttori.find(i => i.id === linkedInstrId) ?? null;
+      } catch {
+        // Sessione non disponibile
       }
     }
 
-    // 3b. Trova un veicolo compatibile per tipo patente e cambio
-    const compatibleVehicles = veicoli.filter(v => {
-      const isGearboxMatch = v.cambio_manuale ? (updates.cambio === 'manuale') : (updates.cambio === 'automatico');
-      const isMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
-      const isLicenseMatch = isMoto ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) : v.tipo_patente === currentPatenteTipo;
-      return isGearboxMatch && isLicenseMatch;
-    });
+    // ─── PRIORITY 3: primo istruttore abilitato per la patente ───
+    const instrAbilitato = (instrStorico || instrProfilo)
+      ? null
+      : (istruttori.find(i => i.patenti_abilitate && i.patenti_abilitate.includes(currentPatenteTipo as any)) ?? null);
 
-    if (compatibleVehicles.length > 0) {
-      setSelectedVeicolo(compatibleVehicles[0]);
-      setForm(prev => ({ ...prev, ...updates, veicolo_id: compatibleVehicles[0].id }));
-    } else {
-      setForm(prev => ({ ...prev, ...updates }));
-    }
+    const istruttoreFinale = instrStorico ?? instrProfilo ?? instrAbilitato;
+
+    // ─── Veicolo: 1) memoria del cliente  2) default dell'istruttore  3) primo compatibile ───
+    const veicoloDefaultIstruttore = istruttoreFinale?.veicolo_id
+      ? (veicoli.find(v => v.id === istruttoreFinale.veicolo_id) ?? null)
+      : null;
+
+    const veicoloFinale: Veicolo | null =
+      veicoloRicordato ?? migliorVeicoloCompatibile(veicoloDefaultIstruttore);
+
+    setSelectedIstruttore(istruttoreFinale);
+    setSelectedVeicolo(veicoloFinale);
+    setForm(prev => ({
+      ...prev,
+      ...updates,
+      istruttore_id: istruttoreFinale?.id ?? '',
+      veicolo_id: veicoloFinale?.id ?? '',
+    }));
   };
 
+  /**
+   * Veicolo compatibile con patente + cambio richiesto.
+   *
+   * FONTE DI VERITÀ: `patenti.veicoli_abilitati` (configurata in Gestione).
+   * Es. A1 -> Liberty (automatico) + Yamaha 125 (manuale); A2 -> Beverly (automatico) + Suzuki 500 (manuale).
+   * Solo se la mappa è vuota si ricade sul tipo patente (comportamento storico).
+   *
+   * Così una patente A1 con cambio automatico ottiene SEMPRE il Liberty e non un
+   * veicolo automatico di altra categoria (AM/A2).
+   */
   const findCompatibleVehicle = (
     patId: string, 
     gearbox: 'manuale' | 'automatico', 
@@ -480,15 +584,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   ): Veicolo | null => {
     const pat = patenti.find(p => p.id === patId);
     const patenteTipo = pat ? pat.tipo : 'B';
-    const isLicenseMoto = ['AM', 'A1', 'A2', 'A'].includes(patenteTipo);
+    const abilitati: string[] = pat?.veicoli_abilitati ?? [];
 
-    const isCompatible = (v: Veicolo) => {
-      const isLicenseMatch = isLicenseMoto 
-        ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) 
-        : v.tipo_patente === patenteTipo;
-      const isGearboxMatch = v.cambio_manuale ? (gearbox === 'manuale') : (gearbox === 'automatico');
-      return isLicenseMatch && isGearboxMatch;
-    };
+    const isCompatible = (v: Veicolo) => isVehicleCompatible(v, patenteTipo, abilitati, gearbox);
+
+    // Rispetta l'ordine curato in Gestione (es. Liberty prima di Yamaha per A1)
+    const inEnabledOrder = (list: Veicolo[]) => sortByEnabledOrder(list, abilitati);
 
     // 1. Prioritize instructor's default vehicle if compatible
     if (instructor?.veicolo_id) {
@@ -504,15 +605,15 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
 
     // 3. Find first compatible vehicle from available (non-busy) vehicles
-    const availableCompatible = veicoli.filter(v => 
-      (availableSlots?.vehicle_ids || []).includes(v.id) && isCompatible(v)
+    const availableCompatible = inEnabledOrder(
+      veicoli.filter(v => (availableSlots?.vehicle_ids || []).includes(v.id) && isCompatible(v))
     );
     if (availableCompatible.length > 0) {
       return availableCompatible[0];
     }
 
     // 4. Find first compatible vehicle globally (fallback)
-    const globalCompatible = veicoli.filter(isCompatible);
+    const globalCompatible = inEnabledOrder(veicoli.filter(isCompatible));
     if (globalCompatible.length > 0) {
       return globalCompatible[0];
     }
@@ -628,24 +729,41 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   }, [currentPatenteTipo]);
 
   const availableVeicoli = useMemo(() => {
-    // Filter by slots first
-    const slotAvailable = veicoli.filter(v => availableSlots.vehicle_ids.includes(v.id));
-    
-    // Filter by Patente compatibility
-    const isVehMoto = ['AM', 'A1', 'A2', 'A'].includes(currentPatenteTipo);
-    const compatibleWithPatente = slotAvailable.filter(v => isVehMoto ? ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente) : v.tipo_patente === currentPatenteTipo);
+    const pat = patenti.find(p => p.id === form.patente_id);
+    const abilitati: string[] = pat?.veicoli_abilitati ?? [];
+    const isMotoPatente = MOTO_LICENSES.includes(currentPatenteTipo);
 
-    if (!selectedIstruttore) return compatibleWithPatente;
-    
-    // Within compatible vehicles, prioritize instructor's default vehicle
+    // Base: veicoli liberi nello slot
+    const liberi = veicoli.filter(v => availableSlots.vehicle_ids.includes(v.id));
+
+    if (isMotoPatente) {
+      // Patente A (qualsiasi categoria): SOLO motoveicoli — le auto non compaiono mai.
+      // Raggruppate per categoria: AM → A1 → A2 → A, dentro la categoria prima le automatiche.
+      const moto = liberi.filter(v => MOTO_LICENSES.includes(v.tipo_patente));
+      return sortMotoByCategory(moto);
+    }
+
+    // Auto: solo veicoli compatibili con patente e cambio
+    let list = liberi.filter(v => isVehicleCompatible(v, currentPatenteTipo, abilitati, form.cambio));
+
+    // Mantiene visibile il veicolo già assegnato (es. modifica di un appuntamento esistente)
+    if (form.veicolo_id && !list.some(v => v.id === form.veicolo_id)) {
+      const corrente = veicoli.find(v => v.id === form.veicolo_id);
+      if (corrente) list = [corrente, ...list];
+    }
+
+    list = sortByEnabledOrder(list, abilitati);
+
+    if (!selectedIstruttore) return list;
+
+    // Veicolo di default dell'istruttore in cima
     const instrDefaultId = selectedIstruttore.veicolo_id;
-    
-    return compatibleWithPatente.sort((a, b) => {
+    return [...list].sort((a, b) => {
       if (a.id === instrDefaultId) return -1;
       if (b.id === instrDefaultId) return 1;
       return 0;
     });
-  }, [veicoli, selectedIstruttore, availableSlots.vehicle_ids, currentPatenteTipo]);
+  }, [veicoli, selectedIstruttore, availableSlots.vehicle_ids, currentPatenteTipo, patenti, form.patente_id, form.cambio, form.veicolo_id]);
 
   const oraFine = useMemo(() => {
     if (!form.ora || isNaN(form.durata)) return '--:--';
@@ -808,6 +926,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     e.preventDefault();
     if (!isImpegno && !form.cliente_id) return alert('Seleziona un cliente');
     if (isImpegno && !nomeImpegno.trim()) return alert('Inserisci il nome dell\'impegno');
+    if (!isImpegno && !form.veicolo_id) {
+      return alert('Assegna un veicolo: non è possibile salvare un appuntamento senza veicolo.');
+    }
     if (!form.istruttore_id) return alert('Seleziona un istruttore');
     
     // Strict overlap validation before submitting
@@ -1523,31 +1644,28 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
               <label className={LABEL_CLS}><Car size={13} /> VEICOLO</label>
               {isView ? (
-                <div className={VIEW_BLOCK_CLS}>{selectedVeicolo?.nome || 'Senza veicolo'}</div>
+                <div className={VIEW_BLOCK_CLS}>
+                  {selectedVeicolo ? veicoloLabel(selectedVeicolo) : 'Nessun veicolo'}
+                </div>
               ) : (
-              <Select
-                options={[
-                  { id: '', label: 'Senza veicolo' },
-                  ...availableVeicoli.map(v => {
-                    const isVeicoloMoto = ['AM', 'A1', 'A2', 'A'].includes(v.tipo_patente);
-                    return {
-                      id: v.id,
-                      label: isVeicoloMoto 
-                        ? `${v.nome} - Patente ${v.tipo_patente} [${v.cambio_manuale ? 'M' : 'A'}] (${v.targa})` 
-                        : `${v.nome} (${v.targa})`,
-                      color: v.colore
-                    };
-                  })
-                ]}
-                value={form.veicolo_id}
-                onChange={(val: string) => {
-                  const veh = veicoli.find((v: Veicolo) => v.id === val);
-                  setSelectedVeicolo(veh || null);
-                  setForm(prev => ({ ...prev, veicolo_id: val }));
-                }}
-                placeholder="Seleziona veicolo..."
-                searchable
-              />
+                <PatentePicker
+                  options={availableVeicoli.map(v => ({
+                    id: v.id,
+                    label: veicoloLabel(v),
+                    color: v.colore,
+                  }))}
+                  value={form.veicolo_id}
+                  onChange={(val: string) => {
+                    const veh = veicoli.find((v: Veicolo) => v.id === val) || null;
+                    setSelectedVeicolo(veh);
+                    setForm(prev => ({ ...prev, veicolo_id: val }));
+                  }}
+                  placeholder="Seleziona veicolo..."
+                  title="Veicolo"
+                  searchPlaceholder="Cerca veicolo..."
+                  icon={<Car size={18} className="text-purple-500" />}
+                  emptyLabel="Nessun veicolo disponibile per questa patente e questo cambio"
+                />
               )}
             </div>
 

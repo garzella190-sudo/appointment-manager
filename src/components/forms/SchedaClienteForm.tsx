@@ -212,12 +212,15 @@ export const SchedaClienteForm = ({
             <Select
               options={[
                 { id: 'manuale', label: 'Meccanico (Manuale)' },
-                { id: 'automatico', label: 'Automatico' }
+                { id: 'automatico', label: 'Automatico (cod. 78)' }
               ]}
               value={form.preferenza_cambio || ''}
               onChange={(val) => setForm(prev => ({ ...prev, preferenza_cambio: val }))}
               placeholder="Seleziona Preferenza Cambio"
             />
+            <p className="text-[10px] text-zinc-400 font-medium ml-1 leading-snug">
+              Determina il veicolo assegnato (es. A1 automatico → Liberty).
+            </p>
           </div>
         )}
       </div>

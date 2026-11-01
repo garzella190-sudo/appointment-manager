@@ -28,7 +28,8 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 
 ## 📐 Regole di Impaginazione
 - `istruzioni programmazione/REGOLE_MOBILE_LAYOUT.md` -> **Regole mobile obbligatorie** + procedura di misura con playwright-core.
-- `.cursorrules` -> Sintesi operativa delle stesse regole per l'IDE.
+- `istruzioni programmazione/REGOLE_VEICOLI_PATENTI.md` -> **Assegnazione veicoli/patenti**: priorità, memoria cliente, ordine categorie, divieto auto con patenti A.
+- `.cursorrules` -> Sintesi operativa delle stesse regole + workflow standard del comando "pusha".
 
 ## 🧱 Componenti trasversali condivisi
 - `/src/components/Modal.tsx` -> Modale unico dell'app (portale, `z-[9999]`): chiudibile con ✕ `shrink-0`, titolo e padding adattivi su mobile. Ogni nuovo modale DEVE usarlo.

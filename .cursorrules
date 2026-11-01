@@ -34,6 +34,25 @@ Vedi 'istruzioni programmazione/REGOLE_MOBILE_LAYOUT.md' per il dettaglio e la p
 - Note Real-time: Salvare le note in tempo reale con debouncing di 1 secondo.
 - Relazione Istruttore-Veicolo: Consenti l'assegnazione di un `veicolo_default_id`. Se la patente è 'B', il sistema deve selezionare automaticamente quel veicolo nell'AppointmentForm.
 
+## Assegnazione Veicoli (OBBLIGATORIO)
+Vedi 'istruzioni programmazione/REGOLE_VEICOLI_PATENTI.md'.
+- Fonte di verità: 'patenti.veicoli_abilitati' (configurata in Gestione). Un veicolo non collegato alla patente non viene mai assegnato.
+- Priorità: 1) memoria del cliente (veicolo dell'ultimo appuntamento) 2) patente richiesta nella scheda cliente + cambio 3) default istruttore, poi primo compatibile libero.
+- La memoria vale anche tra categorie moto, se la moto e' LEGALMENTE guidabile (AM < A1 < A2 < A) e con lo stesso cambio; va scartata se la categoria e' superiore alla patente.
+- Regola dura: patente A <-> auto MAI compatibili, nemmeno con dati sbagliati in Gestione.
+- Nessun appuntamento senza veicolo: niente opzione "Senza veicolo", il salvataggio si blocca. Eccezione: impegni di ufficio ('is_impegno').
+- Lista moto: ordine AM -> A1 -> A2 -> A, dentro la categoria prima le automatiche; etichette 'Nome [AM - Auto]' (auto: 'Nome (TARGA)').
+- Selettore veicolo = modale in primo piano riusando 'PatentePicker' (come "Patente Richiesta" su Clienti). Non duplicare il componente.
+- "Automatico" nel form cliente corrisponde al cod. 78.
+
+## Workflow "pusha" (standard)
+Quando l'utente scrive "pusha" eseguire SEMPRE, in quest'ordine:
+1. Controllo: 'npx tsc --noEmit', 'npm run build', conteggio ESLint confrontato con HEAD (non deve peggiorare).
+2. Aggiornare i file di istruzioni in 'istruzioni programmazione/' e '.cursorrules' se ci sono regole nuove.
+3. Commit descrittivo in italiano + 'git push origin main' (Vercel va in produzione).
+4. Verifica: 'git ls-remote origin main' == HEAD locale, poi controllo che il deploy Vercel sia andato a buon fine (hash dei chunk cambiati / nuova build online).
+5. Riportare l'esito con numeri, senza dichiarare verifiche non eseguite.
+
 ## Protocollo Risposta
 - File COMPLETO.
 - Planning Step obbligatorio.

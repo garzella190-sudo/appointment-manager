@@ -24,7 +24,7 @@ Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco v
 - **Stile**: Tailwind CSS.
 - **Componenti**: Lucide React, Date-fns, DND-Kit.
 
-## 📐 Standard Layout Mobile (obbligatorio)
+## 📐 Regole di Impaginazione
 Le regole di impaginazione responsiva e la procedura di misura sono in
 [`REGOLE_MOBILE_LAYOUT.md`](./REGOLE_MOBILE_LAYOUT.md). In sintesi:
 - Griglie a colonna singola sempre `grid grid-cols-1` (mai `grid gap-X`).
@@ -32,6 +32,14 @@ Le regole di impaginazione responsiva e la procedura di misura sono in
 - Touch target minimo 32px (36-40 su mobile).
 - Wrapper centrati in `absolute` sempre con `pointer-events-none`.
 - Verifica strumentata a 320/360/390/412/430px prima di ogni commit.
+
+## 🚗 Assegnazione Veicoli
+Le regole di scelta del mezzo sono in
+[`REGOLE_VEICOLI_PATENTI.md`](./REGOLE_VEICOLI_PATENTI.md). In sintesi:
+- Fonte di verità: `patenti.veicoli_abilitati`.
+- Prima la memoria del cliente, poi la patente richiesta, poi il default istruttore.
+- Patenti A: mai auto. Nessun appuntamento senza veicolo.
+- Selettore veicolo = modale `PatentePicker`.
 
 
 ## 📦 Installazione
