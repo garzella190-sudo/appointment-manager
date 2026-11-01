@@ -376,7 +376,9 @@ export default function CalendarPage() {
     if (!isFullScreen) return;
 
     const handlePrev = () => {
-      const step = viewMode === 'resource' ? 1 : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
+      const step = viewMode === 'resource'
+        ? (effectiveViewDays > 1 ? effectiveViewDays : 1)
+        : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
       setCurrentDate(prev => {
         const next = new Date(prev);
         next.setDate(next.getDate() - step);
@@ -385,7 +387,9 @@ export default function CalendarPage() {
     };
 
     const handleNext = () => {
-      const step = viewMode === 'resource' ? 1 : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
+      const step = viewMode === 'resource'
+        ? (effectiveViewDays > 1 ? effectiveViewDays : 1)
+        : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
       setCurrentDate(prev => {
         const next = new Date(prev);
         next.setDate(next.getDate() + step);
@@ -896,14 +900,12 @@ export default function CalendarPage() {
                     {[1, 3, 5, 7].map((days) => (
                       <button
                         key={days}
-                        disabled={viewMode === 'resource'}
                         onClick={() => setViewDays(days as 1 | 3 | 5 | 7)}
                         className={cn(
                           "h-11 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border active:scale-95",
-                          viewDays === days && viewMode === 'week'
+                          viewDays === days
                             ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800 shadow-sm"
-                            : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500",
-                          viewMode === 'resource' && "opacity-40 cursor-not-allowed"
+                            : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
                         )}
                       >
                         {days} G
@@ -912,7 +914,7 @@ export default function CalendarPage() {
                   </div>
                   {viewMode === 'resource' && (
                     <p className="text-[10px] text-zinc-400 font-bold mt-2 ml-1">
-                      Seleziona un solo istruttore per scegliere quanti giorni vedere.
+                      Vista più istruttori: i giorni vengono mostrati in sequenza verticale (fino a 7 = una settimana).
                     </p>
                   )}
                 </div>
@@ -1149,6 +1151,20 @@ export default function CalendarPage() {
                   </div>
                 )}
 
+                {(viewMode === 'resource' ? displayDays : [null]).map((resourceDay: Date | null, dayIdx: number) => {
+                  const resourceDateStr = format(resourceDay || currentDate, 'yyyy-MM-dd');
+                  return (
+                  <React.Fragment key={resourceDateStr}>
+                  {viewMode === 'resource' && displayDays.length > 1 && resourceDay && (
+                    <div className="sticky top-0 z-[90] flex items-center justify-between px-3 py-1.5 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm border-y border-zinc-200 dark:border-zinc-800">
+                      <span className="text-[11px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300 capitalize">
+                        {format(resourceDay, 'EEEE d MMMM', { locale: it })}
+                      </span>
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                        {appointments.filter(a => a.appointment_date === resourceDateStr).length} guide
+                      </span>
+                    </div>
+                  )}
                 {timeSlots.map((slot) => {
                   const isFullHour = slot.endsWith(':00');
                   const [slotH, slotM] = slot.split(':').map(Number);
@@ -1164,7 +1180,7 @@ export default function CalendarPage() {
                   return (
                       <div 
                         key={slot} 
-                        id={`slot-${slot}`}
+                        id={dayIdx === 0 ? `slot-${slot}` : undefined}
                         className={cn(
                           "grid min-h-[40px] transition-colors relative",
                           isFullHour ? "border-zinc-300 dark:border-zinc-700 border-b" : "border-zinc-200 dark:border-zinc-800/60 border-b"
@@ -1316,7 +1332,7 @@ export default function CalendarPage() {
                           </DroppableCell>
                         );
                       }) : displayIstruttori.map((ist: any) => {
-                        const dateStr = format(currentDate, 'yyyy-MM-dd');
+                        const dateStr = resourceDateStr;
                         const cellId = `${dateStr}|${slot}|${ist.id}`;
                         
                         const dayAppointments = appointments.filter(a => a.appointment_date === dateStr);
@@ -1438,6 +1454,9 @@ export default function CalendarPage() {
                         );
                       })}
                     </div>
+                  );
+                })}
+                  </React.Fragment>
                   );
                 })}
             </div>

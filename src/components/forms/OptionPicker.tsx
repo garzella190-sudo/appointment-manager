@@ -80,15 +80,15 @@ export const OptionPicker = ({
 
   const modal = isOpen && mounted ? createPortal(
     <div
-      className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
       onClick={handleClose}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
 
-      {/* Card */}
+      {/* Card — sempre centrata a schermo, mai ancorata in basso */}
       <div
-        className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300"
+        className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Intestazione */}

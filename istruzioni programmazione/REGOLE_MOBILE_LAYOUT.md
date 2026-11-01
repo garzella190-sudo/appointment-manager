@@ -105,9 +105,21 @@ Non reinventare il controllo su ogni pagina: copiare le classi.
 
 ---
 
-## 8. `overflow-x: hidden` non è una soluzione
+## 7-bis. Modali e picker sempre **centrati**
 
-Su `html`/`body` è un paracadute, non un fix: **nasconde** lo sforamento (la card resta
+I selettori (patente, veicolo, ecc.) e i modali devono stare **al centro dello schermo**,
+mai ancorati in basso come un vecchio bottom-sheet/dropdown:
+
+```diff
+- <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-4">
++ <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+```
+
+Verifica: il centro della card deve coincidere con il centro del viewport (scarto 0px su X e Y).
+
+---
+
+## 8. `overflow-x: hidden` non è una soluzioneSu `html`/`body` è un paracadute, non un fix: **nasconde** lo sforamento (la card resta
 larga e il tasto resta fuori schermo). Se lo scroll orizzontale "non c'è" ma un elemento
 manca, il colpevole è quasi sempre una colonna `auto` (regola 1).
 
