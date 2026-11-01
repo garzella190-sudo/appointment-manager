@@ -17,6 +17,7 @@ import DatePicker from '@/components/DatePicker';
 import Link from 'next/link';
 import { ClientAutocomplete } from './ClientAutocomplete';
 import { PatentePicker } from './PatentePicker';
+import { VehiclePicker } from './VehiclePicker';
 import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
 import { addToOfflineQueue } from '@/lib/offlineSync';
@@ -1599,7 +1600,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             {isView ? (
               <div className={VIEW_BLOCK_CLS}>{patenti.find(p => p.id === form.patente_id)?.tipo || 'B'}</div>
             ) : (
-              <Select
+              <PatentePicker
                 options={patenti.map(p => ({ id: p.id, label: p.tipo }))}
                 value={form.patente_id}
                 onChange={handlePatenteChange}
@@ -1648,7 +1649,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   {selectedVeicolo ? veicoloLabel(selectedVeicolo) : 'Nessun veicolo'}
                 </div>
               ) : (
-                <PatentePicker
+                <VehiclePicker
                   options={availableVeicoli.map(v => ({
                     id: v.id,
                     label: veicoloLabel(v),
@@ -1661,10 +1662,6 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                     setForm(prev => ({ ...prev, veicolo_id: val }));
                   }}
                   placeholder="Seleziona veicolo..."
-                  title="Veicolo"
-                  searchPlaceholder="Cerca veicolo..."
-                  icon={<Car size={18} className="text-purple-500" />}
-                  emptyLabel="Nessun veicolo disponibile per questa patente e questo cambio"
                 />
               )}
             </div>

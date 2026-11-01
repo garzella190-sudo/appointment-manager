@@ -42,7 +42,7 @@ Vedi 'istruzioni programmazione/REGOLE_VEICOLI_PATENTI.md'.
 - Regola dura: patente A <-> auto MAI compatibili, nemmeno con dati sbagliati in Gestione.
 - Nessun appuntamento senza veicolo: niente opzione "Senza veicolo", il salvataggio si blocca. Eccezione: impegni di ufficio ('is_impegno').
 - Lista moto: ordine AM -> A1 -> A2 -> A, dentro la categoria prima le automatiche; etichette 'Nome [AM - Auto]' (auto: 'Nome (TARGA)').
-- Selettore veicolo = modale in primo piano riusando 'PatentePicker' (come "Patente Richiesta" su Clienti). Non duplicare il componente.
+- Selettore veicolo e patente = modali in primo piano: base condivisa 'OptionPicker', wrapper 'PatentePicker' e 'VehiclePicker'. Mai dropdown 'Select' per questi due campi; non duplicare il markup del picker.
 - "Automatico" nel form cliente corrisponde al cod. 78.
 
 ## Workflow "pusha" (standard)

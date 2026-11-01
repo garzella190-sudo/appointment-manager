@@ -79,8 +79,23 @@ in nessuna lista compaiono auto.
 - Ordine: **AM → A1 → A2 → A** e, dentro la stessa categoria, prima le **automatiche** e poi
   le meccaniche (`MOTO_RANK` + `sortMotoByCategory`).
 - Etichette: `Nome [AM - Auto]` per le moto, `Nome (TARGA)` per le auto (`veicoloLabel`).
-- Il veicolo si sceglie in un **modale in primo piano** riusando `PatentePicker`
-  (lo stesso della "Patente Richiesta" su Clienti): non creare selettori duplicati.
+- I veicoli si scelgono in un **modale in primo piano**; vedi sotto.
+
+---
+
+## Selettori (patente e veicolo)
+
+Architettura a tre livelli, **nessun dropdown** e nessuna duplicazione:
+
+| Componente | Ruolo |
+|---|---|
+| `forms/OptionPicker.tsx` | Base condivisa: tasto + modale con ricerca (bottom-sheet su mobile, card centrata su desktop), colori, chiusura con Esc/backdrop |
+| `forms/PatentePicker.tsx` | Wrapper per la patente (titolo "Patente Richiesta", icona badge, `Cerca patente...`) |
+| `forms/VehiclePicker.tsx` | Wrapper per il veicolo (titolo "Veicolo", icona auto, `Cerca veicolo...`) |
+
+Regole:
+- In `AppointmentForm` i campi **PATENTE** e **VEICOLO** usano questi modali, mai il `<Select>` a tendina.
+- Per un nuovo selettore sul modello "lista di opzioni con ricerca" → usare `OptionPicker`, non copiare il markup.
 
 ---
 
