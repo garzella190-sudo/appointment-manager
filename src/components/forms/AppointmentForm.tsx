@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { ClientAutocomplete } from './ClientAutocomplete';
 import { PatentePicker } from './PatentePicker';
 import { VehiclePicker } from './VehiclePicker';
+import { IstruttorePicker } from './IstruttorePicker';
 import { WhatsAppButton } from '../WhatsAppButton';
 import { useToast } from '@/hooks/useToast';
 import { addToOfflineQueue } from '@/lib/offlineSync';
@@ -322,6 +323,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           if (apt && !error) {
             const dateObj = new Date(apt.inizio);
             const duration = apt.durata || 60;
+            const clienteCaricato = (sortedClienti as Cliente[]).find((c: Cliente) => c.id === apt.cliente_id) || null;
+            const veicoloCaricato = (sortedVeicoli as Veicolo[]).find((v: Veicolo) => v.id === apt.veicolo_id) || null;
+            // `appuntamenti` NON ha una colonna "cambio": il dato vero è il cambio del mezzo usato,
+            // altrimenti la preferenza del cliente. Senza questo il dettaglio mostrava sempre
+            // "Manuale" accanto a una moto automatica (es. Buster [AM - Auto]).
+            const cambioReale: 'manuale' | 'automatico' = veicoloCaricato
+              ? (veicoloCaricato.cambio_manuale ? 'manuale' : 'automatico')
+              : ((clienteCaricato?.preferenza_cambio as 'manuale' | 'automatico') || 'manuale');
             setForm({
               cliente_id: apt.cliente_id || '',
               istruttore_id: apt.istruttore_id || '',
@@ -330,7 +339,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               ora: format(dateObj, 'HH:mm'),
               durata: duration,
               patente_id: apt.patente_id || '', 
-              cambio: (apt.cambio as 'manuale' | 'automatico') || 'manuale', 
+              cambio: cambioReale, 
               note: apt.note || '',
               stato: (apt.stato as StatoAppuntamento) || 'programmato',
             });
@@ -339,15 +348,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             else setDurationMode('custom');
             
             if (apt.cliente_id) {
-              const client = (sortedClienti as Cliente[]).find((c: Cliente) => c.id === apt.cliente_id);
-              if (client?.nome === 'UFFICIO') {
+              if (clienteCaricato?.nome === 'UFFICIO') {
                 setIsImpegno(true);
-                setNomeImpegno(client.cognome);
+                setNomeImpegno(clienteCaricato.cognome);
               }
-              setSelectedCliente(client || null);
+              setSelectedCliente(clienteCaricato);
             }
             setSelectedIstruttore((sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === apt.istruttore_id) || null);
-            setSelectedVeicolo((sortedVeicoli as Veicolo[]).find((v: Veicolo) => v.id === apt.veicolo_id) || null);
+            setSelectedVeicolo(veicoloCaricato);
           }
         } else {
           // New appointment: auto-fill from logged-in user's instructor association
@@ -587,7 +595,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     const patenteTipo = pat ? pat.tipo : 'B';
     const abilitati: string[] = pat?.veicoli_abilitati ?? [];
 
-    const isCompatible = (v: Veicolo) => isVehicleCompatible(v, patenteTipo, abilitati, gearbox);
+    const isCompatible = (v: Veicolo) =>
+      // MOTO: vale la copertura legale (una A può guidare AM/A1/A2/A) + il cambio richiesto,
+      // non la lista `veicoli_abilitati` pensata per le auto. Così, cambiando il tipo cambio,
+      // la moto viene riassegnata davvero (es. manuale → Buster/Liberty automatiche).
+      MOTO_LICENSES.includes(patenteTipo)
+        ? isStoricoValido(v, patenteTipo, abilitati, gearbox)
+        : isVehicleCompatible(v, patenteTipo, abilitati, gearbox);
 
     // Rispetta l'ordine curato in Gestione (es. Liberty prima di Yamaha per A1)
     const inEnabledOrder = (list: Veicolo[]) => sortByEnabledOrder(list, abilitati);
@@ -661,7 +675,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   };
 
   const handleCambioChange = (newCambio: 'manuale' | 'automatico') => {
-    const veh = findCompatibleVehicle(form.patente_id, newCambio, selectedIstruttore);
+    const trovato = findCompatibleVehicle(form.patente_id, newCambio, selectedIstruttore);
+    // Solo mezzi DAVVERO liberi nello slot: se il fallback pesca un veicolo occupato
+    // meglio lasciare il campo vuoto (e mostrare l'avviso) che creare un conflitto.
+    const veh = trovato && availableSlots.vehicle_ids.includes(trovato.id) ? trovato : null;
     setSelectedVeicolo(veh);
     setForm(prev => ({ 
       ...prev, 
@@ -739,8 +756,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
     if (isMotoPatente) {
       // Patente A (qualsiasi categoria): SOLO motoveicoli — le auto non compaiono mai.
+      // Il TIPO CAMBIO selezionato è vincolante: si vedono solo le moto con quel cambio
+      // (un cliente con patente automatica non può ricevere una moto meccanica).
       // Raggruppate per categoria: AM → A1 → A2 → A, dentro la categoria prima le automatiche.
-      const moto = liberi.filter(v => MOTO_LICENSES.includes(v.tipo_patente));
+      const moto = liberi.filter(v =>
+        MOTO_LICENSES.includes(v.tipo_patente) &&
+        (form.cambio === 'manuale' ? v.cambio_manuale : !v.cambio_manuale)
+      );
       return sortMotoByCategory(moto);
     }
 
@@ -1619,22 +1641,22 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               <span className="truncate">{selectedIstruttore ? `${selectedIstruttore.cognome} ${selectedIstruttore.nome}` : 'Non assegnato'}</span>
             </div>
           ) : (
-            <Select
-              options={istruttori.map(i => {
-                const isBusy = !availableSlots.instructor_ids.includes(i.id);
-                return {
-                  id: i.id,
-                  nome: i.nome,
-                  cognome: i.cognome,
-                  info: isBusy ? '(Occupato)' : '',
-                  disabled: isBusy,
-                  color: i.colore
-                };
-              })}
+            <IstruttorePicker
+              options={[...istruttori]
+                .sort((a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`, 'it'))
+                .map(i => {
+                  const isBusy = !availableSlots.instructor_ids.includes(i.id);
+                  return {
+                    id: i.id,
+                    label: `${i.cognome} ${i.nome}`.trim(),
+                    color: i.colore,
+                    info: isBusy ? 'Occupato' : undefined,
+                    disabled: isBusy,
+                  };
+                })}
               value={form.istruttore_id}
               onChange={handleIstruttoreChange}
               placeholder="Seleziona istruttore..."
-              searchable
             />
           )}
         </div>
@@ -1659,7 +1681,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   onChange={(val: string) => {
                     const veh = veicoli.find((v: Veicolo) => v.id === val) || null;
                     setSelectedVeicolo(veh);
-                    setForm(prev => ({ ...prev, veicolo_id: val }));
+                    setForm(prev => ({
+                      ...prev,
+                      veicolo_id: val,
+                      // Il TIPO CAMBIO segue sempre il mezzo reale: mai "Manuale" con una moto
+                      // automatica (o viceversa). Evita accoppiate impossibili da guidare.
+                      ...(veh ? { cambio: (veh.cambio_manuale ? 'manuale' : 'automatico') as 'manuale' | 'automatico' } : {}),
+                    }));
                   }}
                   placeholder="Seleziona veicolo..."
                 />
@@ -1676,6 +1704,14 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                     </button>
                   ))}
                 </div>
+                {/* Il cambio scelto filtra davvero le moto: se non ce ne sono, va detto */}
+                {!isView && availableVeicoli.length === 0 && (
+                  <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500 px-1">
+                    {form.cambio === 'automatico'
+                      ? 'Nessuna moto automatica libera in questo orario'
+                      : 'Nessuna moto manuale libera in questo orario'}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -1686,20 +1722,25 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         {/* NOTIFICATION TOGGLE */}
         {!isImpegno && !isView && (
           <div className="pt-2 animate-in fade-in slide-in-from-top-2">
+            {/*
+              Colori FISSI (nessuna variante dark): il riquadro resta blu identico alla vista
+              chiara anche in tema scuro. Con `bg-blue-50/50` il 50% di trasparenza lasciava
+              trasparire lo sfondo scuro e il box risultava slavato/illeggibile.
+            */}
             <button
               type="button"
               onClick={() => setSendEmail(!sendEmail)}
               className={cn(
                 "w-full flex items-center justify-between p-4 rounded-2xl border transition-all",
                 sendEmail 
-                  ? "bg-blue-50/50 border-blue-100 text-blue-700" 
-                  : "bg-zinc-50 border-zinc-100 text-zinc-400"
+                  ? "bg-blue-50 border-blue-200 text-blue-700" 
+                  : "bg-zinc-100 border-zinc-200 text-zinc-500"
               )}
             >
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-                  sendEmail ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "bg-zinc-200 text-zinc-400"
+                  sendEmail ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "bg-zinc-200 text-zinc-500"
                 )}>
                   <MessageCircle size={18} />
                 </div>
@@ -1728,7 +1769,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   type="email"
                   required
                   placeholder="Inserisci email cliente..."
-                  className="w-full bg-white border border-amber-200 rounded-xl px-4 h-11 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full bg-white text-black caret-black placeholder:text-zinc-500 border border-amber-200 rounded-xl px-4 h-11 text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500 [color-scheme:light]"
                   value={emailFallback}
                   onChange={(e) => setEmailFallback(e.target.value)}
                 />

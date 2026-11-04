@@ -141,6 +141,26 @@
   canvas {
     max-width: 100%;
   }
+
+  /*
+   * Campi chiari leggibili anche in tema scuro.
+   * `body` propaga `dark:text-zinc-100`: un input con solo `bg-white` (senza variante
+   * `dark:bg-*`) ereditava testo bianco su fondo bianco → indirizzo email invisibile.
+   * Questi campi restano quindi "fondo bianco, caratteri neri" in entrambi i temi.
+   * Se serve un campo scuro basta aggiungere `dark:bg-*` (escluso da questa regola).
+   */
+  input.bg-white:not([class*="dark:bg-"]),
+  textarea.bg-white:not([class*="dark:bg-"]),
+  select.bg-white:not([class*="dark:bg-"]) {
+    color: #000;
+    color-scheme: light;
+  }
+
+  input.bg-white:not([class*="dark:bg-"])::placeholder,
+  textarea.bg-white:not([class*="dark:bg-"])::placeholder {
+    color: #71717a; /* zinc-500 */
+    opacity: 1;
+  }
   body {
     @apply bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100;
     min-height: 100dvh;

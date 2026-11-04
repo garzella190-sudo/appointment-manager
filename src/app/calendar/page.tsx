@@ -289,6 +289,13 @@ export default function CalendarPage() {
   const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate.getTime()]);
   // Per evitare scatti in fase di caricamento dal server
   const effectiveViewDays = mounted ? viewDays : 7; 
+  /**
+   * Passo di navigazione = numero di giorni MOSTRATI (1, 3, 5, 7).
+   * Con la vista a 3 giorni il tasto ‹ torna indietro di 3 giorni, non di 1:
+   * le frecce devono far avanzare/arretrare di una "schermata" intera.
+   * (Definito qui perché serve sia ai tasti ‹ › sia ai listener della fullscreen.)
+   */
+  const passoGiorni = effectiveViewDays > 0 ? effectiveViewDays : 1;
   // Forza sempre la partenza dal Lunedì come richiesto
   const displayStart = weekStart; 
   const displayDays = useMemo(() => {
@@ -376,23 +383,18 @@ export default function CalendarPage() {
     if (!isFullScreen) return;
 
     const handlePrev = () => {
-      const step = viewMode === 'resource'
-        ? (effectiveViewDays > 1 ? effectiveViewDays : 1)
-        : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
+      // Stesso passo dei tasti ‹ ›: tanti giorni quanti sono quelli mostrati
       setCurrentDate(prev => {
         const next = new Date(prev);
-        next.setDate(next.getDate() - step);
+        next.setDate(next.getDate() - passoGiorni);
         return next;
       });
     };
 
     const handleNext = () => {
-      const step = viewMode === 'resource'
-        ? (effectiveViewDays > 1 ? effectiveViewDays : 1)
-        : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
       setCurrentDate(prev => {
         const next = new Date(prev);
-        next.setDate(next.getDate() + step);
+        next.setDate(next.getDate() + passoGiorni);
         return next;
       });
     };
@@ -410,7 +412,7 @@ export default function CalendarPage() {
       window.removeEventListener('calendar-today', handleToday);
       window.removeEventListener('calendar-next', handleNext);
     };
-  }, [isFullScreen, viewMode, effectiveViewDays]);
+  }, [isFullScreen, passoGiorni]);
 
   const fetchWeekAppointments = useCallback(async () => {
     setLoading(true);
@@ -755,8 +757,7 @@ export default function CalendarPage() {
 
   const navigateWeek = (direction: number) => {
     const newDate = new Date(currentDate);
-    const step = viewMode === 'resource' ? 1 : (effectiveViewDays === 7 ? 7 : effectiveViewDays);
-    newDate.setDate(newDate.getDate() + (direction * step));
+    newDate.setDate(newDate.getDate() + (direction * passoGiorni));
     setCurrentDate(newDate);
   };
 
@@ -864,7 +865,7 @@ export default function CalendarPage() {
                 <div className="flex items-center shrink-0 h-11 sm:h-10 gap-0.5 sm:gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 sm:p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner lg:absolute lg:left-1/2 lg:-translate-x-1/2">
                   <button
                     onClick={() => navigateWeek(-1)}
-                    title="Settimana precedente"
+                    title={passoGiorni === 1 ? 'Giorno precedente' : `${passoGiorni} giorni precedenti`}
                     className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
                   >
                     <ChevronLeft size={18} />
@@ -878,7 +879,7 @@ export default function CalendarPage() {
                   </button>
                   <button
                     onClick={() => navigateWeek(1)}
-                    title="Settimana successiva"
+                    title={passoGiorni === 1 ? 'Giorno successivo' : `${passoGiorni} giorni successivi`}
                     className="h-9 w-8 sm:h-8 sm:w-8 flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-all text-zinc-600 dark:text-zinc-400"
                   >
                     <ChevronRight size={18} />

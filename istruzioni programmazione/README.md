@@ -3,7 +3,8 @@
 Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco veicoli, ottimizzata per un utilizzo "Mobile-First" ed ultra-compatto.
 
 ## 🚀 Funzionalità Principali
-- **Agenda Giornaliera**: Vista lista con scroll automatico all'orario attuale, **guide raggruppate per istruttore** (ordine cronologico dentro il gruppo) e **filtro multi-istruttore** dal tasto *people*.
+- **Agenda Giornaliera**: Vista lista con scroll automatico all'orario attuale, **guide raggruppate per istruttore** (ordine cronologico dentro il gruppo) e **filtro multi-istruttore** dal tasto *people*; con più istruttori i gruppi sono **affiancati in orizzontale**, mai impilati.
+- **Ricerca globale**: il tasto cerca cerca il cliente in **tutto il calendario**, non solo nel giorno aperto, e separa i risultati in **guide future** e **guide svolte**.
 - **Dati sempre visibili**: senza aprire l'appuntamento si leggono subito **orario, patente e veicolo in uso**, sia in Agenda (chip) sia in Calendario (riga del blocco).
 - **Calendario Interattivo**: Griglia multi-giorno (1, 3, 5, 7 giorni) con granularità variabile (15, 30, 60 minuti).
 - **Gestione Master**: Anagrafica clienti, istruttori e veicoli con controllo scadenze.
@@ -18,6 +19,8 @@ Un'applicazione Next.js moderna per la gestione di appuntamenti, guide e parco v
 - **Ultra-Compact UI**: Navigazione unificata in una singola barra inferiore (BottomNav) che integra il profilo utente e il logout.
 - **Massimizzazione Spazio**: Rimozione di barre superiori fisse e logica di stretch-up per sfruttare ogni pixel verticale.
 - **Premium Look**: Colori armoniosi basati sugli istruttori, geometrie arrotondate (32px) e micro-animazioni.
+- **Tema scuro leggibile**: i campi a fondo bianco usano sempre caratteri neri (`text-black` + `color-scheme: light`), così il testo digitato non sparisce sul bianco.
+- **Sessione a scadenza**: l'accesso dura al massimo **15 giorni di calendario**; alla scadenza l'utente viene disconnesso e riportato al login con l'avviso "Sessione scaduta" (logica in `src/hooks/useAuth.ts`).
 
 ## 🛠️ Tech Stack
 - **Framework**: Next.js 16 (App Router, Turbopack).
@@ -40,6 +43,7 @@ Le regole di scelta del mezzo sono in
 - Fonte di verità: `patenti.veicoli_abilitati`.
 - Prima la memoria del cliente, poi la patente richiesta, poi il default istruttore.
 - Patenti A: mai auto. Nessun appuntamento senza veicolo.
+- Il **TIPO CAMBIO** (moto) è vincolante: filtra la lista e riassegna la moto quando cambia.
 - Selettore veicolo = modale `VehiclePicker` (base condivisa `OptionPicker`).
 
 

@@ -83,18 +83,45 @@ in nessuna lista compaiono auto.
 
 ---
 
+## TIPO CAMBIO (solo moto) — deve essere realistico
+
+Il selettore `Manuale / Automatico` non è decorativo: **determina davvero i mezzi possibili**.
+
+- La lista moto mostrata nel picker è **filtrata dal cambio scelto**: con `Automatico` si vedono
+  solo moto automatiche (Buster, Liberty, Beverly), con `Manuale` solo le meccaniche
+  (Mash, Yamaha 125, Suzuki 500, Suzuki SV 650).
+- Cambiando il cambio, la moto viene **riassegnata** al primo mezzo libero compatibile; tornando
+  indietro torna la moto adatta (verificato: SV 650 → Beverly → Mash).
+- Scegliendo una moto dal picker il selettore **si allinea al mezzo reale**
+  (`veicolo.cambio_manuale`): mai "Manuale" con una moto automatica.
+- Se non c'è nessuna moto libera con quel cambio compare l'avviso
+  *"Nessuna moto automatica/manuale libera in questo orario"* e il campo resta vuoto
+  (meglio che assegnare un mezzo occupato e creare un conflitto).
+- **Aprendo un appuntamento esistente** il cambio va ricavato dal **mezzo usato**
+  (`veicolo.cambio_manuale`), non da `appuntamenti.cambio`: quella colonna **non esiste**
+  (campi reali: `cliente_id, istruttore_id, veicolo_id, data, durata, stato, importo, note,
+  inizio, fine, data_solo, patente_id, sessione_esame_id, send_email, send_whatsapp, …`).
+  Il fallback è `clienti.preferenza_cambio`, poi `manuale`. Senza questo passaggio il dettaglio
+  mostrava "Manuale" accanto a una moto automatica (es. `Buster [AM - Auto]`).
+- Per le **moto** la compatibilità usa la **copertura legale** (`MOTO_COVERAGE`): una A può
+  guidare AM/A1/A2/A dentro il cambio richiesto — **non** la lista `veicoli_abilitati`, che è
+  pensata per le auto. Senza questa distinzione il cambio su "Automatico" non trovava mezzi.
+
+---
+
 ## Selettori (patente e veicolo)
 
 Architettura a tre livelli, **nessun dropdown** e nessuna duplicazione:
 
 | Componente | Ruolo |
 |---|---|
-| `forms/OptionPicker.tsx` | Base condivisa: tasto + modale **centrato** con ricerca, colori, chiusura con Esc/backdrop. Supporta anche selezione **multipla** (`multiple`, `selectedValues`, `onToggle`, `confirmLabel`) e apertura controllata (`isOpen` / `onOpenChange` / `hideTrigger`) — usata dal picker istruttori in Agenda |
+| `forms/OptionPicker.tsx` | Base condivisa: tasto + modale **centrato** con ricerca, colori, chiusura con Esc/backdrop. Supporta anche selezione **multipla** (`multiple`, `selectedValues`, `onToggle`, `confirmLabel`) e apertura controllata (`isOpen` / `onOpenChange` / `hideTrigger`) — usata dal picker istruttori in Agenda. Le opzioni accettano `info` (testo a destra, es. "Occupato") e `disabled` (voce non cliccabile e attenuata) |
 | `forms/PatentePicker.tsx` | Wrapper per la patente (titolo "Patente Richiesta", icona badge, `Cerca patente...`) |
 | `forms/VehiclePicker.tsx` | Wrapper per il veicolo (titolo "Veicolo", icona auto, `Cerca veicolo...`) |
+| `forms/IstruttorePicker.tsx` | Wrapper per l'istruttore (titolo "Istruttore", icona utente, `Cerca istruttore...`); gli istruttori già impegnati arrivano `disabled` + `info: 'Occupato'` |
 
 Regole:
-- In `AppointmentForm` i campi **PATENTE** e **VEICOLO** usano questi modali, mai il `<Select>` a tendina.
+- In `AppointmentForm` i campi **PATENTE**, **VEICOLO** e **ISTRUTTORE** usano questi modali, mai il `<Select>` a tendina.
 - Per un nuovo selettore sul modello "lista di opzioni con ricerca" → usare `OptionPicker`, non copiare il markup.
   Se serve scelta multipla o apertura da un tasto esterno, usare le prop esistenti: **non** creare un secondo modale.
 

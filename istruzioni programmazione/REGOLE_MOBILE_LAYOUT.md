@@ -119,6 +119,26 @@ un altro modo?* Se no, deve restare visibile (eventualmente compattata).
   "Non assegnato".
 - La griglia delle card resta `grid grid-cols-1` **dentro ogni gruppo**: il raggruppamento non
   deve reintrodurre righe orizzontali o colonne implicite (regola 1).
+- Con **più istruttori i gruppi sono AFFIANCATI IN ORIZZONTALE, mai impilati**:
+
+```jsx
+<div className={gruppi.length > 1
+  ? "flex items-start gap-3 overflow-x-auto pb-3 snap-x"
+  : "space-y-5"}>
+  <div className={gruppi.length > 1 ? "flex-1 min-w-[86vw] sm:min-w-[320px] snap-start" : ""}>
+```
+
+  - Larghezza minima colonna **86vw su mobile** (la colonna successiva si intravede) e
+    **320px da `sm`**; il contenitore scorre in orizzontale invece di comprimere le card.
+  - `min-w` sul figlio è obbligatorio: con solo `flex-1` la colonna si restringe a 0 invece di
+    attivare lo scroll.
+  - **MAI mettere `.scroll-container` sul contenitore orizzontale**: quella classe imposta
+    `overflow-x: hidden` e uccide lo scorrimento (su mobile si vede solo la prima colonna).
+    Usare `overflow-x-auto` + `snap-x snap-mandatory` + `style={{ WebkitOverflowScrolling: 'touch' }}`.
+  - Verifica: tutti i gruppi con la **stessa `y`**, `getComputedStyle(cont).overflowX === 'auto'`,
+    `scrollWidth > clientWidth`, `cont.scrollLeft = 400` deve restituire `> 0`, e uno **swipe touch
+    reale** (CDP `Input.dispatchTouchEvent`) deve spostare `scrollLeft`. Sulla pagina
+    `document.scrollWidth === clientWidth` (nessuno sforamento).
 
 **Regola dei dettagli minimi (obbligatoria):** senza aprire l'appuntamento devono essere
 leggibili **orario, patente e veicolo in uso**.
@@ -131,6 +151,28 @@ leggibili **orario, patente e veicolo in uso**.
 
 Il veicolo si stampa con la **targa** se presente (`Liberty (ES59409)` → `ES59409`), altrimenti
 col nome; i valori vuoti o `Nessuno` non producono alcun chip.
+
+### 6-ter.1 Ricerca in agenda = tutto il calendario
+
+Il tasto cerca **non** filtra il giorno visualizzato: cerca in **tutte** le guide e divide i
+risultati in **Guide future** e **Guide svolte** (chiave di confronto `yyyy-MM-dd HH:mm`).
+
+- Il filtro istruttore **non** si applica alla ricerca: si cerca il cliente, chiunque lo segua.
+- Quattro filtri con i rispettivi conteggi: `Tutte / Future / Svolte / Annullate`
+  (`grid grid-cols-2` su mobile, `flex` da `sm`, così le 4 etichette non si schiacciano).
+- **Le ore NON vanno scritte sui tasti**: su 320–390px la seconda riga rendeva il tasto illeggibile.
+  Il tasto resta a **una sola riga** (`h-9`, `text-[10px]`, `whitespace-nowrap`, solo `ETICHETTA + n`).
+  Le ore stanno nel **riepilogo sotto i filtri** (`Ore totali` / `Effettuate` / `Annullate`, 3 box
+  `grid-cols-3`) e nelle **intestazioni di sezione** (`GUIDE SVOLTE 24 · 17h 45m`).
+  Verifica a 390px: tasti alti **36px**, nessun `scrollWidth > clientWidth`, pagina senza sforamento.
+- **Le guide annullate hanno una sezione propria** (`stato === 'annullato'`), in fondo, con pallino
+  e titolo **rossi** e la chip `ANNULLATA` sulla card. Sono **escluse** da future e svolte, così i
+  conteggi non si sommano due volte (verificato: 27 totali = 1 futura + 24 svolte + 2 annullate).
+- Ogni riga risultato mostra sempre **data, ora, cliente, istruttore, patente e veicolo**.
+- **Paginazione obbligatoria**: Supabase/PostgREST restituisce max **1000 righe** per richiesta.
+  Senza `.range()` ciclico i risultati più recenti non comparirebbero mai (con 1166 guide il
+  cliente cercato dava "0 risultati"). Il fetch completo si fa **una volta** e resta in cache
+  finché non arriva l'evento `appointments-updated`.
 
 ---
 
@@ -146,6 +188,28 @@ stesso ordine, stesse misure, stessa posizione (centrato).
 
 Non reinventare il controllo su ogni pagina: copiare le classi.
 
+### 7.1 In Calendario le frecce scorrono di TANTI giorni quanti ne vedi
+
+Il passo di navigazione **non è 1 giorno fisso**: è il numero di giorni mostrati (`viewDays`).
+
+```ts
+const passoGiorni = effectiveViewDays > 0 ? effectiveViewDays : 1;
+const navigateWeek = (d: 1 | -1) => { const n = new Date(currentDate); n.setDate(n.getDate() + d * passoGiorni); setCurrentDate(n); };
+```
+
+| Vista | Passo `‹` / `›` | `title` del tasto |
+|---|---|---|
+| 1 giorno | 1 | "Giorno precedente/successivo" |
+| 3 giorni | **3** | "3 giorni precedenti/successivi" |
+| 5 giorni | **5** | "5 giorni precedenti/successivi" |
+| 7 giorni | **7** | "7 giorni precedenti/successivi" |
+
+Vale sia per `navigateWeek` (tasti e modulo "Visualizzazione") sia per i listener
+`calendar-prev` / `calendar-next` della fullscreen. `passoGiorni` va definito **sopra** gli
+effetti che lo usano (altrimenti errore di inizializzazione nel render).
+Misura verificata (cambio data in `localStorage.calendar_currentDate`):
+3G `04→01→04→07 nov`, 5G `04→30 ott→04→09 nov`, 7G `04→28 ott→04→11 nov`.
+
 ---
 
 ## 7-bis. Modali e picker sempre **centrati**
@@ -159,6 +223,51 @@ mai ancorati in basso come un vecchio bottom-sheet/dropdown:
 ```
 
 Verifica: il centro della card deve coincidere con il centro del viewport (scarto 0px su X e Y).
+
+---
+
+## 7-ter. Tema scuro: campo bianco = caratteri neri
+
+`body` dichiara `text-zinc-900 dark:text-zinc-100`: **tutti i controlli ereditano il colore del
+testo**. Un input con `bg-white` e senza variante `dark:bg-*` resta bianco anche in tema scuro,
+quindi il testo digitato diventava **bianco su bianco** (bug reale: campo email nel
+"Nuovo Appuntamento", illeggibile).
+
+```diff
+- <input className="w-full bg-white border border-amber-200 …" />
++ <input className="w-full bg-white text-black caret-black placeholder:text-zinc-500 … [color-scheme:light]" />
+```
+
+- `text-black` + `caret-black` → testo e cursore sempre leggibili.
+- `[color-scheme:light]` → anche il rendering nativo (autofill, selezione) resta chiaro.
+- Se il campo invece deve diventare scuro, serve `dark:bg-*` **e** testo ereditato: non forzare il nero.
+
+Rete di sicurezza globale in `globals.css` (non sostituisce la classe esplicita):
+
+```css
+input.bg-white:not([class*="dark:bg-"]), textarea.bg-white:not([class*="dark:bg-"]) {
+  color: #000;
+  color-scheme: light;
+}
+```
+
+Campi già a posto perché hanno `dark:bg-*`: ricerca clienti/agenda/gestione, candidati esami.
+
+**Riquadri colorati (es. "NOTIFICA EMAIL"):** niente trasparenza sul fondo colorato.
+`bg-blue-50/50` lasciava trasparire lo sfondo scuro → box slavato e testo poco leggibile.
+La scelta approvata è **colore fisso, identico alla vista chiara** in entrambi i temi:
+
+```diff
+- sendEmail ? "bg-blue-50/50 border-blue-100 text-blue-700" : "bg-zinc-50 border-zinc-100 text-zinc-400"
++ sendEmail ? "bg-blue-50 border-blue-200 text-blue-700"    : "bg-zinc-100 border-zinc-200 text-zinc-500"
+```
+
+Verifica: `getComputedStyle` di sfondo/bordo/testo deve restituire **lo stesso valore** con
+`colorScheme: 'light'` e `colorScheme: 'dark'`.
+
+Verifica strumentata: con `colorScheme: 'dark'` nel contesto Playwright, dopo aver digitato un
+indirizzo il campo deve avere `getComputedStyle(el).color === 'rgb(0, 0, 0)'` **e**
+`backgroundColor === 'rgb(255, 255, 255)'`.
 
 ---
 
@@ -220,6 +329,7 @@ Rimuovere sempre script temporanei, route di prova e screenshot generati.
 - [ ] Nessun wrapper `absolute` a larghezza piena senza `pointer-events-none`
 - [ ] Azioni necessarie visibili anche sotto 640px
 - [ ] Agenda/calendario mostrano **orario, patente e veicolo** senza aprire l'appuntamento
+- [ ] Nessun campo `bg-white` senza `text-black` (o `dark:bg-*`): testo leggibile in tema scuro
 - [ ] Le card dell'agenda restano raggruppate per istruttore, `grid-cols-1` per gruppo
 - [ ] Misura a 320/360/390/412/430px: 0 elementi fuori schermo
 - [ ] `npm run build` e `npx tsc --noEmit` puliti

@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
-import { format, addDays, isSameDay } from 'date-fns';
+import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 import { ConflictsAlert } from '@/components/ConflictsAlert';
@@ -20,6 +20,134 @@ import { RefreshButton } from '@/components/RefreshButton';
 import DatePickerModal from '@/components/modals/DatePickerModal';
 import { useAuth } from '@/hooks/useAuth';
 
+/** Campi necessari alla vista agenda (giorno singolo e ricerca globale). */
+const APPOINTMENT_SELECT = `
+  id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, sessione_esame_id,
+  clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
+  istruttori ( nome, cognome, colore ),
+  veicoli ( id, targa, nome, colore )
+`;
+
+/** Righe Supabase (relazioni annidate: possono arrivare come oggetto o array). */
+type ClienteRiga = {
+  id: string; nome: string; cognome: string; telefono: string | null;
+  preferenza_cambio: string | null; patente_richiesta_id: string | null;
+  sessione_esame_id: string | null; pronto_esame: boolean | null;
+};
+type IstruttoreRiga = { nome: string; cognome: string; colore: string | null };
+type VeicoloRiga = { id: string; targa: string; nome: string; colore: string | null };
+type RigaAppuntamento = {
+  id: string; data: string; durata: number; stato: string; note: string | null;
+  importo: number | null; istruttore_id: string | null; veicolo_id: string | null;
+  inizio: string | null; fine: string | null; sessione_esame_id: string | null;
+  clienti: ClienteRiga | ClienteRiga[] | null;
+  istruttori: IstruttoreRiga | IstruttoreRiga[] | null;
+  veicoli: VeicoloRiga | VeicoloRiga[] | null;
+};
+
+/** Converte le righe Supabase nel modello usato dalla UI (usato da giorno e ricerca). */
+const mapAppointmentRows = (
+  rows: RigaAppuntamento[],
+  patentiMap: Map<string, string>
+): Appointment[] => rows.map((row) => {
+  const rowDate = new Date(row.data);
+  const clienteObj = Array.isArray(row.clienti) ? row.clienti[0] : row.clienti;
+  const istruttoreObj = Array.isArray(row.istruttori) ? row.istruttori[0] : row.istruttori;
+  const veicoloObj = Array.isArray(row.veicoli) ? row.veicoli[0] : row.veicoli;
+  const patenteId = clienteObj?.patente_richiesta_id;
+  const isUfficio = clienteObj?.nome === 'UFFICIO';
+  return {
+    id: row.id,
+    cliente_id: clienteObj?.id || '',
+    appointment_date: format(rowDate, 'yyyy-MM-dd'),
+    appointment_time: format(rowDate, 'HH:mm'),
+    client_name: isUfficio ? clienteObj.cognome : (clienteObj ? `${clienteObj.cognome} ${clienteObj.nome}` : 'Sconosciuto'),
+    is_impegno: isUfficio,
+    tipo_impegno: isUfficio ? (clienteObj?.cognome || '') : null,
+    phone: clienteObj?.telefono || '',
+    trainer_id: row.istruttore_id,
+    vehicle_id: veicoloObj ? `${veicoloObj.nome} (${veicoloObj.targa})` : 'Nessuno',
+    vehicle_color: veicoloObj?.colore,
+    duration: row.durata,
+    notes: row.note,
+    status: row.stato,
+    stato: row.stato,
+    cost: row.importo || 0,
+    license_type: patenteId ? (patentiMap.get(patenteId) || 'B') : 'B',
+    gearbox_type: clienteObj?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
+    istruttore: {
+      name: istruttoreObj ? `${istruttoreObj.cognome} ${istruttoreObj.nome}` : 'Non ass.',
+      color: istruttoreObj?.colore || '#3b82f6'
+    },
+    exam_status: clienteObj?.sessione_esame_id ? 'scheduled' : (clienteObj?.pronto_esame ? 'ready' : 'none'),
+    sessione_esame_id: row.sessione_esame_id
+  };
+}) as unknown as Appointment[];
+
+
+/** Targa dal valore `Nome (TARGA)`, altrimenti il nome. Vuoto/Nessuno → null. */
+const veicoloBreve = (valore?: string): string | null => {
+  const raw = (valore || '').trim();
+  if (!raw || raw.toLowerCase() === 'nessuno') return null;
+  return raw.match(/\(([^)]+)\)/)?.[1] || raw;
+};
+
+/** Durata in minuti → "1h 30m" / "2h" / "45m". Usata per i totali ore della ricerca. */
+const formatOre = (minuti: number): string => {
+  const tot = Math.max(0, Math.round(minuti || 0));
+  const h = Math.floor(tot / 60);
+  const m = tot % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+};
+
+/** Somma delle durate (in minuti) di un elenco di guide. */
+const minutiTotali = (lista: Appointment[]): number =>
+  lista.reduce((acc, a) => acc + (Number(a.duration) || 0), 0);
+
+/** Riga dei risultati di ricerca: mostra sempre DATA, ora, cliente, istruttore, patente e veicolo. */
+const RigaRisultato = ({ apt, onOpen }: { apt: Appointment; onOpen: () => void }) => {
+  const veicolo = veicoloBreve(apt.vehicle_id);
+  const annullata = apt.stato === 'annullato';
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        "w-full text-left border shadow-sm rounded-2xl p-3 flex items-center justify-between gap-3 transition-all hover:border-sky-500/50 hover:shadow-lg hover:shadow-sky-500/5",
+        annullata
+          ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60"
+          : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
+      )}
+    >
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+          {format(parseISO(apt.appointment_date), 'EEE d MMM yyyy', { locale: it })} · {apt.appointment_time}
+        </p>
+        <p className="font-bold text-zinc-900 dark:text-zinc-100 truncate">{apt.client_name}</p>
+        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 truncate">{apt.istruttore?.name || 'Non assegnato'}</p>
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-700/50">
+          PAT. {apt.license_type}
+        </span>
+        {veicolo && (
+          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50 flex items-center gap-1 max-w-[110px]">
+            <Car size={9} className="shrink-0" />
+            <span className="truncate">{veicolo}</span>
+          </span>
+        )}
+        {annullata && (
+          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/50">
+            Annullata
+          </span>
+        )}
+      </div>
+    </button>
+  );
+};
+
 export default function Home() {
   const { istruttoreId, isIstruttore, loading: authLoading } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -32,6 +160,11 @@ export default function Home() {
   const lastScrollY = useRef(0);
   const hasAutoScrolled = useRef(false);
   const [hasAppliedAutoFilter, setHasAppliedAutoFilter] = useState(false);
+
+  // Ricerca globale: appuntamenti di TUTTO il calendario (non solo il giorno scelto)
+  const [globalAppointments, setGlobalAppointments] = useState<Appointment[] | null>(null);
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [searchScope, setSearchScope] = useState<'tutte' | 'future' | 'svolte' | 'annullate'>('tutte');
   
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
@@ -49,12 +182,7 @@ export default function Home() {
       const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
         supabase
           .from('appuntamenti')
-          .select(`
-            id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, sessione_esame_id,
-            clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
-            istruttori ( nome, cognome, colore ),
-            veicoli ( id, targa, nome, colore )
-          `)
+          .select(APPOINTMENT_SELECT)
           .eq('data_solo', dateStr)
           .order('data'),
         supabase.from('patenti').select('id, tipo'),
@@ -66,46 +194,13 @@ export default function Home() {
 
       const patentiMap = new Map<string, string>((patentiData || []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
 
-      const mappedAppointments: Appointment[] = (dbData || []).map((row: Record<string, any>) => {
-        const rowDate = new Date(row.data);
-        const clienteObj = Array.isArray(row.clienti) ? row.clienti[0] : row.clienti;
-        const istruttoreObj = Array.isArray(row.istruttori) ? row.istruttori[0] : row.istruttori;
-        const veicoloObj = Array.isArray(row.veicoli) ? row.veicoli[0] : row.veicoli;
-        const patenteId = clienteObj?.patente_richiesta_id;
-        const isUfficio = clienteObj?.nome === 'UFFICIO';
-        return {
-          id: row.id,
-          cliente_id: clienteObj?.id || '',
-          appointment_date: format(rowDate, 'yyyy-MM-dd'),
-          appointment_time: format(rowDate, 'HH:mm'),
-          client_name: isUfficio ? clienteObj.cognome : (clienteObj ? `${clienteObj.cognome} ${clienteObj.nome}` : 'Sconosciuto'),
-          is_impegno: isUfficio,
-          tipo_impegno: isUfficio ? (clienteObj?.cognome || '') : null,
-          phone: clienteObj?.telefono || '',
-          trainer_id: row.istruttore_id,
-          vehicle_id: veicoloObj ? `${veicoloObj.nome} (${veicoloObj.targa})` : 'Nessuno',
-          vehicle_color: veicoloObj?.colore,
-          duration: row.durata,
-          notes: row.note,
-          status: row.stato,
-          stato: row.stato,
-          cost: row.importo || 0,
-          license_type: patenteId ? (patentiMap.get(patenteId) || 'B') : 'B',
-          gearbox_type: clienteObj?.preferenza_cambio === 'automatico' ? 'Automatico' : 'Manuale',
-          istruttore: {
-            name: istruttoreObj ? `${istruttoreObj.cognome} ${istruttoreObj.nome}` : 'Non ass.',
-            color: istruttoreObj?.colore || '#3b82f6'
-          },
-          exam_status: clienteObj?.sessione_esame_id ? 'scheduled' : (clienteObj?.pronto_esame ? 'ready' : 'none'),
-          sessione_esame_id: row.sessione_esame_id
-        };
-      });
+      const mappedAppointments = mapAppointmentRows((dbData || []) as unknown as RigaAppuntamento[], patentiMap);
 
-      setAppointments(mappedAppointments as unknown as Appointment[]);
+      setAppointments(mappedAppointments);
       
       if (selectedAppointment) {
         const updated = mappedAppointments.find(a => a.id === selectedAppointment.id);
-        if (updated) setSelectedAppointment(updated as unknown as Appointment);
+        if (updated) setSelectedAppointment(updated);
       }
     } catch (err) {
       console.error('Error fetching appointments:', err);
@@ -120,6 +215,7 @@ export default function Home() {
 
     const handleUpdate = () => {
       console.log("Sync global triggered: fetching appointments...");
+      setGlobalAppointments(null); // invalida la cache della ricerca globale
       fetchAppointments();
     };
 
@@ -144,6 +240,47 @@ export default function Home() {
       setHasAppliedAutoFilter(true); // marca comunque per evitare loop
     }
   }, [authLoading, istruttoreId, hasAppliedAutoFilter]);
+
+  // Ricerca globale: cerca la parola in TUTTO il calendario, non solo nel giorno scelto.
+  // Il fetch completo (una volta sola, poi in cache) viene invalidato al sync degli appuntamenti.
+  const isGlobalSearch = searchQuery.trim().length >= 2;
+
+  useEffect(() => {
+    if (!isGlobalSearch || globalAppointments) return;
+    let annullato = false;
+
+    (async () => {
+      setGlobalLoading(true);
+      try {
+        const { data: patentiData } = await supabase.from('patenti').select('id, tipo');
+
+        // Supabase/PostgREST restituisce al massimo 1000 righe per richiesta:
+        // senza paginazione le guide più recenti non entrerebbero mai nei risultati.
+        const PAGINA = 1000;
+        const righe: RigaAppuntamento[] = [];
+        for (let da = 0; da < 20000; da += PAGINA) {
+          const { data: pagina, error: paginaError } = await supabase
+            .from('appuntamenti')
+            .select(APPOINTMENT_SELECT)
+            .order('data')
+            .range(da, da + PAGINA - 1);
+          if (paginaError) throw paginaError;
+          const blocco = (pagina || []) as unknown as RigaAppuntamento[];
+          righe.push(...blocco);
+          if (blocco.length < PAGINA) break;
+        }
+
+        const patentiMap = new Map<string, string>((patentiData || []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
+        if (!annullato) setGlobalAppointments(mapAppointmentRows(righe, patentiMap));
+      } catch (err) {
+        console.error('Error fetching all appointments:', err);
+      } finally {
+        if (!annullato) setGlobalLoading(false);
+      }
+    })();
+
+    return () => { annullato = true; };
+  }, [isGlobalSearch, globalAppointments]);
 
   // Reset auto-scroll flag when date changes
   useEffect(() => {
@@ -224,6 +361,47 @@ export default function Home() {
     gruppi.forEach(g => g.items.sort((a, b) => a.appointment_time.localeCompare(b.appointment_time)));
     return gruppi;
   }, [filteredAppointments]);
+
+  /**
+   * Risultati della ricerca globale (tutto il calendario), separati in guide FUTURE, SVOLTE e ANNULLATE.
+   * Il filtro istruttore NON si applica: si cerca il cliente, chiunque lo segua.
+   * Le guide annullate hanno una sezione propria: non sono né "future" né "svolte" e non
+   * devono sparire dentro gli altri gruppi.
+   */
+  const risultatiRicerca = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const vuoto = { future: [], svolte: [], annullate: [], totale: 0, ore: { tutte: 0, future: 0, svolte: 0, annullate: 0 } };
+    if (!isGlobalSearch || !globalAppointments) return vuoto;
+
+    const trovati = globalAppointments.filter(a =>
+      (a.client_name?.toLowerCase().includes(q)) ||
+      (a.istruttore?.name?.toLowerCase().includes(q)) ||
+      (a.phone && a.phone.includes(q))
+    );
+
+    const adesso = format(new Date(), 'yyyy-MM-dd HH:mm');
+    const chiave = (a: Appointment) => `${a.appointment_date} ${a.appointment_time}`;
+    const annullata = (a: Appointment) => a.stato === 'annullato';
+
+    const attive = trovati.filter(a => !annullata(a));
+    const future = attive.filter(a => chiave(a) >= adesso).sort((a, b) => chiave(a).localeCompare(chiave(b)));
+    const svolte = attive.filter(a => chiave(a) < adesso).sort((a, b) => chiave(b).localeCompare(chiave(a)));
+    const annullate = trovati.filter(annullata).sort((a, b) => chiave(b).localeCompare(chiave(a)));
+
+    return {
+      future,
+      svolte,
+      annullate,
+      totale: trovati.length,
+      // Ore (in minuti): tutte = totale, effettuate = svolte, annullate = annullate
+      ore: {
+        tutte: minutiTotali(trovati),
+        future: minutiTotali(future),
+        svolte: minutiTotali(svolte),
+        annullate: minutiTotali(annullate),
+      },
+    };
+  }, [isGlobalSearch, globalAppointments, searchQuery]);
 
   const handleSuccess = () => {
     setIsModalOpen(false);
@@ -385,21 +563,153 @@ export default function Home() {
         className="flex-1 overflow-y-auto scroll-container px-4 md:px-6 pb-32"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="max-w-2xl mx-auto space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{titleText}</h2>
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{filteredAppointments.length} Guide</span>
+        <div className={cn("mx-auto space-y-3", isGlobalSearch ? "max-w-4xl" : "max-w-2xl")}>
+          <div className="flex items-center justify-between px-1 gap-2">
+            <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight truncate">
+              {isGlobalSearch ? `Ricerca: ${searchQuery.trim()}` : titleText}
+            </h2>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest shrink-0">
+              {isGlobalSearch ? `${risultatiRicerca.totale} Risultati` : `${filteredAppointments.length} Guide`}
+            </span>
           </div>
 
-          {loading && appointments.length === 0 ? (
+          {isGlobalSearch ? (
+            /* ---------- RICERCA GLOBALE (tutto il calendario: future, svolte e annullate) ---------- */
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:flex gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60">
+                {([
+                  ['tutte', 'Tutte', risultatiRicerca.totale],
+                  ['future', 'Future', risultatiRicerca.future.length],
+                  ['svolte', 'Svolte', risultatiRicerca.svolte.length],
+                  ['annullate', 'Annullate', risultatiRicerca.annullate.length],
+                ] as const).map(([valore, etichetta, quante]) => (
+                  <button
+                    key={valore}
+                    type="button"
+                    onClick={() => setSearchScope(valore)}
+                    className={cn(
+                      // Niente ore sui tasti: su mobile li rendevano meno leggibili.
+                      // Le ore restano nel riepilogo qui sotto e nelle intestazioni delle sezioni.
+                      "flex-1 h-9 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all px-1 whitespace-nowrap",
+                      searchScope === valore
+                        ? valore === 'annullate'
+                          ? "bg-white dark:bg-zinc-800 text-red-600 dark:text-red-400 shadow-sm"
+                          : "bg-white dark:bg-zinc-800 text-sky-600 dark:text-sky-400 shadow-sm"
+                        : valore === 'annullate'
+                          ? "text-red-400/70"
+                          : "text-zinc-400"
+                    )}
+                  >
+                    {etichetta} {quante}
+                  </button>
+                ))}
+              </div>
+
+              {/* Riepilogo ore: totale / effettuate / annullate */}
+              {risultatiRicerca.totale > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    ['Ore totali', risultatiRicerca.ore.tutte, 'text-zinc-900 dark:text-zinc-100 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50'],
+                    ['Effettuate', risultatiRicerca.ore.svolte, 'text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20'],
+                    ['Annullate', risultatiRicerca.ore.annullate, 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50 bg-red-50/60 dark:bg-red-950/20'],
+                  ] as const).map(([label, minuti, classi]) => (
+                    <div key={label} className={cn("rounded-xl border px-3 py-2 text-center", classi)}>
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-70">{label}</p>
+                      <p className="text-sm font-black tabular-nums">{formatOre(minuti)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {globalLoading ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-4 text-zinc-400">
+                  <Loader2 className="animate-spin text-sky-500" size={36} />
+                  <p className="text-sm font-medium">Cerco in tutto il calendario...</p>
+                </div>
+              ) : risultatiRicerca.totale === 0 ? (
+                <div className="p-10 text-center bg-zinc-50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                  <p className="text-zinc-900 dark:text-zinc-100 font-bold">Nessuna guida trovata</p>
+                  <p className="text-zinc-500 text-sm mt-1">Nessun appuntamento per “{searchQuery.trim()}” in tutto il calendario.</p>
+                </div>
+              ) : (
+                <>
+                  {(searchScope === 'tutte' || searchScope === 'future') && risultatiRicerca.future.length > 0 && (
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 px-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                        <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Guide future</h3>
+                        <span className="text-[10px] font-bold text-zinc-400 shrink-0">{risultatiRicerca.future.length} · {formatOre(risultatiRicerca.ore.future)}</span>
+                        <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {risultatiRicerca.future.map(apt => (
+                          <RigaRisultato key={apt.id} apt={apt} onOpen={() => setSelectedAppointment(apt)} />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {(searchScope === 'tutte' || searchScope === 'svolte') && risultatiRicerca.svolte.length > 0 && (
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 px-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-zinc-400 shrink-0" />
+                        <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Guide svolte</h3>
+                        <span className="text-[10px] font-bold text-zinc-400 shrink-0">{risultatiRicerca.svolte.length} · {formatOre(risultatiRicerca.ore.svolte)}</span>
+                        <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {risultatiRicerca.svolte.map(apt => (
+                          <RigaRisultato key={apt.id} apt={apt} onOpen={() => setSelectedAppointment(apt)} />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Guide ANNULLATE: sezione dedicata, sempre in fondo e con il tasto rosso */}
+                  {(searchScope === 'tutte' || searchScope === 'annullate') && risultatiRicerca.annullate.length > 0 && (
+                    <section className="space-y-2">
+                      <div className="flex items-center gap-2 px-1">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                        <h3 className="text-[11px] font-black uppercase tracking-widest text-red-500 dark:text-red-400">Guide annullate</h3>
+                        <span className="text-[10px] font-bold text-red-400 shrink-0">{risultatiRicerca.annullate.length} · {formatOre(risultatiRicerca.ore.annullate)}</span>
+                        <div className="flex-1 h-[1px] bg-red-200 dark:bg-red-900/50" />
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {risultatiRicerca.annullate.map(apt => (
+                          <RigaRisultato key={apt.id} apt={apt} onOpen={() => setSelectedAppointment(apt)} />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
+          ) : loading && appointments.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4 text-zinc-400">
               <Loader2 className="animate-spin text-sky-500" size={40} />
               <p className="text-sm font-medium">Sincronizzazione...</p>
             </div>
           ) : filteredAppointments.length > 0 ? (
-            <div className="space-y-5">
+            /*
+              Più istruttori = colonne AFFIANCATE in orizzontale (mai impilate).
+              NB: qui NON va la classe `.scroll-container`: imposta `overflow-x: hidden`
+              e bloccherebbe lo scorrimento laterale su mobile.
+            */
+            <div className={cn(
+              gruppiIstruttori.length > 1
+                ? "flex items-start gap-3 overflow-x-auto pb-3 snap-x snap-mandatory"
+                : "space-y-5"
+            )}
+            style={{ WebkitOverflowScrolling: 'touch' }}
+            >
               {gruppiIstruttori.map((gruppo, groupIdx) => (
-                <div key={gruppo.id} className="space-y-2">
+                <div
+                  key={gruppo.id}
+                  className={cn(
+                    "space-y-2",
+                    gruppiIstruttori.length > 1 && "flex-1 min-w-[86vw] sm:min-w-[320px] snap-start"
+                  )}
+                >
                   {/* Intestazione istruttore */}
                   <div className="flex items-center gap-2 px-1">
                     <span

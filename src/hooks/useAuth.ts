@@ -13,7 +13,14 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const MAX_SESSION_DURATION = 3.5 * 60 * 60 * 1000; // 3 ore 30 minuti in millisecondi
+    /**
+     * Disconnessione automatica dell'utente: 15 GIORNI DI CALENDARIO dall'accesso
+     * (prima erano 3 ore e 30). Allo scadere la sessione viene chiusa e si torna a /login.
+     * `auth_login_time` viene scritta al primo caricamento autenticato, quindi il conteggio
+     * parte dall'accesso effettivo.
+     */
+    const SESSION_MAX_GIORNI = 15;
+    const MAX_SESSION_DURATION = SESSION_MAX_GIORNI * 24 * 60 * 60 * 1000; // 15 giorni in ms
 
     async function checkSessionTimeout() {
       const loginTimeStr = localStorage.getItem('auth_login_time');
@@ -22,7 +29,7 @@ export function useAuth() {
         if (Date.now() - loginTime > MAX_SESSION_DURATION) {
           localStorage.removeItem('auth_login_time');
           await supabase.auth.signOut();
-          window.location.href = '/login';
+          window.location.href = '/login?scaduta=1';
           return true;
         }
       }

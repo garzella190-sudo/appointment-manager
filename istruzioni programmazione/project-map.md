@@ -3,7 +3,7 @@
 Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-Compact".
 
 ## 🛣️ Percorsi App Router (Core)
-- `/src/app/page.tsx` -> **Agenda** (Home Page, scroll automatico a "Now", guide raggruppate per istruttore + picker multi-istruttore dal tasto *people*).
+- `/src/app/page.tsx` -> **Agenda** (Home Page, scroll automatico a "Now", guide raggruppate per istruttore e **affiancate in orizzontale**, picker multi-istruttore dal tasto *people*, **ricerca globale su tutto il calendario** con split future/svolte e fetch paginato a 1000 righe).
 - `/src/app/calendar/page.tsx` -> **Calendario** (Griglia interattiva con granularità 15/30/60m).
 - `/src/app/clienti/page.tsx` -> Lista e gestione anagrafiche.
 - `/src/app/esami/page.tsx` -> **Esami** (Creazione sedute, assegnazione allievi pronti e istruttori).
@@ -23,7 +23,7 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 - `/src/actions/impegni.ts` -> **Commitment Server Actions**: Logica impegni con notifiche push selettive in caso di modifiche dell'ufficio.
 
 ## 🎨 Token di Stile
-- `/src/app/globals.css` -> Definizione border-radius (32px/40px), scrollbar overrides e regole anti-overflow (`html { overflow-x: hidden }`, `.truncate { min-width: 0 }`).
+- `/src/app/globals.css` -> Definizione border-radius (32px/40px), scrollbar overrides e regole anti-overflow (`html { overflow-x: hidden }`, `.truncate { min-width: 0 }`) + regola tema scuro per i campi a fondo bianco (`input.bg-white:not([class*="dark:bg-"]) { color:#000; color-scheme:light }`).
 - `tailwind.config.ts` -> Palette colori basata sugli istruttori.
 
 ## 📐 Regole di Impaginazione
@@ -32,6 +32,7 @@ Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-
 - `.cursorrules` -> Sintesi operativa delle stesse regole + workflow standard del comando "pusha".
 
 ## 🧱 Componenti trasversali condivisi
+- `/src/hooks/useAuth.ts` -> Sessione e ruolo utente. Contiene la **durata massima dell'accesso**: `SESSION_MAX_GIORNI = 15` (giorni di calendario) su `localStorage.auth_login_time`, controllata al mount, a ogni cambio di stato auth e ogni 60s; alla scadenza `signOut()` + redirect a `/login?scaduta=1`.
 - `/src/components/Modal.tsx` -> Modale unico dell'app (portale, `z-[9999]`): chiudibile con ✕ `shrink-0`, titolo e padding adattivi su mobile. Ogni nuovo modale DEVE usarlo.
 - `/src/components/forms/Select.tsx` -> Select custom condiviso.
 - `/src/components/forms/OptionPicker.tsx` -> Base di **tutti** i picker (tasto + modale centrato): supporta singola e **multipla** selezione (`multiple` / `selectedValues` / `onToggle`), apertura controllata (`isOpen` / `onOpenChange`) e `hideTrigger`. Patente, veicolo e istruttori passano da qui.

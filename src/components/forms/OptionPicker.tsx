@@ -9,6 +9,10 @@ export interface PickerOption {
   id: string;
   label: string;
   color?: string | null;
+  /** Testo secondario a destra (es. "Occupato"). */
+  info?: string;
+  /** Voce non cliccabile (es. istruttore già impegnato in quell'orario). */
+  disabled?: boolean;
 }
 
 interface OptionPickerProps {
@@ -176,12 +180,15 @@ export const OptionPicker = ({
                 <button
                   key={opt.id}
                   type="button"
+                  disabled={opt.disabled}
                   onClick={() => handleSelect(opt.id)}
                   className={cn(
                     'w-full flex items-center justify-between px-4 py-3 rounded-[16px] transition-all text-left',
-                    isSelected
-                      ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                    opt.disabled
+                      ? 'opacity-55 cursor-not-allowed'
+                      : isSelected
+                        ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
+                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                   )}
                 >
                   <span className="flex items-center gap-2.5 min-w-0">
@@ -195,7 +202,12 @@ export const OptionPicker = ({
                       {opt.label}
                     </span>
                   </span>
-                  {isSelected && <Check size={15} className="text-purple-500 shrink-0" />}
+                  <span className="flex items-center gap-2 shrink-0">
+                    {opt.info && (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{opt.info}</span>
+                    )}
+                    {isSelected && !opt.disabled && <Check size={15} className="text-purple-500 shrink-0" />}
+                  </span>
                 </button>
               );
             })

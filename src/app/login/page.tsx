@@ -14,7 +14,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [scaduta, setScaduta] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Sessione chiusa automaticamente dopo 15 giorni (vedi hooks/useAuth.ts).
+    // La query string esiste solo lato client: non è calcolabile durante il render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (new URLSearchParams(window.location.search).get('scaduta')) setScaduta(true);
+  }, []);
 
   useEffect(() => {
     // Carica l'email salvata se presente all'avvio
@@ -78,6 +86,12 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-white tracking-tight">Accesso</h1>
           <p className="text-zinc-400 mt-2 text-sm font-medium">Autoscuola Toscana</p>
         </div>
+
+        {scaduta && (
+          <div className="mb-5 relative z-10 rounded-xl border border-amber-600/40 dark:border-amber-500/30 bg-amber-500/20 dark:bg-amber-500/10 px-4 py-3 text-center text-[11px] font-black uppercase tracking-wide text-amber-800 dark:text-amber-300">
+            Sessione scaduta: l&apos;accesso dura al massimo 15 giorni. Accedi di nuovo.
+          </div>
+        )}
         
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-1.5">
