@@ -1,78 +1,87 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { RefreshCw, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useEffect } from 'react';
 
+/** File del service worker (cambiare nome forza il reinstallo) */
+const SW_URL = '/sw-v11.js';
+/** Controllo periodico mentre l'app resta aperta */
+const INTERVALLO_MS = 30 * 60 * 1000;
+
+/**
+ * Registra il service worker e forza l'aggiornamento automatico all'apertura dell'app.
+ *
+ * Quando si apre l'app (anche sulla schermata di login, quindi senza sessione) il browser
+ * rivalida il worker (`updateViaCache: 'none'` + header no-store lato server); se c'è una
+ * versione nuova questa prende subito il controllo (`skipWaiting` + `clients.claim`) e la
+ * pagina si ricarica da sola, così le modifiche deployate si vedono senza svuotare la cache.
+ */
 export default function SWRegister() {
-  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
-  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
-
   useEffect(() => {
-    let updateInterval: NodeJS.Timeout;
-    let registration: ServiceWorkerRegistration;
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && registration) {
-        registration.update();
-      }
+    let registration: ServiceWorkerRegistration | undefined;
+    let intervallo: ReturnType<typeof setInterval> | undefined;
+    let ricaricando = false;
+
+    /** Attiva subito il worker in attesa */
+    const attivaSubito = (worker?: ServiceWorker | null) => {
+      worker?.postMessage({ type: 'SKIP_WAITING' });
     };
 
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      // Force physical file rename to bypass iOS cache
-      navigator.serviceWorker
-        .register('/sw-v11.js')
-        .then((reg) => {
-          registration = reg;
-          
-          // 1. Check for update immediately on registration (initial opening)
-          registration.update();
+    /** Cerca aggiornamenti e attiva quello eventualmente pronto */
+    const controllaAggiornamenti = () => {
+      if (!registration) return;
+      registration
+        .update()
+        .then(() => attivaSubito(registration?.waiting))
+        .catch(() => {
+          /* offline o rete instabile: si riproverà al prossimo avvio */
+        });
+    };
 
-          if (registration.waiting) {
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
+    const suVisibilita = () => {
+      if (document.visibilityState === 'visible') controllaAggiornamenti();
+    };
 
-          // 2. Poll for updates every 30 minutes
-          updateInterval = setInterval(() => {
-            registration.update();
-          }, 30 * 60 * 1000);
+    const suControllerChange = () => {
+      if (ricaricando) return;
+      ricaricando = true;
+      window.location.reload();
+    };
 
-          // 3. Check for update when the app comes to foreground
-          document.addEventListener('visibilitychange', handleVisibilityChange);
+    navigator.serviceWorker.addEventListener('controllerchange', suControllerChange);
 
-          // Listen for new updates
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // Auto update without prompt
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
-                }
-              });
+    navigator.serviceWorker
+      .register(SW_URL, { updateViaCache: 'none' })
+      .then((reg) => {
+        registration = reg;
+
+        // Controllo immediato all'apertura + uno di sicurezza dopo il primo render
+        controllaAggiornamenti();
+        setTimeout(controllaAggiornamenti, 3000);
+
+        // Un nuovo worker installato prende subito il controllo (senza prompt)
+        reg.addEventListener('updatefound', () => {
+          const nuovo = reg.installing;
+          nuovo?.addEventListener('statechange', () => {
+            if (nuovo.state === 'installed' && navigator.serviceWorker.controller) {
+              attivaSubito(nuovo);
             }
           });
-        })
-        .catch((error) => {
-          console.log('SW registration failed:', error);
         });
 
-      // Reload page when the new service worker takes over
-      let refreshing = false;
-      const handleControllerChange = () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      };
-      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+        intervallo = setInterval(controllaAggiornamenti, INTERVALLO_MS);
+        document.addEventListener('visibilitychange', suVisibilita);
+      })
+      .catch((error) => {
+        console.log('SW registration failed:', error);
+      });
 
-      return () => {
-        if (updateInterval) clearInterval(updateInterval);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-      };
-    }
+    return () => {
+      if (intervallo) clearInterval(intervallo);
+      document.removeEventListener('visibilitychange', suVisibilita);
+      navigator.serviceWorker.removeEventListener('controllerchange', suControllerChange);
+    };
   }, []);
 
   return null;

@@ -394,6 +394,73 @@
   scrollbar-width: none;
 }
 
+/* ── Scrollbar orizzontale visibile SOLO su PC (mouse) ─────────────
+   Le griglie larghe (vista 7 giorni / multi-istruttore) hanno bisogno di una
+   barra afferrabile col mouse: su mobile/tablet non serve (si scorre col dito)
+   e resta nascosta come prima.
+   `pointer: fine` + `hover: hover` escludono i dispositivi touch. */
+.scroll-x-visible {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* Mobile/tablet: nessuna barra (comportamento precedente) */
+.scroll-x-visible::-webkit-scrollbar {
+  display: none;
+}
+.scroll-x-visible {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .scroll-x-visible {
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #e2e8f0;
+  }
+
+  .scroll-x-visible::-webkit-scrollbar {
+    display: block;
+    height: 14px;
+  }
+
+  .scroll-x-visible::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 999px;
+  }
+
+  .scroll-x-visible::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 999px;
+    border: 3px solid #e2e8f0;
+    background-clip: padding-box;
+  }
+
+  .scroll-x-visible::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+    background-clip: padding-box;
+  }
+
+  .dark .scroll-x-visible {
+    scrollbar-color: #52525b #26262b;
+  }
+
+  .dark .scroll-x-visible::-webkit-scrollbar-track {
+    background: #26262b;
+  }
+
+  .dark .scroll-x-visible::-webkit-scrollbar-thumb {
+    background: #52525b;
+    border-color: #26262b;
+  }
+
+  .dark .scroll-x-visible::-webkit-scrollbar-thumb:hover {
+    background: #71717a;
+    background-clip: padding-box;
+  }
+}
+
 /* ── Fix autoimpaginazione mobile ─────────────────────────
    `truncate` impone white-space:nowrap, che fa crescere la
    larghezza minima (min-content) di un elemento dentro flex/grid.

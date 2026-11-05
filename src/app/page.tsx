@@ -19,6 +19,9 @@ import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
 import DatePickerModal from '@/components/modals/DatePickerModal';
 import { useAuth } from '@/hooks/useAuth';
+import { useHoverApriScheda } from '@/hooks/useHoverApriScheda';
+import { useAggiornaAlRitorno } from '@/hooks/useAggiornaAlRitorno';
+import { AnteprimaAppuntamento } from '@/components/AnteprimaAppuntamento';
 
 /** Campi necessari alla vista agenda (giorno singolo e ricerca globale). */
 const APPOINTMENT_SELECT = `
@@ -122,6 +125,14 @@ const LineaOra = ({ time, withId = false }: { time: string; withId?: boolean }) 
  * lista a colonna singola sia dalla vista multi-istruttore allineata per orario.
  */
 const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => void; onDelete: () => void }) => {
+  // Da PC: mouse fermo 3 secondi sulla card → anteprima rapida che sparisce al movimento
+  const [anteprima, setAnteprima] = useState<DOMRect | null>(null);
+
+  const hoverApri = useHoverApriScheda(
+    (el) => setAnteprima(el.getBoundingClientRect()),
+    { onChiudi: () => setAnteprima(null) }
+  );
+
   const initials = apt.client_name
     .split(' ')
     .filter(Boolean)
@@ -131,9 +142,27 @@ const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => 
     .slice(0, 2);
 
   return (
+    <>
     <div
       id={`apt-${apt.id}`}
-      onClick={onOpen}
+      onClick={(e) => {
+        // Fine di un long-press: mostra solo l'anteprima, non aprire la scheda
+        if (hoverApri.consumaClick()) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        onOpen();
+      }}
+      onPointerEnter={hoverApri.onPointerEnter}
+      onPointerMove={hoverApri.onPointerMove}
+      onPointerLeave={hoverApri.onPointerLeave}
+      onPointerDown={hoverApri.onPointerDown}
+      onTouchStart={hoverApri.onTouchStart}
+      onTouchMove={hoverApri.onTouchMove}
+      onTouchEnd={hoverApri.onTouchEnd}
+      onTouchCancel={hoverApri.onTouchCancel}
+      onContextMenu={hoverApri.onContextMenu}
       className={cn(
         "relative border shadow-sm rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-12 sm:pr-14",
         apt.stato === 'annullato' ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60 grayscale" : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
@@ -226,6 +255,10 @@ const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => 
         />
       </div>
     </div>
+    {anteprima && (
+      <AnteprimaAppuntamento apt={apt} rect={anteprima} onClose={() => setAnteprima(null)} />
+    )}
+    </>
   );
 };
 
@@ -298,8 +331,8 @@ export default function Home() {
   // Popup state
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
-  const fetchAppointments = useCallback(async () => {
-    setLoading(true);
+  const fetchAppointments = useCallback(async (opzioni?: { silenzioso?: boolean }) => {
+    if (!opzioni?.silenzioso) setLoading(true);
     const dateStr = format(currentDate, 'yyyy-MM-dd');
 
     try {
@@ -332,6 +365,11 @@ export default function Home() {
       setLoading(false);
     }
   }, [currentDate]);
+
+  // Dati freschi ogni volta che l'app PWA torna in primo piano (senza loader a schermo)
+  useAggiornaAlRitorno(() => {
+    void fetchAppointments({ silenzioso: true });
+  });
 
   useEffect(() => {
     console.log("Agenda V10 - Initialized");
@@ -867,7 +905,7 @@ export default function Home() {
             vistaMulti ? (
               /* ---------- MULTI-ISTRUTTORE: colonne affiancate con le RIGHE ALLINEATE PER ORARIO ---------- */
               <div
-                className="overflow-x-auto pb-3 snap-x snap-mandatory"
+                className="scroll-x-visible pb-3 snap-x snap-mandatory"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
                 <div

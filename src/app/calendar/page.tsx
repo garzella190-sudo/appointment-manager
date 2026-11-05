@@ -40,6 +40,8 @@ import { it } from 'date-fns/locale';
 import { createClient } from '@/utils/supabase/client';
 import { Appointment } from '@/types';
 import { DroppableCell } from '@/components/DroppableCell';
+import { ScrollbarOrizzontale } from '@/components/ScrollbarOrizzontale';
+import { useAggiornaAlRitorno } from '@/hooks/useAggiornaAlRitorno';
 import { DraggableAppointment } from '@/components/DraggableAppointment';
 import { RefreshButton } from '@/components/RefreshButton';
 import { cn } from '@/lib/utils';
@@ -414,8 +416,8 @@ export default function CalendarPage() {
     };
   }, [isFullScreen, passoGiorni]);
 
-  const fetchWeekAppointments = useCallback(async () => {
-    setLoading(true);
+  const fetchWeekAppointments = useCallback(async (opzioni?: { silenzioso?: boolean }) => {
+    if (!opzioni?.silenzioso) setLoading(true);
     const fetchStartDate = displayDays[0];
     const fetchEndDate = addDays(displayDays[displayDays.length - 1], 1);
 
@@ -519,6 +521,11 @@ export default function CalendarPage() {
       setLoading(false);
     }
   }, [supabaseClient, displayDays]);
+
+  // Dati freschi ogni volta che l'app PWA torna in primo piano (senza overlay di caricamento)
+  useAggiornaAlRitorno(() => {
+    void fetchWeekAppointments({ silenzioso: true });
+  });
 
   useEffect(() => {
     if (mounted) fetchWeekAppointments();
@@ -768,21 +775,52 @@ export default function CalendarPage() {
     ? istruttori.filter(i => selectedInstructorIds.includes(i.id))
     : istruttori;
 
-  // Larghezza minima per colonna: sotto questa soglia le card non sarebbero leggibili,
-  // quindi la griglia scorre in orizzontale invece di comprimersi.
-  const MIN_COL_WEEK = 110;      // px per giorno nella vista settimana
-  const MIN_COL_RESOURCE = 132;  // px per istruttore nella vista a colonne
+  // Larghezza delle colonne adattiva:
+  // - se le colonne entrano nello spazio del pannello, si allargano fino a riempirlo
+  //   (i 7 giorni si vedono tutti, senza scroll);
+  // - altrimenti si scende fino alla larghezza minima leggibile e la griglia scorre
+  //   orizzontalmente (barra visibile su PC).
+  const MIN_COL_WEEK = 96;        // px minimi leggibili per giorno (vista settimana)
+  const MIN_COL_RESOURCE = 104;   // px minimi leggibili per istruttore (vista a colonne)
+  const MAX_COL = 240;            // oltre questa larghezza la colonna non serve piu' larga
+  const TIME_COL_W = 60;          // colonna degli orari
+
+  /** "Adatta allo schermo": nessun minimo, tutto visibile anche se le colonne si stringono */
+  const [fitAll, setFitAll] = useState(false);
+
   const gridColumnsCount = viewMode === 'week'
     ? displayDays.length
     : Math.max(1, displayDays.length * displayIstruttori.length);
-  const minGridWidth = 60 + gridColumnsCount * (viewMode === 'week' ? MIN_COL_WEEK : MIN_COL_RESOURCE);
+
+  const grigliaRef = useRef<HTMLDivElement | null>(null);
+  const [larghezzaPannello, setLarghezzaPannello] = useState(0);
+
+  useEffect(() => {
+    const el = grigliaRef.current;
+    if (!el) return;
+    const aggiorna = () => setLarghezzaPannello(el.clientWidth);
+    aggiorna();
+    const ro = new ResizeObserver(aggiorna);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode, displayDays.length, displayIstruttori.length, isFullScreen]);
+
+  const colLeggibile = viewMode === 'week' ? MIN_COL_WEEK : MIN_COL_RESOURCE;
+  const spazioColonne = Math.max(0, larghezzaPannello - TIME_COL_W);
+  const colDisponibile = spazioColonne > 0
+    ? Math.floor(spazioColonne / Math.max(1, gridColumnsCount))
+    : colLeggibile;
+  const colWidth = fitAll
+    ? Math.max(36, colDisponibile)
+    : Math.max(colLeggibile, Math.min(colDisponibile, MAX_COL));
+  const minGridWidth = TIME_COL_W + gridColumnsCount * colWidth;
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
-  const [newModalInitialData, setNewModalInitialData] = useState<{ date: string; time: string } | null>(null);
+  const [newModalInitialData, setNewModalInitialData] = useState<{ date: string; time: string; istruttoreId?: string } | null>(null);
 
-  const handleCellClick = (dateStr: string, slot: string) => {
+  const handleCellClick = (dateStr: string, slot: string, istruttoreId?: string) => {
     if (Date.now() - datePickerCloseTime < 500) return;
-    setNewModalInitialData({ date: dateStr, time: slot });
+    setNewModalInitialData({ date: dateStr, time: slot, istruttoreId });
     setIsNewModalOpen(true);
   };
 
@@ -1068,6 +1106,42 @@ export default function CalendarPage() {
                   )}
                 </div>
 
+                {/* LARGHEZZA COLONNE */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2 ml-1">Larghezza</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFitAll(true)}
+                      className={cn(
+                        "h-11 flex-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center justify-center gap-1.5",
+                        fitAll
+                          ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border-sky-300 dark:border-sky-800"
+                          : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
+                      )}
+                    >
+                      <Minimize2 size={14} className="shrink-0" />
+                      Adatta tutto
+                    </button>
+                    <button
+                      onClick={() => setFitAll(false)}
+                      className={cn(
+                        "h-11 flex-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center justify-center gap-1.5",
+                        !fitAll
+                          ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border-sky-300 dark:border-sky-800"
+                          : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
+                      )}
+                    >
+                      <Maximize2 size={14} className="shrink-0" />
+                      Colonne leggibili
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 font-bold mt-2 ml-1">
+                    {fitAll
+                      ? 'Tutti i giorni entrano nello schermo, colonne più strette.'
+                      : 'Colonne larghe e leggibili: se non entrano, scorri in orizzontale.'}
+                  </p>
+                </div>
+
                 <button
                   onClick={() => {
                     if (selectedInstructorIds.length === 1) {
@@ -1105,9 +1179,15 @@ export default function CalendarPage() {
 
           <ConflictsAlert />
 
-          <div className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col">
-            <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px] scrollbar-hide">
-              <div className="w-full flex flex-col h-full overflow-x-auto">
+          <div
+            className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col"
+          >
+            <div className="bg-white dark:bg-zinc-900/80 rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[40px] shadow-2xl shadow-blue-500/5 border border-zinc-100 dark:border-zinc-800 overflow-hidden flex flex-col h-full rounded-b-[24px] sm:rounded-b-[32px] md:rounded-b-[40px] scrollbar-hide relative">
+              <ScrollbarOrizzontale
+                targetRef={grigliaRef}
+                versione={`${viewMode}-${displayDays.length}-${displayIstruttori.length}-${Math.round(colWidth)}-${fitAll ? 'fit' : 'wide'}`}
+              />
+              <div ref={grigliaRef} className="w-full flex flex-col h-full overflow-x-auto scrollbar-hide">
                 <div className="flex flex-col h-full" style={{ minWidth: minGridWidth }}>
               <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0">
                 {/* Fascia giorni — vista risorse con più giorni: giorni affiancati in orizzontale */}
@@ -1376,6 +1456,7 @@ export default function CalendarPage() {
                                             granularity={15}
                                             isFirst={idx === 0}
                                             totalColumns={group.length}
+                                            compatta={colWidth < 150}
                                           />
                                         </div>
                                       );
@@ -1470,7 +1551,7 @@ export default function CalendarPage() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                handleCellClick(dateStr, slot);
+                                handleCellClick(dateStr, slot, ist.id);
                               }}
                             >
                               {sortedTimes.map((time) => {
@@ -1499,6 +1580,7 @@ export default function CalendarPage() {
                                             granularity={15}
                                             isFirst={idx === 0}
                                             totalColumns={group.length}
+                                            compatta={colWidth < 150}
                                           />
                                         </div>
                                       );
@@ -1573,6 +1655,7 @@ export default function CalendarPage() {
         }}
         initialDate={newModalInitialData?.date}
         initialTime={newModalInitialData?.time}
+        initialIstruttoreId={newModalInitialData?.istruttoreId}
       />
 
       {selectedAppointment && (

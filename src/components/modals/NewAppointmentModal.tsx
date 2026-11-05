@@ -10,6 +10,8 @@ interface NewAppointmentModalProps {
   onSuccess: () => void;
   initialDate?: string;
   initialTime?: string;
+  /** Istruttore già scelto (click su una colonna in vista a colonne) */
+  initialIstruttoreId?: string;
 }
 
 /**
@@ -21,7 +23,8 @@ const NewAppointmentModal = ({
   onClose, 
   onSuccess,
   initialDate,
-  initialTime 
+  initialTime,
+  initialIstruttoreId
 }: NewAppointmentModalProps) => {
   return (
     <Modal
@@ -36,6 +39,7 @@ const NewAppointmentModal = ({
             onCancel={onClose}
             initialDate={initialDate}
             initialTime={initialTime}
+            initialIstruttoreId={initialIstruttoreId}
             initialMode="create"
           />
         )}

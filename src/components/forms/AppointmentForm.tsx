@@ -35,6 +35,8 @@ interface FormProps {
   onCancel: () => void;
   initialDate?: string;
   initialTime?: string;
+  /** Istruttore già scelto (es. click sulla colonna in vista a colonne) */
+  initialIstruttoreId?: string;
   appointmentId?: string;
   initialMode?: 'create' | 'edit' | 'view';
   defaultIsImpegno?: boolean;
@@ -155,7 +157,7 @@ const isStoricoValido = (
 };
 
 
-export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
+export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, initialIstruttoreId, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
   const { role, isAdmin, isSegreteria, istruttoreId } = useAuth();
   const [mode, setMode] = useState<'create' | 'edit' | 'view'>(appointmentId ? initialMode : 'create');
   const [loading, setLoading] = useState(false);
@@ -362,9 +364,15 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           try {
             const browserSupabase = createClient();
             const { data: { user } } = await browserSupabase.auth.getUser();
+            // Priorità: colonna cliccata nel calendario (es. segreteria che clicca
+            // "Manuele Garzella - 15:00") > profilo dell'istruttore loggato.
+            // Segreteria senza colonna selezionata: campo vuoto, scelta manuale.
+            const ruolo = (user?.user_metadata?.role as string | undefined) ?? 'istruttore';
             const linkedInstrId = user?.user_metadata?.istruttore_id;
-            if (linkedInstrId) {
-              const instr = (sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === linkedInstrId);
+            const instrIdDaApplicare =
+              initialIstruttoreId || (ruolo === 'istruttore' ? linkedInstrId : undefined);
+            if (instrIdDaApplicare) {
+              const instr = (sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === instrIdDaApplicare);
               if (instr) {
                 setSelectedIstruttore(instr);
                 // Auto-select instructor's default vehicle (for patente B)
@@ -373,12 +381,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   const veh = (sortedVeicoli as Veicolo[]).find((v: Veicolo) => v.id === instrVehicleId);
                   if (veh) {
                     setSelectedVeicolo(veh);
-                    setForm(prev => ({ ...prev, istruttore_id: linkedInstrId, veicolo_id: instrVehicleId }));
+                    setForm(prev => ({ ...prev, istruttore_id: instrIdDaApplicare, veicolo_id: instrVehicleId }));
                   } else {
-                    setForm(prev => ({ ...prev, istruttore_id: linkedInstrId }));
+                    setForm(prev => ({ ...prev, istruttore_id: instrIdDaApplicare }));
                   }
                 } else {
-                  setForm(prev => ({ ...prev, istruttore_id: linkedInstrId }));
+                  setForm(prev => ({ ...prev, istruttore_id: instrIdDaApplicare }));
                 }
               }
             }
@@ -539,24 +547,42 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
 
     // ─── PRIORITY 2: profilo utente — istruttore collegato alla sessione ───
+    // Serve solo agli istruttori (che si preassegnano da soli). Segreteria e admin
+    // devono trovare il campo "Istruttore" vuoto e sceglierlo manualmente.
     let instrProfilo: Istruttore | null = null;
-    if (!instrStorico) {
-      try {
-        const browserSupabase = createClient();
-        const { data: { user } } = await browserSupabase.auth.getUser();
-        const linkedInstrId = user?.user_metadata?.istruttore_id;
-        if (linkedInstrId) instrProfilo = istruttori.find(i => i.id === linkedInstrId) ?? null;
-      } catch {
-        // Sessione non disponibile
+    let ruoloLoggato: string | null = null;
+    try {
+      const browserSupabase = createClient();
+      const { data: { user } } = await browserSupabase.auth.getUser();
+      ruoloLoggato = (user?.user_metadata?.role as string | undefined) ?? 'istruttore';
+      const linkedInstrId = user?.user_metadata?.istruttore_id;
+      if (ruoloLoggato === 'istruttore' && linkedInstrId) {
+        instrProfilo = istruttori.find(i => i.id === linkedInstrId) ?? null;
       }
+    } catch {
+      // Sessione non disponibile
     }
+
+    const isIstruttoreLoggato = ruoloLoggato === 'istruttore';
 
     // ─── PRIORITY 3: primo istruttore abilitato per la patente ───
     const instrAbilitato = (instrStorico || instrProfilo)
       ? null
       : (istruttori.find(i => i.patenti_abilitate && i.patenti_abilitate.includes(currentPatenteTipo as any)) ?? null);
 
-    const istruttoreFinale = instrStorico ?? instrProfilo ?? instrAbilitato;
+    // L'istruttore loggato ha la precedenza assoluta (si assegna lui la guida).
+    // Per segreteria/admin nessuna preassegnazione: campo vuoto.
+    // Eccezione: se un istruttore è già scelto (colonna del calendario o scelta manuale)
+    // non va mai sovrascritto.
+    const instrGiaScelto =
+      (form.istruttore_id ? (istruttori.find(i => i.id === form.istruttore_id) ?? null) : null) ??
+      (initialIstruttoreId ? (istruttori.find(i => i.id === initialIstruttoreId) ?? null) : null);
+
+    const istruttoreFinale = instrGiaScelto
+      ? instrGiaScelto
+      : isIstruttoreLoggato
+        ? (instrProfilo ?? instrStorico ?? instrAbilitato)
+        : null;
 
     // ─── Veicolo: 1) memoria del cliente  2) default dell'istruttore  3) primo compatibile ───
     const veicoloDefaultIstruttore = istruttoreFinale?.veicolo_id
