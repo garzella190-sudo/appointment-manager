@@ -106,6 +106,130 @@ const formatOre = (minuti: number): string => {
 const minutiTotali = (lista: Appointment[]): number =>
   lista.reduce((acc, a) => acc + (Number(a.duration) || 0), 0);
 
+/** Linea dell'orario attuale in agenda (una sola per pagina: id per lo scroll automatico). */
+const LineaOra = ({ time, withId = false }: { time: string; withId?: boolean }) => (
+  <div className="flex items-center gap-2 my-1 -mx-2 px-2 relative" id={withId ? 'current-time-line' : undefined}>
+    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] border-2 border-white dark:border-zinc-900 z-10 shrink-0"></div>
+    <div className="flex-1 h-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] rounded-full"></div>
+    <div className="text-[10px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800 shadow-sm shrink-0">
+      {time}
+    </div>
+  </div>
+);
+
+/**
+ * Card di una guida in agenda. Estratta in un componente perché viene usata sia dalla
+ * lista a colonna singola sia dalla vista multi-istruttore allineata per orario.
+ */
+const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => void; onDelete: () => void }) => {
+  const initials = apt.client_name
+    .split(' ')
+    .filter(Boolean)
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <div
+      id={`apt-${apt.id}`}
+      onClick={onOpen}
+      className={cn(
+        "relative border shadow-sm rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-12 sm:pr-14",
+        apt.stato === 'annullato' ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60 grayscale" : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
+      )}
+    >
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
+        <div
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shrink-0 shadow-inner"
+          style={{
+            backgroundColor: apt.stato === 'annullato' ? '#f4f4f5' : `${apt.istruttore?.color}20` || '#f1f5f9',
+            color: apt.stato === 'annullato' ? '#a1a1aa' : apt.istruttore?.color || '#0ea5e9'
+          }}
+        >
+          {initials}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h4 className={cn(
+            "font-bold flex items-center gap-1.5 sm:gap-2 min-w-0",
+            apt.stato === 'annullato' ? "text-zinc-500 dark:text-zinc-400 line-through" : "text-zinc-900 dark:text-white"
+          )}>
+            <span className={cn(
+              "tabular-nums text-xs font-black shrink-0",
+              apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
+            )}>{apt.appointment_time}</span>
+            <span className="truncate">{apt.client_name}</span>
+            {apt.exam_status && apt.exam_status !== 'none' && (
+              <GraduationCap
+                size={14}
+                className={cn(
+                  "shrink-0",
+                  apt.exam_status === 'scheduled' ? "text-emerald-500 fill-emerald-500/10" : "text-zinc-300"
+                )}
+              />
+            )}
+          </h4>
+          <div className="flex items-center flex-wrap gap-x-2 sm:gap-x-3 gap-y-1.5 mt-1.5 min-w-0">
+            {apt.phone && (
+              <a
+                href={`tel:${apt.phone.replace(/\D/g, '')}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline shrink-0"
+              >
+                <Phone size={10} />
+                {apt.phone}
+              </a>
+            )}
+            <div className="flex items-center gap-1.5 min-w-0 max-w-full text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
+              <User size={10} className="text-zinc-400 shrink-0" />
+              <span className="truncate">{apt.istruttore?.name}</span>
+            </div>
+            <span className="px-2 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
+              {apt.duration} min
+            </span>
+            {apt.license_type && (
+              <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
+                Pat. {apt.license_type}
+              </span>
+            )}
+            {apt.vehicle_id && apt.vehicle_id.trim() !== '' && apt.vehicle_id !== 'Nessuno' && (
+              <span
+                className="flex items-center gap-1 px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider min-w-0 max-w-full"
+                title={apt.vehicle_id}
+                style={apt.vehicle_color ? { color: apt.vehicle_color } : undefined}
+              >
+                <Car size={10} className="shrink-0" />
+                <span className="truncate">{apt.vehicle_id}</span>
+              </span>
+            )}
+          </div>
+          {apt.notes && apt.notes.trim() !== '' && (
+            <div className="flex items-center gap-1 mt-2 text-zinc-400 italic">
+              <StickyNote size={10} className="shrink-0" />
+              <p className="text-[10px] truncate leading-none">{apt.notes}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
+        <ConfirmBubble
+          title="Elimina Guida"
+          message="Sei sicuro di voler eliminare questo appuntamento?"
+          confirmLabel="Elimina"
+          onConfirm={onDelete}
+          trigger={
+            <button className="h-9 w-9 flex items-center justify-center rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50">
+              <Trash2 size={16} />
+            </button>
+          }
+        />
+      </div>
+    </div>
+  );
+};
+
+
 /** Riga dei risultati di ricerca: mostra sempre DATA, ora, cliente, istruttore, patente e veicolo. */
 const RigaRisultato = ({ apt, onOpen }: { apt: Appointment; onOpen: () => void }) => {
   const veicolo = veicoloBreve(apt.vehicle_id);
@@ -361,6 +485,56 @@ export default function Home() {
     gruppi.forEach(g => g.items.sort((a, b) => a.appointment_time.localeCompare(b.appointment_time)));
     return gruppi;
   }, [filteredAppointments]);
+
+  /** Con più di un istruttore si usa la vista a colonne allineate per orario. */
+  const vistaMulti = gruppiIstruttori.length > 1;
+
+  /**
+   * Timeline dell'agenda per la vista multi-istruttore.
+   *
+   * Si costruisce la mappa `ora → istruttore → guide`: così la stessa ora finisce sulla
+   * stessa riga della griglia in TUTTE le colonne (gli appuntamenti restano allineati per
+   * orario anche scorrendo in orizzontale su desktop e tablet).
+   */
+  const timelineAgenda = useMemo(() => {
+    const celle = new Map<string, Map<string, Appointment[]>>();
+
+    for (const apt of filteredAppointments) {
+      const ora = apt.appointment_time;
+      if (!celle.has(ora)) celle.set(ora, new Map());
+      const perGruppo = celle.get(ora)!;
+      const chiave = apt.trainer_id || 'non-assegnato';
+      if (!perGruppo.has(chiave)) perGruppo.set(chiave, []);
+      perGruppo.get(chiave)!.push(apt);
+    }
+
+    const orari = [...celle.keys()].sort();
+    const adesso = format(new Date(), 'HH:mm');
+    const righe: Array<{ tipo: 'orario'; ora: string } | { tipo: 'adesso' }> = [];
+
+    if (isSameDay(currentDate, new Date())) {
+      let inserita = false;
+      for (const ora of orari) {
+        if (!inserita && ora > adesso) {
+          righe.push({ tipo: 'adesso' });
+          inserita = true;
+        }
+        righe.push({ tipo: 'orario', ora });
+      }
+      if (!inserita) righe.push({ tipo: 'adesso' });
+    } else {
+      for (const ora of orari) righe.push({ tipo: 'orario', ora });
+    }
+
+    return { celle, righe, adesso };
+  }, [filteredAppointments, currentDate]);
+
+  /** Eliminazione guida (la card è un componente condiviso, quindi il server action arriva da qui). */
+  const eliminaGuida = async (id: string) => {
+    const { deleteAppointmentAction } = await import('@/actions/appointment_actions');
+    await deleteAppointmentAction(id);
+    fetchAppointments();
+  };
 
   /**
    * Risultati della ricerca globale (tutto il calendario), separati in guide FUTURE, SVOLTE e ANNULLATE.
@@ -690,187 +864,112 @@ export default function Home() {
               <p className="text-sm font-medium">Sincronizzazione...</p>
             </div>
           ) : filteredAppointments.length > 0 ? (
-            /*
-              Più istruttori = colonne AFFIANCATE in orizzontale (mai impilate).
-              NB: qui NON va la classe `.scroll-container`: imposta `overflow-x: hidden`
-              e bloccherebbe lo scorrimento laterale su mobile.
-            */
-            <div className={cn(
-              gruppiIstruttori.length > 1
-                ? "flex items-start gap-3 overflow-x-auto pb-3 snap-x snap-mandatory"
-                : "space-y-5"
-            )}
-            style={{ WebkitOverflowScrolling: 'touch' }}
-            >
-              {gruppiIstruttori.map((gruppo, groupIdx) => (
+            vistaMulti ? (
+              /* ---------- MULTI-ISTRUTTORE: colonne affiancate con le RIGHE ALLINEATE PER ORARIO ---------- */
+              <div
+                className="overflow-x-auto pb-3 snap-x snap-mandatory"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 <div
-                  key={gruppo.id}
-                  className={cn(
-                    "space-y-2",
-                    gruppiIstruttori.length > 1 && "flex-1 min-w-[86vw] sm:min-w-[320px] snap-start"
-                  )}
+                  className="grid gap-x-3 gap-y-2 items-start"
+                  style={{ gridTemplateColumns: `repeat(${gruppiIstruttori.length}, min(86vw, 320px))` }}
                 >
-                  {/* Intestazione istruttore */}
-                  <div className="flex items-center gap-2 px-1">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
-                    />
-                    <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 truncate">
-                      {gruppo.nome}
-                    </h3>
-                    <span className="text-[10px] font-bold text-zinc-400 shrink-0">{gruppo.items.length}</span>
-                    <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3">
-              {gruppo.items.map((apt, index) => {
-                const initials = apt.client_name
-                  .split(' ')
-                  .filter(Boolean)
-                  .map(n => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2);
-
-                const now = new Date();
-                const isToday = isSameDay(currentDate, now);
-                const currentTimeStr = format(now, 'HH:mm');
-                const nextApt = gruppo.items[index + 1];
-                
-                let insertLineBefore = false;
-                let insertLineAfter = false;
-                
-                if (isToday) {
-                  if (index === 0 && apt.appointment_time > currentTimeStr) {
-                    insertLineBefore = true;
-                  } else if (apt.appointment_time <= currentTimeStr && (!nextApt || nextApt.appointment_time > currentTimeStr)) {
-                    insertLineAfter = true;
-                  }
-                }
-
-                const CurrentTimeLine = ({ time }: { time: string }) => (
-                  <div className="flex items-center gap-2 my-1 -mx-2 px-2 relative" id={(insertLineAfter || insertLineBefore) && groupIdx === 0 ? "current-time-line" : undefined}>
-                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] border-2 border-white dark:border-zinc-900 z-10 shrink-0"></div>
-                    <div className="flex-1 h-[2px] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] rounded-full"></div>
-                    <div className="text-[10px] font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800 shadow-sm shrink-0">
-                      {time}
+                  {/* Intestazioni: un istruttore per colonna */}
+                  {gruppiIstruttori.map(gruppo => (
+                    <div key={`head-${gruppo.id}`} className="flex items-center gap-2 px-1 snap-start">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
+                      />
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 truncate">
+                        {gruppo.nome}
+                      </h3>
+                      <span className="text-[10px] font-bold text-zinc-400 shrink-0">{gruppo.items.length}</span>
+                      <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
                     </div>
-                  </div>
-                );
+                  ))}
 
-                return (
-                  <React.Fragment key={apt.id}>
-                    {insertLineBefore && <CurrentTimeLine time={currentTimeStr} />}
-                    <div 
-                      id={`apt-${apt.id}`}
-                      onClick={() => {
-                        setSelectedAppointment(apt);
-                      }}
-                      className={cn(
-                        "relative border shadow-sm rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-12 sm:pr-14",
-                        apt.stato === 'annullato' ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60 grayscale" : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
-                        <div 
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shrink-0 shadow-inner"
-                          style={{ 
-                            backgroundColor: apt.stato === 'annullato' ? '#f4f4f5' : `${apt.istruttore?.color}20` || '#f1f5f9',
-                            color: apt.stato === 'annullato' ? '#a1a1aa' : apt.istruttore?.color || '#0ea5e9'
-                          }}
-                        >
-                          {initials}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <h4 className={cn(
-                            "font-bold flex items-center gap-1.5 sm:gap-2 min-w-0",
-                            apt.stato === 'annullato' ? "text-zinc-500 dark:text-zinc-400 line-through" : "text-zinc-900 dark:text-white"
-                          )}>
-                            <span className={cn(
-                              "tabular-nums text-xs font-black shrink-0",
-                              apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
-                            )}>{apt.appointment_time}</span>
-                            <span className="truncate">{apt.client_name}</span>
-                            {apt.exam_status && apt.exam_status !== 'none' && (
-                              <GraduationCap 
-                                size={14} 
-                                className={cn(
-                                  "shrink-0",
-                                  apt.exam_status === 'scheduled' ? "text-emerald-500 fill-emerald-500/10" : "text-zinc-300"
-                                )} 
-                              />
-                            )}
-                          </h4>
-                          <div className="flex items-center flex-wrap gap-x-2 sm:gap-x-3 gap-y-1.5 mt-1.5 min-w-0">
-                            {apt.phone && (
-                              <a
-                                href={`tel:${apt.phone.replace(/\D/g, '')}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline shrink-0"
-                              >
-                                <Phone size={10} />
-                                {apt.phone}
-                              </a>
-                            )}
-                            <div className="flex items-center gap-1.5 min-w-0 max-w-full text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
-                              <User size={10} className="text-zinc-400 shrink-0" />
-                              <span className="truncate">{apt.istruttore?.name}</span>
-                            </div>
-                            <span className="px-2 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
-                              {apt.duration} min
-                            </span>
-                            {apt.license_type && (
-                              <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:purple-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
-                                Pat. {apt.license_type}
-                              </span>
-                            )}
-                            {apt.vehicle_id && apt.vehicle_id.trim() !== '' && apt.vehicle_id !== 'Nessuno' && (
-                              <span
-                                className="flex items-center gap-1 px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider min-w-0 max-w-full"
-                                title={apt.vehicle_id}
-                                style={apt.vehicle_color ? { color: apt.vehicle_color } : undefined}
-                              >
-                                <Car size={10} className="shrink-0" />
-                                <span className="truncate">{apt.vehicle_id}</span>
-                              </span>
-                            )}
-                          </div>
-                          {apt.notes && apt.notes.trim() !== '' && (
-                            <div className="flex items-center gap-1 mt-2 text-zinc-400 italic">
-                              <StickyNote size={10} className="shrink-0" />
-                              <p className="text-[10px] truncate leading-none">{apt.notes}</p>
-                            </div>
-                          )}
-                        </div>
+                  {/* Righe: una per orario, così le guide della stessa ora sono allineate */}
+                  {timelineAgenda.righe.map((riga, idx) => (
+                    riga.tipo === 'adesso' ? (
+                      <div key={`adesso-${idx}`} className="col-span-full">
+                        <LineaOra time={timelineAgenda.adesso} withId />
                       </div>
-                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
-                        <ConfirmBubble
-                          title="Elimina Guida"
-                          message="Sei sicuro di voler eliminare questo appuntamento?"
-                          confirmLabel="Elimina"
-                          onConfirm={async () => {
-                            const { deleteAppointmentAction } = await import('@/actions/appointment_actions');
-                            await deleteAppointmentAction(apt.id);
-                            fetchAppointments();
-                          }}
-                          trigger={
-                            <button className="h-9 w-9 flex items-center justify-center rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50">
-                              <Trash2 size={16} />
-                            </button>
-                          }
-                        />
-                      </div>
-                    </div>
-                    {insertLineAfter && <CurrentTimeLine time={currentTimeStr} />}
-                  </React.Fragment>
-                );
-              })}
-                  </div>
+                    ) : (
+                      <React.Fragment key={`riga-${riga.ora}`}>
+                        {gruppiIstruttori.map(gruppo => {
+                          const items = timelineAgenda.celle.get(riga.ora)?.get(gruppo.id) || [];
+                          return (
+                            <div key={`${riga.ora}-${gruppo.id}`} className="min-w-0 space-y-2">
+                              {items.map(apt => (
+                                <CardGuida
+                                  key={apt.id}
+                                  apt={apt}
+                                  onOpen={() => setSelectedAppointment(apt)}
+                                  onDelete={() => eliminaGuida(apt.id)}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
+                    )
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              /* ---------- COLONNA SINGOLA ---------- */
+              <div className="space-y-5">
+                {gruppiIstruttori.map((gruppo, groupIdx) => (
+                  <div key={gruppo.id} className="space-y-2">
+                    {/* Intestazione istruttore */}
+                    <div className="flex items-center gap-2 px-1">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
+                      />
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 truncate">
+                        {gruppo.nome}
+                      </h3>
+                      <span className="text-[10px] font-bold text-zinc-400 shrink-0">{gruppo.items.length}</span>
+                      <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {gruppo.items.map((apt, index) => {
+                        const now = new Date();
+                        const isToday = isSameDay(currentDate, now);
+                        const currentTimeStr = format(now, 'HH:mm');
+                        const nextApt = gruppo.items[index + 1];
+
+                        let insertLineBefore = false;
+                        let insertLineAfter = false;
+
+                        if (isToday) {
+                          if (index === 0 && apt.appointment_time > currentTimeStr) {
+                            insertLineBefore = true;
+                          } else if (apt.appointment_time <= currentTimeStr && (!nextApt || nextApt.appointment_time > currentTimeStr)) {
+                            insertLineAfter = true;
+                          }
+                        }
+
+                        return (
+                          <React.Fragment key={apt.id}>
+                            {insertLineBefore && <LineaOra time={currentTimeStr} withId={groupIdx === 0} />}
+                            <CardGuida
+                              apt={apt}
+                              onOpen={() => setSelectedAppointment(apt)}
+                              onDelete={() => eliminaGuida(apt.id)}
+                            />
+                            {insertLineAfter && <LineaOra time={currentTimeStr} withId={groupIdx === 0} />}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
             <div className="p-12 text-center bg-zinc-50 dark:bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-3">
               <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">

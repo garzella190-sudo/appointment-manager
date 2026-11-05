@@ -119,26 +119,35 @@ un altro modo?* Se no, deve restare visibile (eventualmente compattata).
   "Non assegnato".
 - La griglia delle card resta `grid grid-cols-1` **dentro ogni gruppo**: il raggruppamento non
   deve reintrodurre righe orizzontali o colonne implicite (regola 1).
-- Con **più istruttori i gruppi sono AFFIANCATI IN ORIZZONTALE, mai impilati**:
+- Con **più istruttori** la vista è una **timeline**: colonne affiancate e **righe allineate per
+  orario** (la stessa ora cade sulla stessa riga in tutte le colonne, come un'agenda cartacea).
+  Identico su mobile, tablet e desktop.
 
 ```jsx
-<div className={gruppi.length > 1
-  ? "flex items-start gap-3 overflow-x-auto pb-3 snap-x"
-  : "space-y-5"}>
-  <div className={gruppi.length > 1 ? "flex-1 min-w-[86vw] sm:min-w-[320px] snap-start" : ""}>
+<div className="overflow-x-auto pb-3 snap-x snap-mandatory" style={{ WebkitOverflowScrolling: 'touch' }}>
+  <div className="grid gap-x-3 gap-y-2 items-start"
+       style={{ gridTemplateColumns: `repeat(${n}, min(86vw, 320px))` }}>
+    {/* riga di intestazioni: un istruttore per colonna */}
+    {/* poi UNA RIGA per ogni orario: n celle, una per istruttore */}
+  </div>
+</div>
 ```
 
-  - Larghezza minima colonna **86vw su mobile** (la colonna successiva si intravede) e
-    **320px da `sm`**; il contenitore scorre in orizzontale invece di comprimere le card.
-  - `min-w` sul figlio è obbligatorio: con solo `flex-1` la colonna si restringe a 0 invece di
-    attivare lo scroll.
+  - La mappa `ora → istruttore → guide` (`timelineAgenda`) è ciò che garantisce l'allineamento:
+    cella vuota se l'istruttore non ha guide a quell'ora, riga alta come la card più alta,
+    card allineate in alto (`items-start`).
+  - Colonne a **larghezza fissa** `min(86vw, 320px)`: non si comprimono e non si allargano, quindi
+    con 3+ istruttori il contenitore **scorre in orizzontale anche su PC** (il wrapper della
+    giornata è `max-w-2xl`: 2 colonne entrano, dalla terza si scorre).
+  - La card della guida è il componente condiviso `CardGuida` (lo stesso della colonna singola):
+    **non duplicare** il markup della card.
+  - La linea dell'orario attuale è una riga a tutta larghezza (`col-span-full`) inserita prima del
+    primo orario successivo ad "adesso" (solo se la data visibile è oggi).
   - **MAI mettere `.scroll-container` sul contenitore orizzontale**: quella classe imposta
     `overflow-x: hidden` e uccide lo scorrimento (su mobile si vede solo la prima colonna).
-    Usare `overflow-x-auto` + `snap-x snap-mandatory` + `style={{ WebkitOverflowScrolling: 'touch' }}`.
-  - Verifica: tutti i gruppi con la **stessa `y`**, `getComputedStyle(cont).overflowX === 'auto'`,
-    `scrollWidth > clientWidth`, `cont.scrollLeft = 400` deve restituire `> 0`, e uno **swipe touch
-    reale** (CDP `Input.dispatchTouchEvent`) deve spostare `scrollLeft`. Sulla pagina
-    `document.scrollWidth === clientWidth` (nessuno sforamento).
+  - Verifica: gli orari condivisi da più istruttori devono avere **la stessa `y`** in tutte le
+    colonne; `getComputedStyle(cont).overflowX === 'auto'`; `scrollWidth > clientWidth` quando le
+    colonne non entrano; `document.scrollWidth === clientWidth` sulla pagina (nessuno sforamento).
 
 **Regola dei dettagli minimi (obbligatoria):** senza aprire l'appuntamento devono essere
 leggibili **orario, patente e veicolo in uso**.
