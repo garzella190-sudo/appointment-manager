@@ -19,6 +19,7 @@ import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { RefreshButton } from '@/components/RefreshButton';
 import DatePickerModal from '@/components/modals/DatePickerModal';
 import { useAuth } from '@/hooks/useAuth';
+import { leggiIstruttoriSelezionati, salvaIstruttoriSelezionati, sincronizzaModoIstruttori } from '@/lib/preferenzeVista';
 import { useHoverApriScheda } from '@/hooks/useHoverApriScheda';
 import { useAggiornaAlRitorno } from '@/hooks/useAggiornaAlRitorno';
 import { AnteprimaAppuntamento } from '@/components/AnteprimaAppuntamento';
@@ -316,7 +317,8 @@ export default function Home() {
   const [showSearch, setShowSearch] = useState(false);
   const lastScrollY = useRef(0);
   const hasAutoScrolled = useRef(false);
-  const [hasAppliedAutoFilter, setHasAppliedAutoFilter] = useState(false);
+  /** La preferenza salvata è già stata letta (evita di sovrascriverla prima di leggerla). */
+  const preferenzaLetta = useRef(false);
 
   // Ricerca globale: appuntamenti di TUTTO il calendario (non solo il giorno scelto)
   const [globalAppointments, setGlobalAppointments] = useState<Appointment[] | null>(null);
@@ -393,15 +395,27 @@ export default function Home() {
     };
   }, [fetchAppointments]);
 
-  // Auto-filter: si applica a qualunque ruolo se l'account è associato a un istruttore
+  // Preferenza PERSONALE degli istruttori: condivisa con il Calendario e mai resettata.
+  // - se l'utente ha già scelto qualcosa, si riusa quella scelta;
+  // - al primo avvio si parte dal proprio calendario (se l'account è collegato a un istruttore);
+  // - da quel momento la scelta si salva a ogni modifica manuale e non viene più toccata.
   useEffect(() => {
-    if (!authLoading && istruttoreId && !hasAppliedAutoFilter) {
+    if (authLoading || preferenzaLetta.current) return;
+    const salvati = leggiIstruttoriSelezionati();
+    if (salvati) {
+      setSelectedInstructorIds(salvati);
+    } else if (istruttoreId) {
       setSelectedInstructorIds([istruttoreId]);
-      setHasAppliedAutoFilter(true);
-    } else if (!authLoading && !hasAppliedAutoFilter) {
-      setHasAppliedAutoFilter(true); // marca comunque per evitare loop
     }
-  }, [authLoading, istruttoreId, hasAppliedAutoFilter]);
+    preferenzaLetta.current = true;
+  }, [authLoading, istruttoreId]);
+
+  // Salvataggio della scelta manuale (vale anche per il Calendario)
+  useEffect(() => {
+    if (!preferenzaLetta.current) return;
+    salvaIstruttoriSelezionati(selectedInstructorIds);
+    sincronizzaModoIstruttori(selectedInstructorIds);
+  }, [selectedInstructorIds]);
 
   // Ricerca globale: cerca la parola in TUTTO il calendario, non solo nel giorno scelto.
   // Il fetch completo (una volta sola, poi in cache) viene invalidato al sync degli appuntamenti.

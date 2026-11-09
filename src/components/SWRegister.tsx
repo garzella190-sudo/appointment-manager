@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 
 /** File del service worker (cambiare nome forza il reinstallo) */
-const SW_URL = '/sw-v11.js';
+const SW_URL = '/sw-v12.js';
 /** Controllo periodico mentre l'app resta aperta */
 const INTERVALLO_MS = 30 * 60 * 1000;
 

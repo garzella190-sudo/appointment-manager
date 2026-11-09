@@ -385,20 +385,6 @@
   scrollbar-gutter: stable;
 }
 
-/*
- * Scroll SOLO verticale: `overflow-x: clip` non crea uno scrollport orizzontale,
- * così le colonne `sticky left-0` (la barra degli orari del calendario) restano
- * ancorate al bordo sinistro del contenitore che scorre in orizzontale.
- * Con `overflow-x: hidden` la sticky si agganciava al contenitore interno e
- * scorreva via insieme alla griglia.
- */
-.scroll-verticale {
-  overflow-y: auto;
-  overflow-x: clip;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable;
-}
-
 /* Nascondi scrollbar ma mantieni funzionalità se desiderato */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

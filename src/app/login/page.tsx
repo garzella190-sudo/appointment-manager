@@ -65,8 +65,8 @@ export default function LoginPage() {
         localStorage.removeItem('autoscuola_remembered_password');
       }
 
-      // Se è tutto ok, ti spedisce al calendario!
-      window.location.href = '/';
+      // Home dell'app = CALENDARIO per tutti (l'agenda resta raggiungibile dalla barra)
+      window.location.href = '/calendar';
     }
   };
 

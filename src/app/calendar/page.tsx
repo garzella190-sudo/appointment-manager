@@ -139,7 +139,15 @@ export default function CalendarPage() {
   const [granularity, setGranularity] = useState<15 | 30 | 60>(15);
   const [viewMode, setViewMode] = useState<'week' | 'resource'>('week');
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /**
+   * UNICO contenitore di scroll del calendario (orizzontale + verticale).
+   * Tenere un solo scrollport è ciò che rende possibili insieme:
+   * - la colonna degli orari `sticky left-0` (non scorre via in orizzontale)
+   * - la fascia giorni/istruttori `sticky top-0` (resta in alto)
+   * Con due contenitori annidati la sticky si aggancia a quello interno e si muove
+   * insieme alla griglia (bug visto su alcuni browser / PWA installata).
+   */
+  const grigliaRef = useRef<HTMLDivElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   // Su schermi piccoli troppe colonne renderebbero illeggibili le card: massimo 3 istruttori.
   const MAX_ISTRUTTORI_MOBILE = 3;
@@ -350,7 +358,7 @@ export default function CalendarPage() {
       return;
     }
 
-    const container = scrollContainerRef.current;
+    const container = grigliaRef.current;
     if (!container) return;
 
     let lastScrollTop = container.scrollTop;
@@ -549,7 +557,7 @@ export default function CalendarPage() {
 
   // Auto-scroll logic: go to current time if apps exist near, otherwise start at 09:00
   useEffect(() => {
-    if (!loading && mounted && scrollContainerRef.current) {
+    if (!loading && mounted && grigliaRef.current) {
       // Small timeout to ensure DOM is ready
       const timer = setTimeout(() => {
         const now = new Date();
@@ -582,8 +590,14 @@ export default function CalendarPage() {
           return (now >= startD && now <= endD) || timeDiff <= 2.5; 
         });
 
-        const container = scrollContainerRef.current;
+        const container = grigliaRef.current;
         if (!container) return;
+        
+        // Lo scroll è unico (X+Y): l'intestazione sticky copre la parte alta del viewport,
+        // quindi va sottratta per non centrare/posizionare la riga sotto di essa.
+        const intestazione = document.querySelector('[data-header-calendario]') as HTMLElement | null;
+        const altezzaIntestazione = intestazione?.offsetHeight ?? 0;
+        const altezzaUtile = Math.max(120, container.clientHeight - altezzaIntestazione);
         
         let scrollPos = 0;
 
@@ -591,13 +605,13 @@ export default function CalendarPage() {
           const targetSlot = `${targetH.toString().padStart(2, '0')}:${targetM.toString().padStart(2, '0')}`;
           const element = document.getElementById(`slot-${targetSlot}`);
           if (element) {
-            scrollPos = element.offsetTop - (container.clientHeight / 2) + (element.clientHeight / 2);
+            scrollPos = element.offsetTop - altezzaIntestazione - (altezzaUtile / 2) + (element.clientHeight / 2);
           }
         } else {
           // Posizionati alle 9 come primo rigo visibile
           const element = document.getElementById(`slot-09:00`);
           if (element) {
-            scrollPos = element.offsetTop - 10;
+            scrollPos = element.offsetTop - altezzaIntestazione - 10;
           }
         }
 
@@ -792,7 +806,6 @@ export default function CalendarPage() {
     ? displayDays.length
     : Math.max(1, displayDays.length * displayIstruttori.length);
 
-  const grigliaRef = useRef<HTMLDivElement | null>(null);
   const [larghezzaPannello, setLarghezzaPannello] = useState(0);
 
   useEffect(() => {
@@ -1187,15 +1200,16 @@ export default function CalendarPage() {
                 targetRef={grigliaRef}
                 versione={`${viewMode}-${displayDays.length}-${displayIstruttori.length}-${Math.round(colWidth)}-${fitAll ? 'fit' : 'wide'}`}
               />
-              <div ref={grigliaRef} className="w-full flex flex-col h-full overflow-x-auto scrollbar-hide">
-                <div className="flex flex-col h-full" style={{ minWidth: minGridWidth }}>
-              <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex-shrink-0">
+              {/* Unico scrollport (X e Y): colonna orari sticky a sinistra e intestazioni sticky in alto */}
+              <div ref={grigliaRef} className="w-full flex-1 min-h-0 overflow-auto scrollbar-hide">
+                <div className="flex flex-col" style={{ minWidth: minGridWidth }}>
+              <div data-header-calendario className="sticky top-0 z-40 flex flex-col border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0">
                 {/* Fascia giorni — vista risorse con più giorni: giorni affiancati in orizzontale */}
                 {viewMode === 'resource' && displayDays.length > 1 && (
                   <div
                     className="flex border-b border-zinc-200 dark:border-zinc-800"
                   >
-                    <div className="sticky left-0 z-30 w-[60px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900" />
+                    <div className="sticky left-0 z-50 w-[60px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900" />
                     {displayDays.map((day: Date) => {
                       const isHoliday = isItalianHoliday(day) || isWeekend(day);
                       const isToday = isSameDay(day, new Date());
@@ -1220,7 +1234,7 @@ export default function CalendarPage() {
                 )}
 
                 <div className="flex">
-                  <div className="sticky left-0 z-30 w-[60px] shrink-0 p-1 sm:p-4 border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
+                  <div className="sticky left-0 z-50 w-[60px] shrink-0 p-1 sm:p-4 border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
                     <Clock size={16} className="text-zinc-400" />
                   </div>
                 {viewMode === 'week' ? displayDays.map((day: Date) => {
@@ -1285,12 +1299,13 @@ export default function CalendarPage() {
               </div>
 
               {/* Corpo Scorrevole */}
-              <div 
-                ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto scroll-verticale scrollbar-hide relative pb-24"
-              >
+              {/*
+                Corpo della griglia: NESSUN overflow proprio (l'unico scrollport è più sopra).
+                Così le celle `sticky left-0` restano ancorate al bordo sinistro anche su iOS.
+              */}
+              <div className="pb-24">
                 {loading && (
-                  <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
+                  <div className="fixed inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-[90] flex items-center justify-center">
                     <Loader2 className="animate-spin text-blue-600" size={40} />
                   </div>
                 )}
@@ -1341,7 +1356,7 @@ export default function CalendarPage() {
                         passano sotto ai numeri.
                       */}
                       <div className={cn(
-                        "sticky left-0 z-40 p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
+                        "sticky left-0 z-[70] p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
                         isFullHour
                           ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900"
                           : "text-zinc-500 font-semibold bg-white dark:bg-zinc-900"

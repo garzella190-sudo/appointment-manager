@@ -3,8 +3,9 @@
 Mappa aggiornata dei file core e delle loro dipendenze dopo il restyling "Ultra-Compact".
 
 ## 🛣️ Percorsi App Router (Core)
-- `/src/app/page.tsx` -> **Agenda** (Home Page, scroll automatico a "Now", guide raggruppate per istruttore e **affiancate in orizzontale**, picker multi-istruttore dal tasto *people*, **ricerca globale su tutto il calendario** con split future/svolte e fetch paginato a 1000 righe).
-- `/src/app/calendar/page.tsx` -> **Calendario** (Griglia interattiva con granularità 15/30/60m).
+- `/src/app/calendar/page.tsx` -> **HOME dell'app / Calendario** (griglia interattiva 15/30/60m, orari fissi a sinistra, intestazioni sticky). Dopo il login si atterra qui; è la `start_url` delle PWA.
+- `/src/app/page.tsx` -> **Agenda** (lista del giorno, scroll automatico a "Now", guide raggruppate per istruttore e **affiancate in orizzontale** con righe allineate per orario, picker multi-istruttore dal tasto *people*, **ricerca globale su tutto il calendario** con split future/svolte/annullate e fetch paginato a 1000 righe).
+- `/src/lib/preferenzeVista.ts` -> **Preferenze di visualizzazione personali**, condivise fra Agenda e Calendario (chiavi `calendar_*`): gli istruttori scelti in una schermata valgono anche nell'altra; mai resettate automaticamente.
 - `/src/app/clienti/page.tsx` -> Lista e gestione anagrafiche.
 - `/src/app/esami/page.tsx` -> **Esami** (Creazione sedute, assegnazione allievi pronti e istruttori).
 - `/src/app/gestione/page.tsx` -> Pannello Admin (Istruttori, Veicoli, Patenti).

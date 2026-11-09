@@ -2,7 +2,7 @@
   "name": "Agenda Guide Manu",
   "short_name": "Agenda Manu",
   "description": "Gestione avanzata guide e appuntamenti autoscuola",
-  "start_url": "/",
+  "start_url": "/calendar",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "background_color": "#09090b",

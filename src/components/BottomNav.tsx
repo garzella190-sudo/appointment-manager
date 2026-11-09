@@ -99,9 +99,10 @@ const BottomNav = () => {
     ];
   };
 
+  // La HOME dell'app è il Calendario; l'Agenda (lista del giorno) resta a portata di un tocco.
   const navLeft = [
-    { name: 'Home',      href: '/',         icon: Home },
-    { name: 'Calendario', href: '/calendar', icon: Calendar },
+    { name: 'Home',     href: '/calendar', icon: Home },
+    { name: 'Agenda',   href: '/',         icon: Calendar },
   ];
 
   const navRight = [
@@ -128,10 +129,10 @@ const BottomNav = () => {
                 <PlusCircle size={20} strokeWidth={2.5} className="transition-transform duration-300 sm:w-[22px] sm:h-[22px] group-hover:scale-110" />
               </button>
               <Link
-                href="/"
-                title="Home"
+                href="/calendar"
+                title="Home (Calendario)"
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent('home-reset-today'));
+                  window.dispatchEvent(new CustomEvent('calendar-today'));
                 }}
                 className="relative flex flex-col items-center justify-center w-9 h-9 sm:w-12 sm:h-12 rounded-[14px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
               >
