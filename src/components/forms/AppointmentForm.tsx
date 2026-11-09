@@ -364,13 +364,13 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           try {
             const browserSupabase = createClient();
             const { data: { user } } = await browserSupabase.auth.getUser();
-            // Priorità: colonna cliccata nel calendario (es. segreteria che clicca
-            // "Manuele Garzella - 15:00") > profilo dell'istruttore loggato.
-            // Segreteria senza colonna selezionata: campo vuoto, scelta manuale.
-            const ruolo = (user?.user_metadata?.role as string | undefined) ?? 'istruttore';
+            // Priorità: colonna cliccata nel calendario (es. "Manuele Garzella - 15:00")
+            // > profilo istruttore dell'utente loggato.
+            // Vale per QUALUNQUE ruolo collegato a un istruttore (anche Admin/AdminDev):
+            // se Manuele crea una guida, l'istruttore è Manuele; se la crea Francesco è
+            // Francesco. La segreteria, che non è collegata a un istruttore, sceglie a mano.
             const linkedInstrId = user?.user_metadata?.istruttore_id;
-            const instrIdDaApplicare =
-              initialIstruttoreId || (ruolo === 'istruttore' ? linkedInstrId : undefined);
+            const instrIdDaApplicare = initialIstruttoreId || linkedInstrId;
             if (instrIdDaApplicare) {
               const instr = (sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === instrIdDaApplicare);
               if (instr) {
@@ -547,31 +547,28 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     }
 
     // ─── PRIORITY 2: profilo utente — istruttore collegato alla sessione ───
-    // Serve solo agli istruttori (che si preassegnano da soli). Segreteria e admin
-    // devono trovare il campo "Istruttore" vuoto e sceglierlo manualmente.
+    // Vale per QUALUNQUE ruolo collegato a un istruttore (istruttore, Admin, AdminDev):
+    // chi crea una guida la crea sul proprio calendario (Manuele→Manuele, Francesco→Francesco).
+    // Chi non è collegato a un istruttore (segreteria) trova il campo vuoto e sceglie a mano.
     let instrProfilo: Istruttore | null = null;
-    let ruoloLoggato: string | null = null;
     try {
       const browserSupabase = createClient();
       const { data: { user } } = await browserSupabase.auth.getUser();
-      ruoloLoggato = (user?.user_metadata?.role as string | undefined) ?? 'istruttore';
       const linkedInstrId = user?.user_metadata?.istruttore_id;
-      if (ruoloLoggato === 'istruttore' && linkedInstrId) {
+      if (linkedInstrId) {
         instrProfilo = istruttori.find(i => i.id === linkedInstrId) ?? null;
       }
     } catch {
       // Sessione non disponibile
     }
 
-    const isIstruttoreLoggato = ruoloLoggato === 'istruttore';
-
     // ─── PRIORITY 3: primo istruttore abilitato per la patente ───
     const instrAbilitato = (instrStorico || instrProfilo)
       ? null
       : (istruttori.find(i => i.patenti_abilitate && i.patenti_abilitate.includes(currentPatenteTipo as any)) ?? null);
 
-    // L'istruttore loggato ha la precedenza assoluta (si assegna lui la guida).
-    // Per segreteria/admin nessuna preassegnazione: campo vuoto.
+    // L'istruttore collegato all'account ha la precedenza (si assegna lui la guida).
+    // Chi non è collegato a un istruttore non riceve preassegnazione: campo vuoto.
     // Eccezione: se un istruttore è già scelto (colonna del calendario o scelta manuale)
     // non va mai sovrascritto.
     const instrGiaScelto =
@@ -580,9 +577,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
 
     const istruttoreFinale = instrGiaScelto
       ? instrGiaScelto
-      : isIstruttoreLoggato
-        ? (instrProfilo ?? instrStorico ?? instrAbilitato)
-        : null;
+      : (instrProfilo ?? instrStorico ?? instrAbilitato ?? null);
 
     // ─── Veicolo: 1) memoria del cliente  2) default dell'istruttore  3) primo compatibile ───
     const veicoloDefaultIstruttore = istruttoreFinale?.veicolo_id

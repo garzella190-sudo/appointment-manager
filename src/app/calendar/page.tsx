@@ -1193,10 +1193,9 @@ export default function CalendarPage() {
                 {/* Fascia giorni — vista risorse con più giorni: giorni affiancati in orizzontale */}
                 {viewMode === 'resource' && displayDays.length > 1 && (
                   <div
-                    className="grid border-b border-zinc-200 dark:border-zinc-800"
-                    style={{ gridTemplateColumns: `60px repeat(${displayDays.length}, minmax(0, 1fr))` } as React.CSSProperties}
+                    className="flex border-b border-zinc-200 dark:border-zinc-800"
                   >
-                    <div className="border-r border-zinc-200 dark:border-zinc-800" />
+                    <div className="sticky left-0 z-30 w-[60px] shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900" />
                     {displayDays.map((day: Date) => {
                       const isHoliday = isItalianHoliday(day) || isWeekend(day);
                       const isToday = isSameDay(day, new Date());
@@ -1204,7 +1203,7 @@ export default function CalendarPage() {
                         <div
                           key={`giorno-${day.toString()}`}
                           className={cn(
-                            "py-1 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 border-l-2 border-l-zinc-400 dark:border-l-zinc-600",
+                            "flex-1 min-w-0 py-1 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 border-l-2 border-l-zinc-400 dark:border-l-zinc-600",
                             isToday ? "bg-blue-50/60 dark:bg-blue-500/10" : ""
                           )}
                         >
@@ -1220,11 +1219,8 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-                <div 
-                  className="grid"
-                  style={{ gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayDays.length * displayIstruttori.length)}, minmax(0, 1fr))` } as React.CSSProperties}
-                >
-                  <div className="p-1 sm:p-4 border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
+                <div className="flex">
+                  <div className="sticky left-0 z-30 w-[60px] shrink-0 p-1 sm:p-4 border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
                     <Clock size={16} className="text-zinc-400" />
                   </div>
                 {viewMode === 'week' ? displayDays.map((day: Date) => {
@@ -1238,7 +1234,7 @@ export default function CalendarPage() {
                   );
                   return (
                     <div key={day.toString()} className={cn(
-                      "p-1 sm:p-2 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0",
+                      "flex-1 min-w-0 p-1 sm:p-2 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0",
                       isToday ? "bg-blue-50/50 dark:bg-blue-500/10" : ""
                     )}>
                       <span className={cn(
@@ -1271,7 +1267,7 @@ export default function CalendarPage() {
                     <div
                       key={`${day.toString()}-${ist.id}`}
                       className={cn(
-                        "py-1 px-0.5 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center",
+                        "flex-1 min-w-0 py-1 px-0.5 text-center border-r border-zinc-200 dark:border-zinc-800 last:border-0 flex flex-col items-center justify-center",
                         isTodayCol && "bg-blue-50/40 dark:bg-blue-500/5",
                         istIdx === 0 && "border-l-2 border-l-zinc-400 dark:border-l-zinc-600"
                       )}
@@ -1291,7 +1287,7 @@ export default function CalendarPage() {
               {/* Corpo Scorrevole */}
               <div 
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto scroll-container scrollbar-hide relative pb-24"
+                className="flex-1 overflow-y-auto scroll-verticale scrollbar-hide relative pb-24"
               >
                 {loading && (
                   <div className="absolute inset-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-[2px] z-50 flex items-center justify-center">
@@ -1329,7 +1325,7 @@ export default function CalendarPage() {
                           className="absolute left-0 right-0 z-50 flex items-center pointer-events-none"
                           style={{ top: `${((currentTotalMinutes - slotStartMinutes) / granularity) * 100}%`, transform: 'translateY(-50%)' }}
                         >
-                          <div className="w-[60px] flex justify-end pr-1 sm:pr-3">
+                          <div className="sticky left-0 z-[60] w-[60px] flex justify-end pr-1 sm:pr-3 bg-white dark:bg-zinc-900">
                             <span className="text-[10px] font-black text-red-500 bg-white dark:bg-zinc-900 px-1 rounded-sm shadow-sm">{format(nowLine, 'HH:mm')}</span>
                           </div>
                           <div className="flex-1 h-[2px] bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] flex relative">
@@ -1338,9 +1334,17 @@ export default function CalendarPage() {
                         </div>
                       )}
 
+                      {/*
+                        Colonna degli ORARI FISSA a sinistra: `sticky left-0` dentro il contenitore
+                        che scorre in orizzontale, così l'orario resta sempre leggibile anche
+                        scorrendo giorni/istruttori. Serve un fondo opaco, altrimenti le card
+                        passano sotto ai numeri.
+                      */}
                       <div className={cn(
-                        "p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
-                        isFullHour ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50/50 dark:bg-zinc-800/20" : "text-zinc-500 font-semibold"
+                        "sticky left-0 z-40 p-1 sm:p-2 text-xs sm:text-sm font-mono text-center sm:text-right border-r border-zinc-200 dark:border-zinc-800 flex items-center justify-center sm:justify-end pr-1 sm:pr-4",
+                        isFullHour
+                          ? "font-black text-zinc-900 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900"
+                          : "text-zinc-500 font-semibold bg-white dark:bg-zinc-900"
                       )}>
                         {isFullHour ? slot : slot.split(':')[1]}
                       </div>

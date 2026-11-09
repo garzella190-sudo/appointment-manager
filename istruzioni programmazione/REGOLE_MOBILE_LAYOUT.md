@@ -106,6 +106,31 @@ un altro modo?* Se no, deve restare visibile (eventualmente compattata).
 - Le preferenze utente (`calendar_viewDays`) **non** vanno sovrascritte al `resize`:
   il default legato allo schermo si applica solo al primo avvio.
 
+### 6-bis.1 La barra degli orari resta FISSA a sinistra
+
+Scorrendo in orizzontale (vista COL con più istruttori o settimana) la **colonna degli orari**
+(60px) resta ancorata al bordo sinistro dello schermo.
+
+```jsx
+<div className="sticky left-0 z-40 w-[60px] shrink-0 bg-zinc-50 dark:bg-zinc-900">08:00</div>
+```
+
+Due dettagli indispensabili, entrambi verificati sul campo:
+
+1. **Fondo opaco** sulla cella sticky, altrimenti le card passano sotto ai numeri.
+2. Il contenitore che scorre in verticale deve usare `.scroll-verticale`
+   (`overflow-y: auto; overflow-x: clip`), **non** `.scroll-container`
+   (`overflow-x: hidden`): `hidden` crea uno scrollport interno alla griglia e la cella
+   `sticky left-0` scorre via con il contenuto. `clip` non crea uno scrollport, quindi la
+   sticky si aggancia al vero contenitore orizzontale.
+
+Fanno parte della colonna fissa: la cella d'angolo della fascia giorni, la cella con l'icona
+orologio in alto e l'etichetta dell'orario attuale (linea rossa).
+
+Verifica: con `scrollLeft = 400` su una griglia che scorre (`scrollWidth > clientWidth`)
+**tutte** le celle sticky devono mantenere lo stesso `getBoundingClientRect().left`
+(misurate 60 celle: `left` da 9 a 9, celle accanto da 9 a −391).
+
 ---
 
 ## 6-ter. Agenda — raggruppamento per istruttore e dati sempre visibili

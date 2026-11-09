@@ -6,7 +6,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { sendConfirmationEmailAction } from './notifications';
-import { sendNotificationToAllUsers, sendNotificationToInstructor, isInstructorGarzella } from '@/lib/pushHelper';
+import { notificaGuidaAgliIstruttori } from '@/lib/pushHelper';
 
 // Initialized lazily inside the action
 
@@ -216,12 +216,11 @@ export async function createAppointmentAction(payload: {
     }
   }
 
-  // 4. Web Push Broadcast — notifica TUTTI gli utenti tranne chi ha fatto l'azione
-  // OPPURE notifica solo Manuele Garzella se l'azione è compiuta dall'ufficio
+  // 4. Web Push MIRATO — avvisa solo l'istruttore il cui calendario è stato toccato,
+  // e mai chi ha compiuto l'azione (se Manuele prenota su Manuele, nessuno viene avvisato).
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const currentUserId = session?.user?.id || null;
-    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
     
     const clientName = clientData.nome && clientData.nome !== 'UFFICIO' 
       ? `${clientData.cognome} ${clientData.nome}` 
@@ -229,22 +228,15 @@ export async function createAppointmentAction(payload: {
       
     const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
     
-    const isGarzella = await isInstructorGarzella(payload.istruttore_id);
-    if (isGarzella) {
-      if (currentUserIstruttoreId !== payload.istruttore_id) {
-        await sendNotificationToInstructor(payload.istruttore_id, {
-          title: '📅 Nuova Guida Inserita',
-          body: `${clientName} — ${timeStr}`,
-          url: '/'
-        });
-      }
-    } else {
-      await sendNotificationToAllUsers(currentUserId, {
+    await notificaGuidaAgliIstruttori({
+      destinatari: [payload.istruttore_id],
+      attoreIstruttoreId: currentUserIstruttoreId,
+      payload: {
         title: '📅 Nuova Guida Inserita',
         body: `${clientName} — ${timeStr}`,
         url: '/'
-      });
-    }
+      },
+    });
   } catch (err) {
     console.error('Web Push Error:', err);
   }
@@ -258,6 +250,14 @@ export async function createAppointmentAction(payload: {
 
 export async function updateAppointmentAction(id: string, payload: any) {
   const supabase = await createClient();
+
+  // Istruttore attuale: serve per avvisare anche il "vecchio" calendario se la guida viene spostata
+  const { data: primaDellaModifica } = await supabase
+    .from('appuntamenti')
+    .select('istruttore_id')
+    .eq('id', id)
+    .maybeSingle();
+  const istruttorePrecedente: string | null = primaDellaModifica?.istruttore_id ?? null;
   
   let finalClienteId = payload.cliente_id;
 
@@ -411,31 +411,23 @@ export async function updateAppointmentAction(id: string, payload: any) {
     }
   }
 
-  // 4. Web Push Broadcast — notifica TUTTI gli utenti tranne chi ha fatto la modifica
-  // OPPURE notifica solo Manuele Garzella se l'azione è compiuta dall'ufficio
+  // 4. Web Push MIRATO — solo gli istruttori coinvolti (nuovo e, se spostata, vecchio),
+  // mai chi ha fatto la modifica.
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const currentUserId = session?.user?.id || null;
-    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
+    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
     
     const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
     
-    const isGarzella = await isInstructorGarzella(payload.istruttore_id);
-    if (isGarzella) {
-      if (currentUserIstruttoreId !== payload.istruttore_id) {
-        await sendNotificationToInstructor(payload.istruttore_id, {
-          title: '✏️ Guida Modificata',
-          body: `Una guida è stata aggiornata: ${timeStr}`,
-          url: '/'
-        });
-      }
-    } else {
-      await sendNotificationToAllUsers(currentUserId, {
+    await notificaGuidaAgliIstruttori({
+      destinatari: [payload.istruttore_id, istruttorePrecedente],
+      attoreIstruttoreId: currentUserIstruttoreId,
+      payload: {
         title: '✏️ Guida Modificata',
         body: `Una guida è stata aggiornata: ${timeStr}`,
         url: '/'
-      });
-    }
+      },
+    });
   } catch (err) {
     console.error('Web Push Error:', err);
   }

@@ -55,63 +55,31 @@ export async function sendNotificationToInstructor(instructorId: string, payload
 }
 
 /**
- * Broadcasts a push notification to ALL subscribed users,
- * excluding the user who performed the action (to avoid self-notifications).
- * This ensures admin, segreteria, and all instructors get notified on every change.
+ * Notifica PUSH **per utente**: avvisa SOLO gli istruttori il cui calendario è stato toccato,
+ * e mai chi ha compiuto l'azione.
+ *
+ * Regole richieste:
+ * - la segreteria modifica una guida di Francesco  → notifica solo Francesco
+ * - Manuele prenota una guida sul calendario di Francesco → notifica solo Francesco
+ * - Manuele prenota una guida sul proprio calendario → nessuna notifica
+ *
+ * `destinatari` contiene gli istruttori coinvolti (per uno spostamento: nuovo + vecchio
+ * istruttore); i duplicati e l'autore dell'azione vengono scartati.
+ * Restituisce gli id degli istruttori a cui la notifica è stata effettivamente tentata.
  */
-export async function sendNotificationToAllUsers(excludeUserId: string | null, payload: { title: string, body: string, url?: string }) {
-  if (!vapidPublicKey || !vapidPrivateKey) return;
+export async function notificaGuidaAgliIstruttori(params: {
+  destinatari: (string | null | undefined)[];
+  attoreIstruttoreId?: string | null;
+  payload: { title: string; body: string; url?: string };
+}): Promise<string[]> {
+  const attore = params.attoreIstruttoreId || null;
 
-  const { createClient: createAdminClient } = await import('@supabase/supabase-js');
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRoleKey) return;
+  const destinatari = [...new Set(params.destinatari.filter((id): id is string => !!id))]
+    .filter(id => id !== attore);
 
-  const adminDb = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
-
-  // Fetch all subscriptions except the one belonging to the current user
-  let query = adminDb.from('push_subscriptions').select('subscription, id, user_id');
-  if (excludeUserId) {
-    query = (query as any).neq('user_id', excludeUserId);
+  for (const instructorId of destinatari) {
+    await sendNotificationToInstructor(instructorId, params.payload);
   }
-  const { data: subscriptions } = await query;
 
-  if (!subscriptions || subscriptions.length === 0) return;
-
-  const promises = subscriptions.map(async (sub: any) => {
-    try {
-      await webpush.sendNotification(sub.subscription, JSON.stringify(payload));
-    } catch (error: any) {
-      if (error.statusCode === 410 || error.statusCode === 404) {
-        await adminDb.from('push_subscriptions').delete().eq('id', sub.id);
-      } else {
-        console.error('Error sending broadcast push:', error);
-      }
-    }
-  });
-
-  await Promise.all(promises);
-}
-
-/**
- * Checks if a given instructor ID belongs to Manuele Garzella.
- */
-export async function isInstructorGarzella(instructorId: string): Promise<boolean> {
-  const { createClient: createAdminClient } = await import('@supabase/supabase-js');
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRoleKey) return false;
-
-  const adminDb = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
-
-  const { data: instructor, error } = await adminDb
-    .from('istruttori')
-    .select('nome, cognome')
-    .eq('id', instructorId)
-    .single();
-
-  if (error || !instructor) return false;
-
-  return (
-    instructor.nome?.toLowerCase() === 'manuele' &&
-    instructor.cognome?.toLowerCase() === 'garzella'
-  );
+  return destinatari;
 }

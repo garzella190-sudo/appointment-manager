@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { Impegno, TipoImpegno } from '@/lib/database.types';
-import { sendNotificationToInstructor, isInstructorGarzella } from '@/lib/pushHelper';
+import { notificaGuidaAgliIstruttori } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 
 export async function getTipiImpegnoAction() {
@@ -53,20 +53,19 @@ export async function createImpegnoAction(payload: {
 
   try {
     if (payload.istruttore_id) {
-      const isGarzella = await isInstructorGarzella(payload.istruttore_id);
-      if (isGarzella) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
-        if (currentUserIstruttoreId !== payload.istruttore_id) {
-          const dateFormatted = format(new Date(payload.data), 'dd/MM');
-          const timeFormatted = payload.ora_inizio.substring(0, 5);
-          await sendNotificationToInstructor(payload.istruttore_id, {
-            title: '📅 Nuovo Impegno Inserito',
-            body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
-            url: '/'
-          });
-        }
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
+      const dateFormatted = format(new Date(payload.data), 'dd/MM');
+      const timeFormatted = payload.ora_inizio.substring(0, 5);
+      await notificaGuidaAgliIstruttori({
+        destinatari: [payload.istruttore_id],
+        attoreIstruttoreId: currentUserIstruttoreId,
+        payload: {
+          title: '📅 Nuovo Impegno Inserito',
+          body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
+          url: '/'
+        },
+      });
     }
   } catch (err) {
     console.error('Push notification error in createImpegnoAction:', err);
@@ -109,20 +108,19 @@ export async function updateImpegnoAction(id: string, payload: {
 
   try {
     if (payload.istruttore_id) {
-      const isGarzella = await isInstructorGarzella(payload.istruttore_id);
-      if (isGarzella) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
-        if (currentUserIstruttoreId !== payload.istruttore_id) {
-          const dateFormatted = format(new Date(payload.data), 'dd/MM');
-          const timeFormatted = payload.ora_inizio.substring(0, 5);
-          await sendNotificationToInstructor(payload.istruttore_id, {
-            title: '✏️ Impegno Modificato',
-            body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
-            url: '/'
-          });
-        }
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
+      const dateFormatted = format(new Date(payload.data), 'dd/MM');
+      const timeFormatted = payload.ora_inizio.substring(0, 5);
+      await notificaGuidaAgliIstruttori({
+        destinatari: [payload.istruttore_id],
+        attoreIstruttoreId: currentUserIstruttoreId,
+        payload: {
+          title: '✏️ Impegno Modificato',
+          body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
+          url: '/'
+        },
+      });
     }
   } catch (err) {
     console.error('Push notification error in updateImpegnoAction:', err);
@@ -155,20 +153,19 @@ export async function deleteImpegnoAction(id: string) {
 
   try {
     if (impegnoToDelete && impegnoToDelete.istruttore_id) {
-      const isGarzella = await isInstructorGarzella(impegnoToDelete.istruttore_id);
-      if (isGarzella) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
-        if (currentUserIstruttoreId !== impegnoToDelete.istruttore_id) {
-          const dateFormatted = format(new Date(impegnoToDelete.data), 'dd/MM');
-          const timeFormatted = impegnoToDelete.ora_inizio.substring(0, 5);
-          await sendNotificationToInstructor(impegnoToDelete.istruttore_id, {
-            title: '🗑️ Impegno Eliminato',
-            body: `${impegnoToDelete.tipo} del ${dateFormatted} alle ${timeFormatted} è stato eliminato.`,
-            url: '/'
-          });
-        }
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
+      const dateFormatted = format(new Date(impegnoToDelete.data), 'dd/MM');
+      const timeFormatted = impegnoToDelete.ora_inizio.substring(0, 5);
+      await notificaGuidaAgliIstruttori({
+        destinatari: [impegnoToDelete.istruttore_id],
+        attoreIstruttoreId: currentUserIstruttoreId,
+        payload: {
+          title: '🗑️ Impegno Eliminato',
+          body: `${impegnoToDelete.tipo} del ${dateFormatted} alle ${timeFormatted} è stato eliminato.`,
+          url: '/'
+        },
+      });
     }
   } catch (err) {
     console.error('Push notification error in deleteImpegnoAction:', err);
