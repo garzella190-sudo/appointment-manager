@@ -1222,7 +1222,15 @@ export default function CalendarPage() {
               {/* Unico scrollport (X e Y): colonna orari sticky a sinistra e intestazioni sticky in alto */}
               <div ref={grigliaRef} className="w-full flex-1 min-h-0 overflow-auto scrollbar-hide">
                 <div className="flex flex-col" style={{ minWidth: minGridWidth }}>
-              <div data-header-calendario className="sticky top-0 z-40 flex flex-col border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0">
+              {/*
+                BARRA GIORNI+ISTRUTTORI sticky. Il suo z-index deve stare SOPRA tutte le
+                righe orarie, che hanno z-index decrescenti (`timeSlots.length - indice`,
+                es. 57 per le 08:00, e 80 per la riga dell'ora corrente): con un valore
+                più basso (era z-40) le righe della mattina — quelle con z-index alto —
+                si disegnavano SOPRA la barra, facendola sembrare trasparente e lasciando
+                passare le card. Resta sotto il DragOverlay (z 100).
+              */}
+              <div data-header-calendario className="sticky top-0 z-[90] flex flex-col border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0">
                 {/* Fascia giorni — vista risorse con più giorni: giorni affiancati in orizzontale */}
                 {viewMode === 'resource' && displayDays.length > 1 && (
                   <div

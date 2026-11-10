@@ -39,7 +39,7 @@ const APPOINTMENT_SELECT = `
  * così non si spreca mezza schermata quando c'è un buco di due ore.
  */
 const PASSO_TIMELINE = 15;
-const RIGA_TIMELINE_PX = 50;
+const RIGA_TIMELINE_PX = 52;
 const RIGA_PAUSA_PX = 16;
 
 /** Righe Supabase (relazioni annidate: possono arrivare come oggetto o array). */
@@ -134,8 +134,24 @@ const LineaOra = ({ time, withId = false }: { time: string; withId?: boolean }) 
 /**
  * Card di una guida in agenda. Estratta in un componente perché viene usata sia dalla
  * lista a colonna singola sia dalla vista multi-istruttore allineata per orario.
+ *
+ * `altezzaPx` = altezza disponibile nella timeline (righe × 52px). La card NON deve mai
+ * sbordare sulla successiva: `overflow-hidden` + contenuto a densità variabile.
+ *   < 76px  → "minima": una riga (orario + nome)
+ *   < 140px → "compatta": avatar + nome + riga di chip (durata, patente, veicolo)
+ *   ≥ 140px → "completa": anche telefono, istruttore e note
  */
-const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => void; onDelete: () => void }) => {
+const CardGuida = ({
+  apt,
+  onOpen,
+  onDelete,
+  altezzaPx,
+}: {
+  apt: Appointment;
+  onOpen: () => void;
+  onDelete: () => void;
+  altezzaPx?: number;
+}) => {
   // Da PC: mouse fermo 3 secondi sulla card → anteprima rapida che sparisce al movimento
   const [anteprima, setAnteprima] = useState<DOMRect | null>(null);
 
@@ -165,6 +181,13 @@ const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => 
     }
   }, [apt.appointment_date, apt.appointment_time, apt.duration]);
 
+  // Nella lista a colonna singola l'altezza non è vincolata: si usa sempre il layout completo
+  const densita: 'minima' | 'compatta' | 'completa' =
+    altezzaPx === undefined ? 'completa' : altezzaPx < 76 ? 'minima' : altezzaPx < 140 ? 'compatta' : 'completa';
+
+  const veicolo = apt.vehicle_id && apt.vehicle_id.trim() !== '' && apt.vehicle_id !== 'Nessuno' ? apt.vehicle_id : null;
+  const veicoloBreveLabel = veicolo ? (veicolo.match(/\(([^)]+)\)/)?.[1] || veicolo) : null;
+
   return (
     <>
     <div
@@ -188,100 +211,139 @@ const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => 
       onTouchCancel={hoverApri.onTouchCancel}
       onContextMenu={hoverApri.onContextMenu}
       className={cn(
-        // `h-full`: nella timeline multi-istruttore la card riempie le righe assegnate
-        // (una guida da 1h è alta il doppio di una da 30 min); nella colonna singola
-        // il contenitore è automatico, quindi `h-full` non cambia nulla.
-        "relative h-full border shadow-sm rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-12 sm:pr-14",
+        // `h-full` = riempie le righe assegnate; `overflow-hidden` = il contenuto non
+        // può mai finire sopra la card successiva (bug visto a zoom/testi grandi).
+        "relative h-full overflow-hidden border shadow-sm rounded-2xl flex items-center justify-between group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left",
+        densita === 'completa' ? "p-3 sm:p-4 gap-3 sm:gap-4 pr-12 sm:pr-14" : "px-2 py-1.5 gap-2 pr-9",
         apt.stato === 'annullato' ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60 grayscale" : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
       )}
     >
-      <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
-        <div
-          className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shrink-0 shadow-inner"
-          style={{
-            backgroundColor: apt.stato === 'annullato' ? '#f4f4f5' : `${apt.istruttore?.color}20` || '#f1f5f9',
-            color: apt.stato === 'annullato' ? '#a1a1aa' : apt.istruttore?.color || '#0ea5e9'
-          }}
-        >
-          {initials}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h4 className={cn(
-            "font-bold flex items-center gap-1.5 sm:gap-2 min-w-0",
+      {/* ── Densità MINIMA (blocchi da 15 minuti): una sola riga ── */}
+      {densita === 'minima' ? (
+        <div className="flex items-center gap-1.5 min-w-0 w-full">
+          <span className={cn(
+            "tabular-nums text-[11px] font-black shrink-0",
+            apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
+          )}>{apt.appointment_time}</span>
+          <span className={cn(
+            "truncate text-[11px] font-bold min-w-0",
             apt.stato === 'annullato' ? "text-zinc-500 dark:text-zinc-400 line-through" : "text-zinc-900 dark:text-white"
-          )}>
-            <span className={cn(
-              "tabular-nums text-xs font-black shrink-0",
-              apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
-            )}>{apt.appointment_time}</span>
-            {oraFine && (
-              <span className="tabular-nums text-[10px] font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
-                –{oraFine}
+          )}>{apt.client_name}</span>
+        </div>
+      ) : (
+        <div className={cn("flex items-center min-w-0 w-full", densita === 'completa' ? "gap-3 sm:gap-4" : "gap-2")}>
+          <div
+            className={cn(
+              "rounded-xl flex items-center justify-center font-bold shrink-0 shadow-inner",
+              densita === 'completa' ? "w-10 h-10 sm:w-12 sm:h-12 text-base sm:text-lg" : "w-8 h-8 text-[11px]"
+            )}
+            style={{
+              backgroundColor: apt.stato === 'annullato' ? '#f4f4f5' : `${apt.istruttore?.color}20` || '#f1f5f9',
+              color: apt.stato === 'annullato' ? '#a1a1aa' : apt.istruttore?.color || '#0ea5e9'
+            }}
+          >
+            {initials}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h4 className={cn(
+              "font-bold flex items-center gap-1.5 sm:gap-2 min-w-0",
+              apt.stato === 'annullato' ? "text-zinc-500 dark:text-zinc-400 line-through" : "text-zinc-900 dark:text-white"
+            )}>
+              <span className={cn(
+                "tabular-nums font-black shrink-0",
+                densita === 'completa' ? "text-xs" : "text-[11px]",
+                apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
+              )}>{apt.appointment_time}</span>
+              {oraFine && (
+                <span className="tabular-nums text-[10px] font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
+                  –{oraFine}
+                </span>
+              )}
+              <span className="truncate">{apt.client_name}</span>
+              {apt.exam_status && apt.exam_status !== 'none' && (
+                <GraduationCap
+                  size={densita === 'completa' ? 14 : 11}
+                  className={cn(
+                    "shrink-0",
+                    apt.exam_status === 'scheduled' ? "text-emerald-500 fill-emerald-500/10" : "text-zinc-300"
+                  )}
+                />
+              )}
+            </h4>
+
+            {/* Riga chip: sempre presente ma più compatta nei blocchi bassi.
+                `overflow-hidden` sul contenitore: se non entra, viene tagliata, non sborda. */}
+            <div className={cn(
+              "flex items-center overflow-hidden min-w-0",
+              densita === 'completa' ? "flex-wrap gap-x-2 sm:gap-x-3 gap-y-1.5 mt-1.5" : "gap-1.5 mt-0.5 whitespace-nowrap"
+            )}>
+              {densita === 'completa' && apt.phone && (
+                <a
+                  href={`tel:${apt.phone.replace(/\D/g, '')}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline shrink-0"
+                >
+                  <Phone size={10} />
+                  {apt.phone}
+                </a>
+              )}
+              {densita === 'completa' && (
+                <div className="flex items-center gap-1.5 min-w-0 max-w-full text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
+                  <User size={10} className="text-zinc-400 shrink-0" />
+                  <span className="truncate">{apt.istruttore?.name}</span>
+                </div>
+              )}
+              <span className={cn(
+                "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md font-black uppercase tracking-wider shrink-0",
+                densita === 'completa' ? "px-2 py-0.5 text-[10px]" : "px-1.5 py-0.5 text-[9px]"
+              )}>
+                {apt.duration} min
               </span>
-            )}
-            <span className="truncate">{apt.client_name}</span>
-            {apt.exam_status && apt.exam_status !== 'none' && (
-              <GraduationCap
-                size={14}
-                className={cn(
-                  "shrink-0",
-                  apt.exam_status === 'scheduled' ? "text-emerald-500 fill-emerald-500/10" : "text-zinc-300"
-                )}
-              />
-            )}
-          </h4>
-          <div className="flex items-center flex-wrap gap-x-2 sm:gap-x-3 gap-y-1.5 mt-1.5 min-w-0">
-            {apt.phone && (
-              <a
-                href={`tel:${apt.phone.replace(/\D/g, '')}`}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-tighter hover:underline shrink-0"
-              >
-                <Phone size={10} />
-                {apt.phone}
-              </a>
-            )}
-            <div className="flex items-center gap-1.5 min-w-0 max-w-full text-[10px] text-zinc-500 font-bold uppercase tracking-tight bg-zinc-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded-md">
-              <User size={10} className="text-zinc-400 shrink-0" />
-              <span className="truncate">{apt.istruttore?.name}</span>
+              {apt.license_type && (
+                <span className={cn(
+                  "bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md font-black uppercase tracking-wider shrink-0",
+                  densita === 'completa' ? "px-2 py-0.5 text-[10px]" : "px-1.5 py-0.5 text-[9px]"
+                )}>
+                  Pat. {apt.license_type}
+                </span>
+              )}
+              {veicolo && (
+                <span
+                  className={cn(
+                    "flex items-center bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300 rounded-md font-black uppercase tracking-wider min-w-0",
+                    densita === 'completa' ? "gap-1 px-2 py-0.5 text-[10px] max-w-full" : "gap-0.5 px-1.5 py-0.5 text-[9px] shrink-0"
+                  )}
+                  title={veicolo}
+                  style={apt.vehicle_color ? { color: apt.vehicle_color } : undefined}
+                >
+                  <Car size={densita === 'completa' ? 10 : 9} className="shrink-0" />
+                  <span className="truncate">{densita === 'completa' ? veicolo : veicoloBreveLabel}</span>
+                </span>
+              )}
             </div>
-            <span className="px-2 py-0.5 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
-              {apt.duration} min
-            </span>
-            {apt.license_type && (
-              <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0">
-                Pat. {apt.license_type}
-              </span>
-            )}
-            {apt.vehicle_id && apt.vehicle_id.trim() !== '' && apt.vehicle_id !== 'Nessuno' && (
-              <span
-                className="flex items-center gap-1 px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300 rounded-md text-[10px] font-black uppercase tracking-wider min-w-0 max-w-full"
-                title={apt.vehicle_id}
-                style={apt.vehicle_color ? { color: apt.vehicle_color } : undefined}
-              >
-                <Car size={10} className="shrink-0" />
-                <span className="truncate">{apt.vehicle_id}</span>
-              </span>
+
+            {densita === 'completa' && apt.notes && apt.notes.trim() !== '' && (
+              <div className="flex items-center gap-1 mt-2 text-zinc-400 italic">
+                <StickyNote size={10} className="shrink-0" />
+                <p className="text-[10px] truncate leading-none">{apt.notes}</p>
+              </div>
             )}
           </div>
-          {apt.notes && apt.notes.trim() !== '' && (
-            <div className="flex items-center gap-1 mt-2 text-zinc-400 italic">
-              <StickyNote size={10} className="shrink-0" />
-              <p className="text-[10px] truncate leading-none">{apt.notes}</p>
-            </div>
-          )}
         </div>
-      </div>
-      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
+      )}
+      <div className={cn("absolute right-1.5 z-10", densita === 'completa' ? "top-2 sm:top-3 sm:right-3" : "top-1/2 -translate-y-1/2")}>
         <ConfirmBubble
           title="Elimina Guida"
           message="Sei sicuro di voler eliminare questo appuntamento?"
           confirmLabel="Elimina"
           onConfirm={onDelete}
           trigger={
-            <button className="h-9 w-9 flex items-center justify-center rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50">
-              <Trash2 size={16} />
+            <button className={cn(
+              "flex items-center justify-center rounded-lg text-zinc-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all border border-transparent shadow-sm bg-white dark:bg-zinc-900/80 hover:border-red-200 dark:hover:border-red-900/50",
+              densita === 'completa' ? "h-9 w-9" : "h-7 w-7"
+            )}>
+              <Trash2 size={densita === 'completa' ? 16 : 13} />
             </button>
           }
         />
@@ -1119,6 +1181,7 @@ export default function Home() {
                             apt={apt}
                             onOpen={() => setSelectedAppointment(apt)}
                             onDelete={() => eliminaGuida(apt.id)}
+                            altezzaPx={posizione.span * RIGA_TIMELINE_PX - 8}
                           />
                         </div>
                       );
