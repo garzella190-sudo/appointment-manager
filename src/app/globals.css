@@ -397,6 +397,18 @@
   scrollbar-width: none;
 }
 
+/* ── Scorre SOLO in orizzontale, senza creare uno scrollport verticale ──────
+   `overflow-x: auto` da solo rende il contenitore scrollabile anche in verticale
+   (overflow-y calcola `auto`), e così gli elementi `sticky top-*` interni si
+   ancorano a lui — che non scorre — invece che alla pagina: non restano fissi.
+   Con `overflow-y: clip` il contenitore non è uno scrollport verticale e le
+   intestazioni sticky (nomi istruttori dell'agenda) si ancorano al vero
+   contenitore che scorre. Usato insieme a `.scroll-x-visible` per la barra su PC. */
+.scroll-solo-x {
+  overflow-x: auto;
+  overflow-y: clip;
+}
+
 /* ── Scrollbar orizzontale visibile SOLO su PC (mouse) ─────────────
    Le griglie larghe (vista 7 giorni / multi-istruttore) hanno bisogno di una
    barra afferrabile col mouse: su mobile/tablet non serve (si scorre col dito)

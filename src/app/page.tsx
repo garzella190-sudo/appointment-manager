@@ -256,9 +256,14 @@ const CardGuida = ({
                 apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
               )}>{apt.appointment_time}</span>
               {oraFine && (
-                <span className="tabular-nums text-[10px] font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
-                  –{oraFine}
-                </span>
+                // Trattino CENTRATO fra le due ore: è un elemento a sé, quindi il gap
+                // della riga mette lo stesso spazio a sinistra e a destra ("16:00 – 17:00").
+                <>
+                  <span aria-hidden className="text-[10px] font-bold text-zinc-300 dark:text-zinc-600 shrink-0">–</span>
+                  <span className="tabular-nums text-[10px] font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
+                    {oraFine}
+                  </span>
+                </>
               )}
               <span className="truncate">{apt.client_name}</span>
               {apt.exam_status && apt.exam_status !== 'none' && (
@@ -969,8 +974,13 @@ export default function Home() {
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className={cn("mx-auto space-y-3 w-full", isGlobalSearch ? "max-w-5xl" : "max-w-[1600px]")}>
-          <div className="flex items-center justify-between px-1 gap-2">
-            <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight truncate">
+          {/*
+            Riga con GIORNO e conteggio: ANCORATA in alto (sticky) così, scorrendo l'agenda
+            su mobile, la data resta sempre visibile. Altezza fissa (h-9) perché la riga dei
+            nomi istruttori qui sotto si ancora esattamente sotto (top-9).
+          */}
+          <div className="sticky top-0 z-30 -mx-1 px-1 h-9 flex items-center justify-between gap-2 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm">
+            <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight truncate leading-none">
               {isGlobalSearch ? `Ricerca: ${searchQuery.trim()}` : titleText}
             </h2>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest shrink-0">
@@ -1097,13 +1107,14 @@ export default function Home() {
           ) : filteredAppointments.length > 0 ? (
             vistaMulti ? (
               /* ---------- MULTI-ISTRUTTORE: timeline a colonne, altezze = durata della guida ---------- */
-              <div
-                className="scroll-x-visible pb-3"
-                style={{ WebkitOverflowScrolling: 'touch' }}
-              >
-                {/* Intestazioni: un istruttore per colonna (stessa griglia della timeline) */}
+              <div className="scroll-x-visible scroll-solo-x pb-3">
+                {/*
+                  Intestazioni: un istruttore per colonna (stessa griglia della timeline).
+                  ANCORATE sotto la riga del giorno (top-9 = altezza h-9 della riga sticky)
+                  così su mobile i nomi restano visibili mentre si scorre la giornata.
+                */}
                 <div
-                  className="grid gap-x-3"
+                  className="sticky top-9 z-20 grid gap-x-3 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm py-1"
                   style={{ gridTemplateColumns: `repeat(${gruppiIstruttori.length}, minmax(min(86vw, 320px), 1fr))` }}
                 >
                   {gruppiIstruttori.map(gruppo => (
@@ -1208,8 +1219,9 @@ export default function Home() {
               <div className="space-y-5">
                 {gruppiIstruttori.map((gruppo, groupIdx) => (
                   <div key={gruppo.id} className="space-y-2">
-                    {/* Intestazione istruttore */}
-                    <div className="flex items-center gap-2 px-1">
+                    {/* Intestazione istruttore — ancorata sotto la riga del giorno (top-9),
+                        così su mobile il nome resta visibile durante lo scorrimento */}
+                    <div className="sticky top-9 z-20 flex items-center gap-2 px-1 py-1 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm">
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
