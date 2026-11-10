@@ -39,7 +39,10 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
-    !request.nextUrl.pathname.startsWith('/api/cron')
+    !request.nextUrl.pathname.startsWith('/api/cron') &&
+    // Il file .ics delle email deve funzionare dal telefono del CLIENTE (nessun login):
+    // la protezione lì è la firma HMAC sull'id, non la sessione. Vedi api/calendar/ics.
+    !request.nextUrl.pathname.startsWith('/api/calendar/ics')
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
