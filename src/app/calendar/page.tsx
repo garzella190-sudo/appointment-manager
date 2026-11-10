@@ -440,7 +440,7 @@ export default function CalendarPage() {
     const fetchEndDate = addDays(displayDays[displayDays.length - 1], 1);
 
     try {
-      let apptQuery = supabase
+      const apptQuery = supabase
         .from('appuntamenti')
         .select(`
           id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id,
@@ -452,9 +452,12 @@ export default function CalendarPage() {
         .gte('data_solo', format(fetchStartDate, 'yyyy-MM-dd'))
         .lt('data_solo', format(fetchEndDate, 'yyyy-MM-dd'));
 
-      if (isIstruttore && istruttoreId) {
-        apptQuery = apptQuery.eq('istruttore_id', istruttoreId);
-      }
+      // NB: qui si scaricano le guide di TUTTI gli istruttori della fascia visibile.
+      // Filtrare per `istruttore_id` dell'utente collegato (com'era prima) faceva vedere
+      // le colonne degli altri istruttori VUOTE: la colonna di Garzella, aperta da
+      // Carpita, risultava senza appuntamenti anche se a database c'erano. Quali
+      // colonne mostrare lo decide `selectedInstructorIds` (auto-filtro sul proprio
+      // calendario per il ruolo "istruttore"), non la query.
 
       const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
         apptQuery,
