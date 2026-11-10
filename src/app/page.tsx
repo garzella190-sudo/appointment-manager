@@ -427,6 +427,12 @@ export default function Home() {
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [isInstructorPickerOpen, setIsInstructorPickerOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /**
+   * Riga dei nomi istruttori (vista multi): sta FUORI dal contenitore che scorre in
+   * orizzontale, altrimenti `position: sticky` si ancora a quello e i nomi scorrono via
+   * verso l'alto. La posizione orizzontale viene copiata dalla timeline via scrollLeft.
+   */
+  const nomiIstruttoriRef = useRef<HTMLDivElement | null>(null);
 
   // Popup state
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -979,7 +985,7 @@ export default function Home() {
             su mobile, la data resta sempre visibile. Altezza fissa (h-9) perché la riga dei
             nomi istruttori qui sotto si ancora esattamente sotto (top-9).
           */}
-          <div className="sticky top-0 z-30 -mx-1 px-1 h-9 flex items-center justify-between gap-2 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm">
+          <div className="sticky top-0 z-30 -mx-1 px-1 h-9 flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-950">
             <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight truncate leading-none">
               {isGlobalSearch ? `Ricerca: ${searchQuery.trim()}` : titleText}
             </h2>
@@ -1107,30 +1113,48 @@ export default function Home() {
           ) : filteredAppointments.length > 0 ? (
             vistaMulti ? (
               /* ---------- MULTI-ISTRUTTORE: timeline a colonne, altezze = durata della guida ---------- */
-              <div className="scroll-x-visible scroll-solo-x pb-3">
+              <div className="pb-3">
                 {/*
-                  Intestazioni: un istruttore per colonna (stessa griglia della timeline).
-                  ANCORATE sotto la riga del giorno (top-9 = altezza h-9 della riga sticky)
-                  così su mobile i nomi restano visibili mentre si scorre la giornata.
+                  Intestazioni (nomi istruttori): FUORI dal contenitore che scorre in
+                  orizzontale. Qualsiasi `overflow` su un antenato crea uno scrollport e
+                  `position: sticky` si ancora a quello: dentro il wrapper orizzontale i
+                  nomi scorrevano via verso l'alto. Qui l'antenato scrollabile è solo la
+                  sezione dell'agenda, quindi `sticky top-9` funziona; la posizione
+                  orizzontale viene allineata alla timeline via `scrollLeft` (onScroll).
                 */}
                 <div
-                  className="sticky top-9 z-20 grid gap-x-3 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm py-1"
-                  style={{ gridTemplateColumns: `repeat(${gruppiIstruttori.length}, minmax(min(86vw, 320px), 1fr))` }}
+                  ref={nomiIstruttoriRef}
+                  className="sticky top-9 z-20 overflow-x-hidden bg-zinc-50 dark:bg-zinc-950 pt-1 pb-1 -mb-2"
                 >
-                  {gruppiIstruttori.map(gruppo => (
-                    <div key={`head-${gruppo.id}`} className="flex items-center gap-2 px-1">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
-                      />
-                      <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 truncate">
-                        {gruppo.nome}
-                      </h3>
-                      <span className="text-[10px] font-bold text-zinc-400 shrink-0">{gruppo.items.length}</span>
-                      <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
-                    </div>
-                  ))}
+                  <div
+                    className="grid gap-x-3"
+                    style={{ gridTemplateColumns: `repeat(${gruppiIstruttori.length}, minmax(min(86vw, 320px), 1fr))` }}
+                  >
+                    {gruppiIstruttori.map(gruppo => (
+                      <div key={`head-${gruppo.id}`} className="flex items-center gap-2 px-1">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
+                        />
+                        <h3 className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 truncate">
+                          {gruppo.nome}
+                        </h3>
+                        <span className="text-[10px] font-bold text-zinc-400 shrink-0">{gruppo.items.length}</span>
+                        <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Contenitore che scorre SOLO in orizzontale (la riga dei nomi resta fuori) */}
+                <div
+                  className="scroll-x-visible scroll-solo-x"
+                  onScroll={(e) => {
+                    if (nomiIstruttoriRef.current) {
+                      nomiIstruttoriRef.current.scrollLeft = e.currentTarget.scrollLeft;
+                    }
+                  }}
+                >
 
                 {/*
                   Timeline vera: una riga = 15 minuti. Ogni guida occupa tante righe
@@ -1213,6 +1237,7 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+                </div>
               </div>
             ) : (
               /* ---------- COLONNA SINGOLA ---------- */
@@ -1221,7 +1246,7 @@ export default function Home() {
                   <div key={gruppo.id} className="space-y-2">
                     {/* Intestazione istruttore — ancorata sotto la riga del giorno (top-9),
                         così su mobile il nome resta visibile durante lo scorrimento */}
-                    <div className="sticky top-9 z-20 flex items-center gap-2 px-1 py-1 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm">
+                    <div className="sticky top-9 z-20 flex items-center gap-2 px-1 py-1 bg-zinc-50 dark:bg-zinc-950">
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
