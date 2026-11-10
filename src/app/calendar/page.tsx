@@ -1359,12 +1359,17 @@ export default function CalendarPage() {
                         )}
                         style={{ 
                           gridTemplateColumns: `60px repeat(${viewMode === 'week' ? displayDays.length : Math.max(1, displayDays.length * displayIstruttori.length)}, minmax(0, 1fr))`,
-                          zIndex: isCurrentSlot ? 80 : timeSlots.length - timeSlots.indexOf(slot),
+                          // NB: nessun z-index sulla RIGA. Se la riga crea uno stacking
+                          // context, la colonna orari (z-70 al suo interno) non può salire
+                          // sopra le card di un'altra riga: le card (semi-trasparenti al 15%)
+                          // finivano SOPRA i numeri, rendendoli illeggibili. Lo z-index
+                          // decrescente va sulle singole CELLE (vedi DroppableCell), così le
+                          // card lunghe coprono le righe sotto ma la colonna orari resta sopra.
                         } as React.CSSProperties}
                       >
                       {isCurrentSlot && hasToday && (
                         <div 
-                          className="absolute left-0 right-0 z-50 flex items-center pointer-events-none"
+                          className="absolute left-0 right-0 z-[68] flex items-center pointer-events-none"
                           style={{ top: `${((currentTotalMinutes - slotStartMinutes) / granularity) * 100}%`, transform: 'translateY(-50%)' }}
                         >
                           <div className="sticky left-0 z-[60] w-[60px] flex justify-end pr-1 sm:pr-3 bg-white dark:bg-zinc-900">
@@ -1467,7 +1472,7 @@ export default function CalendarPage() {
                         const sortedTimes = Object.keys(appointmentsByTime).sort();
 
                         return (
-                          <DroppableCell key={cellId} id={cellId} className={cellBorderClass}>
+                          <DroppableCell key={cellId} id={cellId} className={cellBorderClass} zIndex={timeSlots.length - timeSlots.indexOf(slot)}>
                             <div 
                               className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px] select-none"
                               onClick={(e) => {
@@ -1591,7 +1596,7 @@ export default function CalendarPage() {
                         const sortedTimes = Object.keys(appointmentsByTime).sort();
 
                         return (
-                          <DroppableCell key={cellId} id={cellId} className={cellBorderClass}>
+                          <DroppableCell key={cellId} id={cellId} className={cellBorderClass} zIndex={timeSlots.length - timeSlots.indexOf(slot)}>
                             <div 
                               className="w-full flex flex-col gap-1 relative cursor-pointer min-h-[40px] select-none"
                               onClick={(e) => {
