@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, ChevronDown, BellRing, MessageSquare } from 'lucide-react';
+import { MessageCircle, BellRing, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Modal } from './Modal';
 import { generateWhatsAppLink } from '@/utils/whatsapp';
@@ -23,8 +23,15 @@ interface WhatsAppButtonProps {
 }
 
 /**
- * WhatsAppButton - Gestisce la scelta tra WhatsApp Standard e Business.
- * Se presente appointmentData, permette di scegliere tra Promemoria e Chat Libera.
+ * WhatsAppButton - Apre WhatsApp (chat libera) oppure invia il promemoria della guida.
+ *
+ * Se c'è `appointmentData` il tasto chiede prima cosa fare ("Ricordare guida" o
+ * "Aprire chat").
+ *
+ * L'app da usare è decisa da `localStorage.wa_app_preference` ('standard' | 'business',
+ * default personale). La linguetta per cambiarla è stata RIMOSSA su richiesta: non c'è
+ * più il tasto col chevron né il modale di scelta. Chi aveva salvato "Business" continua
+ * ad aprire Business; per tornare al personale basta togliere quella chiave dal browser.
  */
 export const WhatsAppButton = ({
   phone,
@@ -35,19 +42,20 @@ export const WhatsAppButton = ({
   showLabel = true,
   appointmentData
 }: WhatsAppButtonProps) => {
-  const [showModal, setShowModal] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [preference, setPreference] = useState<'standard' | 'business' | null>(null);
-  const [pendingMessage, setPendingMessage] = useState<string | undefined>(undefined);
 
-  // Carica la preferenza al mount
+  // Preferenza già salvata sul dispositivo (nessuna interfaccia per cambiarla).
+  // `localStorage` esiste solo lato client: la lettura va in un effetto, non nel
+  // render (altrimenti il server non saprebbe quale app è impostata).
   useEffect(() => {
     const saved = localStorage.getItem('wa_app_preference') as 'standard' | 'business' | null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved) setPreference(saved);
   }, []);
 
-  const openWA = (pref: 'standard' | 'business', message?: string) => {
-    const isBusiness = pref === 'business';
+  const openWA = (message?: string) => {
+    const isBusiness = (preference || 'standard') === 'business';
     const link = generateWhatsAppLink(phone, isBusiness, message);
 
     // Su desktop usiamo window.open, sugli intent Android/iOS a volte serve window.location.href
@@ -62,22 +70,12 @@ export const WhatsAppButton = ({
     e.preventDefault();
     e.stopPropagation();
 
-    // Se c'è un appuntamento, chiediamo prima cosa vuole fare (Ricorda vs Chat)
+    // Se c'è un appuntamento, chiediamo prima cosa vuole fare (Ricordare vs Chat)
     if (appointmentData) {
       setShowActionModal(true);
     } else {
-      // Se non c'è preferenza, usiamo 'standard' come default invece di mostrare il modal
-      const effectivePref = preference || 'standard';
-      openWA(effectivePref);
+      openWA();
     }
-  };
-
-  const handleSelect = (pref: 'standard' | 'business') => {
-    localStorage.setItem('wa_app_preference', pref);
-    setPreference(pref);
-    setShowModal(false);
-    openWA(pref, pendingMessage);
-    setPendingMessage(undefined);
   };
 
   const handleActionSelect = (mode: 'reminder' | 'chat') => {
@@ -86,11 +84,10 @@ export const WhatsAppButton = ({
     let message: string | undefined = undefined;
     if (mode === 'reminder' && appointmentData) {
       const formattedDate = format(parseISO(appointmentData.date), 'dd/MM/yyyy', { locale: it });
-      message = `Ricordati la Guida il giorno ${formattedDate} alle ore ${appointmentData.time} di ${appointmentData.duration} min. Le guide vanno disdette almeno 24h pena addebito dell'intero importo`;
+      message = `Ricordati la Guida il giorno ${formattedDate} alle ore ${appointmentData.time} di ${appointmentData.duration} min.`;
     }
 
-    const effectivePref = preference || 'standard';
-    openWA(effectivePref, message);
+    openWA(message);
   };
 
   return (
@@ -111,26 +108,9 @@ export const WhatsAppButton = ({
         <MessageCircle size={iconSize} />
         {showLabel && label && <span>{label}</span>}
       </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setShowModal(true);
-        }}
-        className={cn(
-          "px-2.5 flex items-center justify-center transition-all border-l",
-          variant === 'primary' && "bg-emerald-600 text-white group-hover:bg-emerald-700 border-white/20",
-          variant === 'secondary' && "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-800/50 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-800/40",
-          variant === 'ghost' && "bg-transparent text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20",
-        )}
-        title="Cambia app WhatsApp"
-      >
-        <ChevronDown size={iconSize + 2} />
-      </button>
     </div>
 
-      {/* MODAL 1: Azione (Promemoria vs Chat) */}
+      {/* MODAL: Azione (Promemoria vs Chat) */}
       {showActionModal && (
         <Modal
           isOpen={showActionModal}
@@ -177,66 +157,8 @@ export const WhatsAppButton = ({
           </div>
         </Modal>
       )}
-
-      {/* MODAL 2: Preferenza App (Standard vs Business) */}
-      {showModal && (
-        <Modal
-          isOpen={showModal}
-          onClose={() => {
-            setShowModal(false);
-            setPendingMessage(undefined);
-          }}
-          title="Preferenza WhatsApp"
-        >
-          <div className="space-y-6 pt-2">
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed text-center">
-              Quale applicazione preferisci utilizzare? 
-              La scelta verrà salvata per i prossimi invii.
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => handleSelect('standard')}
-                className="flex flex-col items-center gap-4 p-6 bg-zinc-50 dark:bg-zinc-900 border-2 border-transparent hover:border-emerald-500/50 rounded-[24px] transition-all group"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <MessageCircle size={28} />
-                </div>
-                <div className="text-center">
-                  <p className="font-bold text-zinc-900 dark:text-zinc-100">WhatsApp</p>
-                  <p className="text-[10px] text-zinc-400 uppercase font-black tracking-widest mt-1">Personale</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSelect('business')}
-                className="flex flex-col items-center gap-4 p-6 bg-zinc-50 dark:bg-zinc-900 border-2 border-transparent hover:border-blue-500/50 rounded-[24px] transition-all group"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <MessageCircle size={28} />
-                </div>
-                <div className="text-center">
-                  <p className="font-bold text-zinc-900 dark:text-zinc-100">WhatsApp</p>
-                  <p className="text-[10px] text-blue-400 uppercase font-black tracking-widest mt-1">Business</p>
-                </div>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowModal(false);
-                setPendingMessage(undefined);
-              }}
-              className="w-full py-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm font-semibold transition-colors"
-            >
-              Forse più tardi
-            </button>
-          </div>
-        </Modal>
-      )}
     </>
   );
 };
+
+export default WhatsAppButton;

@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Loader2, CalendarClock, AlertTriangle, CheckCircle2, AlertCircle, Trash2, Pencil, Car } from 'lucide-react';
 import { TipoPatente, TipoCambio, Patente } from '@/lib/database.types';
+import { caricaPatentiVisibili } from '@/lib/patenti';
 import { useRevisionReminder } from '@/hooks/useRevisionReminder';
 import { createVeicoloAction, updateVeicoloAction, deleteVeicoloAction } from '@/actions/veicoli';
 import DatePicker from '@/components/DatePicker';
@@ -79,8 +80,8 @@ export const VeicoloForm = ({
   
   useEffect(() => {
     async function fetchPatenti() {
-      const { data } = await supabase.from('patenti').select('*').eq('nascosta', false).order('tipo');
-      if (data) setPatenti(data);
+      // Filtro `nascosta` in JS: con la colonna NULL la query non trovava nulla
+      setPatenti(await caricaPatentiVisibili(supabase));
     }
     fetchPatenti();
   }, []);

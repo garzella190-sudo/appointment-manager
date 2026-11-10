@@ -1,10 +1,17 @@
 'use server';
 
-import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { Resend } from 'resend';
-import { format, parseISO, addMinutes } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
+import {
+  buildIcs,
+  eventoGuida,
+  urlGoogleCalendar,
+  urlIcs,
+  SEDE,
+  type EventoCalendario,
+} from '@/lib/calendario';
 
 // Note: use the verified domain email
 const SENDER = 'Autoscuola Toscana <notifiche@guide.autoscuolatoscanasnc.it>';
@@ -30,7 +37,8 @@ function getItalyTimeStr(dateString: string) {
   vehicle,
   isReminder = false,
   isCancellation = false,
-  isModification = false
+  isModification = false,
+  aggiungiAlCalendario
 }: {
   title: string;
   name: string;
@@ -42,6 +50,8 @@ function getItalyTimeStr(dateString: string) {
   isReminder?: boolean;
   isCancellation?: boolean;
   isModification?: boolean;
+  /** Link "aggiungi al calendario": assente nelle email di eliminazione */
+  aggiungiAlCalendario?: { google: string; ics: string } | null;
 }) {
   let accentColor = '#3b82f6'; // Blue
   if (isReminder) accentColor = '#3b82f6';
@@ -80,11 +90,32 @@ function getItalyTimeStr(dateString: string) {
             }
           </div>
 
+          ${
+            !isCancellation && aggiungiAlCalendario
+              ? `
+          <div style="margin: 0 0 28px 0; text-align: center;">
+            <a href="${aggiungiAlCalendario.google}" target="_blank" rel="noopener"
+               style="display: inline-block; background-color: ${accentColor}; color: #ffffff; text-decoration: none; font-weight: 800; font-size: 15px; padding: 14px 28px; border-radius: 14px;">
+              Aggiungi al calendario
+            </a>
+            <div style="margin-top: 14px; font-size: 12px; color: #9ca3af; line-height: 1.7;">
+              iPhone / Outlook / altri calendari:
+              <a href="${aggiungiAlCalendario.ics}" target="_blank" rel="noopener" style="color: #6b7280; font-weight: 700; text-decoration: underline;">
+                aggiungi con questo link
+              </a>
+              oppure apri l&apos;allegato <strong>guida.ics</strong>.
+            </div>
+          </div>
+          `
+              : ''
+          }
+
           <div class="disclaimer">
             NB: le guide vanno disdette 24h prima, pena addebito dell'importo
           </div>
           <div class="contact-info">
-            Per disdire le guide chiama in autoscuola oppure contatta il tuo istruttore
+            Per disdire le guide chiama in autoscuola oppure contatta il tuo istruttore<br>
+            ${SEDE.nome} — ${SEDE.indirizzo}
           </div>
         </div>
         <div class="footer">
@@ -96,35 +127,50 @@ function getItalyTimeStr(dateString: string) {
   `;
 }
 
-/**
- * Generates ICS string content
- */
-function generateICS(apt: any) {
-  const startDate = new Date(apt.inizio);
-  const endDate = new Date(startDate.getTime() + (apt.durata || 60) * 60000);
-  const formatICS = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-  const address = "Via Le Vallicelle, 4, 56043 Fauglia (PI)";
-  const now = new Date();
+/** Riga appuntamento usata per costruire il calendario del cliente */
+interface RigaGuidaEmail {
+  id: string;
+  data: string;
+  durata: number;
+  inizio: string | null;
+  note?: string | null;
+}
 
-  return [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Autoscuola Toscana Fauglia//IT',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:apt-${apt.id}-${startDate.getTime()}@autoscuola.toscana`,
-    `DTSTAMP:${formatICS(now)}`,
-    `DTSTART:${formatICS(startDate)}`,
-    `DTEND:${formatICS(endDate)}`,
-    `SUMMARY:Lezione di Guida`,
-    `DESCRIPTION:Sede: Autoscuola Toscana Fauglia\\nIndirizzo: ${address}`,
-    'LOCATION:Autoscuola Toscana Fauglia',
-    'STATUS:CONFIRMED',
-    'SEQUENCE:0',
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\r\n');
+/** Riga cliente usata per costruire il calendario del cliente */
+interface RigaClienteEmail {
+  nome?: string | null;
+  cognome?: string | null;
+  email?: string | null;
+}
+
+/**
+ * Dati comuni per il calendario del cliente: evento, allegato .ics e link
+ * "Aggiungi al calendario" (Google) + link firmato per gli altri calendari.
+ */
+function calendarioGuida(
+  apt: RigaGuidaEmail,
+  cliente: RigaClienteEmail | null | undefined,
+  instructorName: string,
+  vehicleName: string,
+  sequenza = 0
+) {
+  const evento: EventoCalendario = eventoGuida({
+    id: apt.id,
+    inizio: apt.inizio || apt.data,
+    durata: apt.durata || 60,
+    cliente: cliente ? `${cliente.cognome || ''} ${cliente.nome || ''}`.trim() : null,
+    istruttore: instructorName,
+    veicolo: vehicleName,
+    note: apt.note ?? null,
+    emailCliente: cliente?.email ?? null,
+    sequenza,
+  });
+
+  return {
+    evento,
+    ics: buildIcs(evento),
+    links: { google: urlGoogleCalendar(evento), ics: urlIcs(apt.id) },
+  };
 }
 
 export async function sendConfirmationEmailAction(appointmentId: string, isModification = false) {
@@ -133,7 +179,7 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
   const { data: apt, error } = await supabase
     .from('appuntamenti')
     .select(`
-      id, data, durata, inizio, 
+      id, data, durata, inizio, note,
       clienti ( nome, cognome, email ),
       istruttori ( nome, cognome ),
       veicoli ( nome, targa )
@@ -155,7 +201,10 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
   const dateStr = apt.data.split('T')[0];
   const timeStr = getItalyTimeStr(apt.inizio);
 
-  const icsStr = generateICS(apt);
+  // Allegato .ics + tasto "Aggiungi al calendario" (Google) + link per gli altri calendari.
+  // `sequenza = 1` sulle modifiche: i calendari aggiornano l'evento esistente invece di
+  // crearne un secondo.
+  const calendario = calendarioGuida(apt, cliente, instructorName, vehicleName, isModification ? 1 : 0);
 
   try {
     const html = getEmailTemplate({
@@ -167,7 +216,8 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
       instructor: instructorName,
       vehicle: vehicleName,
       isReminder: false,
-      isModification: isModification
+      isModification: isModification,
+      aggiungiAlCalendario: calendario.links
     });
 
     const resendApiKey = process.env.RESEND_API_KEY;
@@ -185,7 +235,7 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
       attachments: [
         {
           filename: 'guida.ics',
-          content: Buffer.from(icsStr).toString('base64'),
+          content: Buffer.from(calendario.ics).toString('base64'),
           contentType: 'text/calendar'
         }
       ]
@@ -210,7 +260,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
   const { data: apt, error } = await supabase
     .from('appuntamenti')
     .select(`
-      id, data, durata, inizio, 
+      id, data, durata, inizio, note,
       clienti ( nome, cognome, email ),
       istruttori ( nome, cognome ),
       veicoli ( nome, targa )
@@ -232,7 +282,8 @@ export async function sendReminderEmailAction(appointmentId: string) {
   const dateStr = apt.data.split('T')[0];
   const timeStr = getItalyTimeStr(apt.inizio);
 
-  const icsStr = generateICS(apt);
+  // Promemoria: stesso tasto "Aggiungi al calendario" (chi non l'ha aggiunta prima, la aggiunge ora)
+  const calendario = calendarioGuida(apt, cliente, instructorName, vehicleName);
 
   try {
     const html = getEmailTemplate({
@@ -243,7 +294,8 @@ export async function sendReminderEmailAction(appointmentId: string) {
       duration: apt.durata,
       instructor: instructorName,
       vehicle: vehicleName,
-      isReminder: true
+      isReminder: true,
+      aggiungiAlCalendario: calendario.links
     });
 
     const resendApiKey = process.env.RESEND_API_KEY;
@@ -261,7 +313,8 @@ export async function sendReminderEmailAction(appointmentId: string) {
       attachments: [
         {
           filename: 'guida.ics',
-          content: Buffer.from(icsStr).toString('base64'),
+          content: Buffer.from(calendario.ics).toString('base64'),
+          contentType: 'text/calendar'
         }
       ]
     });

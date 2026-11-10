@@ -6,7 +6,7 @@ import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { sendConfirmationEmailAction } from './notifications';
-import { notificaGuidaAgliIstruttori } from '@/lib/pushHelper';
+import { notificaCambioCalendario } from '@/lib/pushHelper';
 
 // Initialized lazily inside the action
 
@@ -216,25 +216,25 @@ export async function createAppointmentAction(payload: {
     }
   }
 
-  // 4. Web Push MIRATO — avvisa solo l'istruttore il cui calendario è stato toccato,
-  // e mai chi ha compiuto l'azione (se Manuele prenota su Manuele, nessuno viene avvisato).
+  // 4. Web Push — la notifica va SOLO al proprietario del calendario toccato e mai
+  // a chi ha inserito la guida: prenotando su se stessi non arriva niente a nessuno.
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
+    const { data: { user } } = await supabase.auth.getUser();
     
     const clientName = clientData.nome && clientData.nome !== 'UFFICIO' 
       ? `${clientData.cognome} ${clientData.nome}` 
       : (payload.nome_impegno || 'Impegno');
       
-    const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
+    const giorno = format(startTime, 'EEE d MMM', { locale: it });
+    const ora = format(startTime, 'HH:mm', { locale: it });
     
-    await notificaGuidaAgliIstruttori({
-      destinatari: [payload.istruttore_id],
-      attoreIstruttoreId: currentUserIstruttoreId,
+    await notificaCambioCalendario({
+      istruttoriCoinvolti: [payload.istruttore_id],
+      attoreUserId: user?.id,
       payload: {
-        title: '📅 Nuova Guida Inserita',
-        body: `${clientName} — ${timeStr}`,
-        url: '/'
+        title: '📅 Nuova guida inserita',
+        body: `${clientName} — ${giorno} alle ${ora}`,
+        url: '/calendar'
       },
     });
   } catch (err) {
@@ -254,10 +254,13 @@ export async function updateAppointmentAction(id: string, payload: any) {
   // Istruttore attuale: serve per avvisare anche il "vecchio" calendario se la guida viene spostata
   const { data: primaDellaModifica } = await supabase
     .from('appuntamenti')
-    .select('istruttore_id')
+    .select('istruttore_id, data, inizio, clienti ( nome, cognome )')
     .eq('id', id)
     .maybeSingle();
   const istruttorePrecedente: string | null = primaDellaModifica?.istruttore_id ?? null;
+  const clientePrecedente = Array.isArray(primaDellaModifica?.clienti)
+    ? primaDellaModifica?.clienti[0]
+    : primaDellaModifica?.clienti;
   
   let finalClienteId = payload.cliente_id;
 
@@ -411,21 +414,29 @@ export async function updateAppointmentAction(id: string, payload: any) {
     }
   }
 
-  // 4. Web Push MIRATO — solo gli istruttori coinvolti (nuovo e, se spostata, vecchio),
-  // mai chi ha fatto la modifica.
+  // 4. Web Push — solo i proprietari dei calendari coinvolti (nuovo e, se spostata,
+  // vecchio istruttore). Chi ha fatto la modifica non viene mai avvisato.
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
-    
-    const timeStr = format(new Date(payload.data), 'dd/MM HH:mm', { locale: it });
-    
-    await notificaGuidaAgliIstruttori({
-      destinatari: [payload.istruttore_id, istruttorePrecedente],
-      attoreIstruttoreId: currentUserIstruttoreId,
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const nomeCliente = clientePrecedente
+      ? `${clientePrecedente.cognome || ''} ${clientePrecedente.nome || ''}`.trim()
+      : '';
+
+    const giorno = format(startTime, 'EEE d MMM', { locale: it });
+    const ora = format(startTime, 'HH:mm', { locale: it });
+
+    const spostata = Boolean(
+      istruttorePrecedente && istruttorePrecedente !== payload.istruttore_id
+    );
+
+    await notificaCambioCalendario({
+      istruttoriCoinvolti: [payload.istruttore_id, istruttorePrecedente],
+      attoreUserId: user?.id,
       payload: {
-        title: '✏️ Guida Modificata',
-        body: `Una guida è stata aggiornata: ${timeStr}`,
-        url: '/'
+        title: spostata ? '🔀 Guida spostata' : '✏️ Guida modificata',
+        body: `${nomeCliente ? `${nomeCliente} — ` : ''}${giorno} alle ${ora}`,
+        url: '/calendar'
       },
     });
   } catch (err) {

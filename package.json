@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "backup": "node backups/backup_db.js"
+    "backup": "node backups/backup_db.js",
+    "icone:notifiche": "node scripts/genera_icone_notifica.js",
+    "verifica:notifiche": "tsc src/lib/pushDestinatari.ts --outDir tmp/__destinatari --module commonjs --target es2020 --skipLibCheck && node scripts/verifica_destinatari_push.js",
+    "collega:istruttore": "node scripts/collega_istruttore_account.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.1",

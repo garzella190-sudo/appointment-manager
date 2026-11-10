@@ -8,6 +8,7 @@ import { Cliente, Patente } from '@/lib/database.types';
 import { Modal } from '@/components/Modal';
 import { SchedaClienteForm } from '@/components/forms/SchedaClienteForm';
 import { deleteClienteAction, archiveClienteAction } from '@/actions/clienti';
+import { caricaPatentiVisibili } from '@/lib/patenti';
 import { Search, Plus, Phone, Mail, ChevronRight, Loader2, UserCircle2, Trash2, Archive, Users, RotateCcw } from 'lucide-react';
 import { isAfter, isBefore, isSameDay, startOfDay, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -26,16 +27,18 @@ export default function ClientiPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [cRes, pRes] = await Promise.all([
+    const [cRes, patentiAttive] = await Promise.all([
       supabase.from('clienti')
         .select('*, sessioni_esame(data)')
         .neq('nome', 'UFFICIO')
         .order('cognome')
         .order('nome'),
-      supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
+      // Filtro `nascosta` applicato in JS: se la colonna è NULL il selettore
+      // resterebbe vuoto (vedi src/lib/patenti.ts)
+      caricaPatentiVisibili(supabase),
     ]);
     setClienti(cRes.data ?? []);
-    setPatenti(pRes.data ?? []);
+    setPatenti(patentiAttive);
     setLoading(false);
   }, []);
 
@@ -283,6 +286,7 @@ export default function ClientiPage() {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nuovo Cliente">
         <SchedaClienteForm
           patenti={patenti}
+          patentiLoading={loading}
           onSuccess={(id) => { setIsModalOpen(false); router.push(`/clienti/${id}`); fetchData(); }}
           onCancel={() => setIsModalOpen(false)}
         />

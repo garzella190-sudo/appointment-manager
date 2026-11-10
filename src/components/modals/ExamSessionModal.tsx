@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/useToast';
 import { Cliente, Istruttore, Veicolo, SessioneEsame } from '@/lib/database.types';
 import { ConfirmBubble } from '@/components/ConfirmBubble';
 import { createAppointmentAction } from '@/actions/appointments';
-import { deleteAppointmentAction } from '@/actions/appointment_actions';
+import { deleteAppointmentAction, notificaSpostamentoAction, notificaSessioneEsameAction } from '@/actions/appointment_actions';
 import { registraEsitoEsameAction } from '@/actions/clienti';
 
 const supabase = createClient();
@@ -172,6 +172,12 @@ export default function ExamSessionModal({
       setSession({ ...session, ...editForm });
       setIsEditingInfo(false);
       showToast('Informazioni aggiornate', 'success');
+      // Avviso push: data/ora della seduta sono cambiate (update diretto sul database)
+      try {
+        await notificaSessioneEsameAction(session.id, 'spostamento');
+      } catch (notificaError) {
+        console.error('Notifica seduta non inviata:', notificaError);
+      }
       onSuccess();
     }
   };

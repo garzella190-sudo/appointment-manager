@@ -9,8 +9,10 @@ export async function createUserAction(formData: {
   email: string;
   password: string;
   full_name: string;
-  role: 'admin' | 'istruttore' | 'segreteria';
+  role: 'admin' | 'AdminDev' | 'istruttore' | 'segreteria';
   permissions?: Record<string, boolean>;
+  /** Istruttore collegato: obbligatorio per lavorare come istruttore (es. account AdminDev) */
+  istruttore_id?: string | null;
 }) {
   try {
     const supabase = createAdminClient();
@@ -18,11 +20,13 @@ export async function createUserAction(formData: {
     const { data, error } = await supabase.auth.admin.createUser({
       email: formData.email,
       password: formData.password,
+      // Auto-conferma: l'account è subito utilizzabile (equivalente a "Auto Confirm User")
       email_confirm: true,
       user_metadata: {
         role: formData.role,
         full_name: formData.full_name,
         permissions: formData.permissions || {},
+        ...(formData.istruttore_id ? { istruttore_id: formData.istruttore_id } : {}),
       },
     });
 

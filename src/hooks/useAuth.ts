@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { risolviIstruttorePerUtente } from '@/lib/istruttoreCorrente';
 
 const supabase = createClient();
 
@@ -46,6 +47,14 @@ export function useAuth() {
         setUser(user);
         setRole(user.user_metadata?.role as UserRole || 'istruttore');
         setIstruttoreId(user.user_metadata?.istruttore_id || null);
+        // Account senza `istruttore_id` nei metadata (es. AdminDev "Manueleautoscuola"):
+        // il collegamento al calendario si ricostruisce da email/nome, così l'utente
+        // risulta istruttore a tutti gli effetti. Non blocca il caricamento.
+        if (!user.user_metadata?.istruttore_id) {
+          risolviIstruttorePerUtente(supabase, user)
+            .then((id) => { if (id) setIstruttoreId(id); })
+            .catch(() => {});
+        }
         if (!localStorage.getItem('auth_login_time')) {
           localStorage.setItem('auth_login_time', Date.now().toString());
         }
@@ -64,6 +73,11 @@ export function useAuth() {
         setUser(session.user);
         setRole(session.user.user_metadata?.role as UserRole || 'istruttore');
         setIstruttoreId(session.user.user_metadata?.istruttore_id || null);
+        if (!session.user.user_metadata?.istruttore_id) {
+          risolviIstruttorePerUtente(supabase, session.user)
+            .then((id) => { if (id) setIstruttoreId(id); })
+            .catch(() => {});
+        }
         if (!localStorage.getItem('auth_login_time')) {
           localStorage.setItem('auth_login_time', Date.now().toString());
         }

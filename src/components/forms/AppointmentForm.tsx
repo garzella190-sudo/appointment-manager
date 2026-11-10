@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { createAppointmentAction, updateAppointmentAction } from '@/actions/appointments';
 import { deleteAppointmentAction, cancelAppointmentAction, updateAppointmentNoteAction } from '@/actions/appointment_actions';
 import { toggleProntoEsameAction } from '@/actions/clienti';
+import { caricaPatentiVisibili } from '@/lib/patenti';
 import { useAuth } from '@/hooks/useAuth';
 import { GraduationCap, CheckCircle2, Search, Send, FileEdit, RefreshCw, XCircle } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
@@ -264,11 +265,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
           console.error("Errore durante la migrazione silenziosa in AppointmentForm:", err);
         }
 
-        const [cRes, iRes, vRes, pRes, impRes, apptImpRes] = await Promise.all([
+        const [cRes, iRes, vRes, patentiAttive, impRes, apptImpRes] = await Promise.all([
           supabase.from('clienti').select('*, sessioni_esame(data)').neq('nome', 'UFFICIO').order('cognome'),
           supabase.from('istruttori').select('*').order('cognome'),
           supabase.from('veicoli').select('*').order('nome'),
-          supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
+          // Filtro `nascosta` in JS: con la colonna NULL la query non trovava nulla
+          caricaPatentiVisibili(supabase),
           supabase.from('clienti').select('id, cognome, telefono').eq('nome', 'UFFICIO'),
           supabase.from('appuntamenti').select('istruttore_id, clienti!inner(cognome, telefono)').eq('clienti.nome', 'UFFICIO')
         ]);
@@ -312,7 +314,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         });
         const sortedIstruttori = iRes.data ?? [];
         const sortedVeicoli = vRes.data ?? [];
-        const sortedPatenti = pRes.data ?? [];
+        const sortedPatenti = patentiAttive;
 
         setClienti(sortedClienti);
         setIstruttori(sortedIstruttori);
@@ -369,7 +371,9 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             // Vale per QUALUNQUE ruolo collegato a un istruttore (anche Admin/AdminDev):
             // se Manuele crea una guida, l'istruttore è Manuele; se la crea Francesco è
             // Francesco. La segreteria, che non è collegata a un istruttore, sceglie a mano.
-            const linkedInstrId = user?.user_metadata?.istruttore_id;
+            // `istruttoreId` (da useAuth) è ricavato anche da email/nome quando i metadata
+            // non hanno `istruttore_id`; `user` resta come rete di sicurezza.
+            const linkedInstrId = istruttoreId || user?.user_metadata?.istruttore_id;
             const instrIdDaApplicare = initialIstruttoreId || linkedInstrId;
             if (instrIdDaApplicare) {
               const instr = (sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === instrIdDaApplicare);
@@ -554,7 +558,7 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     try {
       const browserSupabase = createClient();
       const { data: { user } } = await browserSupabase.auth.getUser();
-      const linkedInstrId = user?.user_metadata?.istruttore_id;
+      const linkedInstrId = istruttoreId || user?.user_metadata?.istruttore_id;
       if (linkedInstrId) {
         instrProfilo = istruttori.find(i => i.id === linkedInstrId) ?? null;
       }

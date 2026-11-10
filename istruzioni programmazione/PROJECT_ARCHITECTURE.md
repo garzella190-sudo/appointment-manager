@@ -62,6 +62,13 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 - **Integrazione Gratuita**: Utilizza `https://wa.me/` per aprire chat dirette con messaggi pre-compilati.
 - **Workflow Notifiche**: Al termine della creazione di un'appuntamento, se selezionato, il sistema apre automaticamente WhatsApp con la conferma per l'allievo.
 - **Prefisso**: Il prefisso internazionale `39` viene gestito automaticamente.
+- **Nessuna scelta dell'app**: la "linguetta" col chevron e il modale "Preferenza WhatsApp"
+  (Personale/Business) sono stati **rimossi**: il tasto è un unico bottone. L'app usata resta
+  quella salvata in `localStorage.wa_app_preference` (`standard` di default, `business` se
+  qualcuno l'aveva scelto); non c'è più un'interfaccia per cambiarla.
+- **Testo del promemoria** ("Ricordare guida"): `Ricordati la Guida il giorno GG/MM/AAAA alle
+  ore HH:mm di N min.` — **senza** la frase sulle disdette 24h e sull'addebito (rimossa su
+  richiesta). La nota di disdetta resta solo nelle email (`actions/notifications.ts`).
 
 ### 🎓 Gestione Esami & Sedute
 - **Gestione Impegni Istruttori (Manuale)**: All'aggiunta di un istruttore alla seduta d'esame, gli viene assegnato di default un blocco orario pari all'intera durata della seduta. È possibile personalizzare manualmente l'**Ora Inizio** e l'**Ora Fine** per ogni singolo istruttore. La durata del blocco non viene auto-scalata o sovrascritta all'inserimento o all'archiviazione degli allievi, garantendo un pieno controllo.
@@ -86,9 +93,22 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
 - **Persistenza**: Le preferenze di selezione vengono salvate nel `localStorage`.
 
 ### 🔒 Sicurezza & Sessioni (Forzatura Logout)
-- **Massima Durata Sessione (3h 30m)**: Il sistema limita la sessione dell'utente a 3 ore e 30 minuti totali per forzare il reinserimento della password e assicurare un hard refresh costante del codice JavaScript lato client.
+- **Massima Durata Sessione (15 giorni di calendario)**: la sessione dura al massimo 15 giorni dall'accesso (non più 3h 30m). Il conteggio parte dal primo caricamento autenticato e serve a forzare periodicamente il reinserimento della password e a far arrivare il codice aggiornato al client. Costante `SESSION_MAX_GIORNI = 15` in `src/hooks/useAuth.ts`.
 - **Polling di Monitoraggio**: Un timer attivo in background effettua un controllo ogni 60 secondi confrontando il timestamp di login salvato in locale con il tempo attuale.
-- **Espulsione & Hard Reload**: Superato il tempo massimo, il sistema cancella le credenziali locali, effettua il `signOut` su Supabase e forza il reindirizzamento tramite `window.location.href = '/login'`, eliminando ogni traccia di vecchi pacchetti JS e costringendo a caricare la versione più aggiornata.
+- **Espulsione & Hard Reload**: Superato il tempo massimo, il sistema cancella le credenziali locali, effettua il `signOut` su Supabase e forza il reindirizzamento tramite `window.location.href = '/login?scaduta=1'`, eliminando ogni traccia di vecchi pacchetti JS e costringendo a caricare la versione più aggiornata.
+
+### 🧑‍💼 Account che valgono anche come Istruttore
+- Il collegamento account ↔ istruttore **non** si legge solo da `user_metadata.istruttore_id`: `src/lib/istruttoreCorrente.ts`
+  (`risolviIstruttorePerUtente`) prova nell'ordine metadata → **email dell'account = `istruttori.email`** →
+  nome **e** cognome contenuti in `full_name`/email. `useAuth` espone l'id risolto come `istruttoreId`
+  (colonna propria in agenda, guide preassegnate, notifiche).
+- Caso reale: l'account **AdminDev** `manueleautoscuola@gmail.com` è anche l'istruttore **Manuele Garzella**
+  (stessa email in tabella `istruttori`). Ruolo `AdminDev` ⇒ `isAdmin` true: vede tutti i tab di Gestione,
+  tutte le colonne in agenda (con la sua per prima) e i report di tutti.
+- Per rendere il legame **esplicito** nel DB: `npm run collega:istruttore <email-account> [email-istruttore] [ruolo]`
+  (`scripts/collega_istruttore_account.js`, legge anche `.env.local`). In alternativa SQL su
+  `auth.users.raw_user_meta_data` o Dashboard → Authentication → Users → Edit user → User Metadata.
+  Dopo la modifica dei metadata serve un **nuovo login** (il token emesso porta i valori vecchi).
 
 ### 📧 Onboarding Staff (Welcome Email)
 - **Logica**: Il sistema prevede un invio massivo di email di benvenuto (`/api/cron/welcome`) per configurare lo staff al primo accesso.
@@ -102,6 +122,20 @@ La gestione delle comunicazioni avviene tramite il componente `PhoneActions` e `
   - **Conferma Prenotazione**: E-mail inviata alla creazione con testo *"La guida per il giorno gg/mm/yyyy alle ore hh:mm è stata prenotata correttamente"*.
   - **Promemoria 24h**: E-mail di promemoria con oggetto *"Promemoria Guida Prenotata"* e testo *"Ricordati la guida per il giorno gg/mm/yyyy alle ore hh:mm"*.
   - Entrambe le e-mail mantengono il layout premium, l'allegato `.ics` e includono in calce le note fisse di disdetta (*"NB: le guide vanno disdette 24h prima, pena addebito dell'importo"* e *"Per disdire le guide chiama in autoscuola oppure contatta il tuo istruttore"*).
+- **"Aggiungi al calendario"**: l'app non può scrivere nel calendario del cliente, quindi ogni
+  e-mail di conferma/promemoria porta un tasto che aggiunge la guida in un tocco:
+  - tasto principale → link **Google Calendar** (`calendar.google.com/calendar/render?action=TEMPLATE`
+    con orari UTC, titolo, dettagli e sede);
+  - link secondario "iPhone / Outlook / altri calendari" → `/api/calendar/ics?id=…&firma=…`
+    (file `.ics` **firmato con HMAC**: funziona dal telefono del cliente, senza login; senza firma
+    valida risponde 403);
+  - in allegato resta `guida.ics`, generato con `METHOD:REQUEST` + `ORGANIZER` + `ATTENDEE` e due
+    promemoria interni (2 ore e 1 giorno prima): i calendari lo trattano come invito e propongono
+    "Aggiungi al calendario". Le e-mail di **eliminazione** non hanno il tasto.
+- **Un solo generatore ICS**: `src/lib/calendario.ts` (`buildIcs`, `eventoGuida`,
+  `urlGoogleCalendar`, `urlOutlookCalendar`, `urlIcs`, `firmaCalendario`). Usato da
+  `actions/notifications.ts`, `api/calendar/ics` e `api/calendar`. Non scrivere altri generatori:
+  righe piegate a 75 byte UTF-8, virgole/virgolette protette, `UID` stabile per appuntamento.
 
 ---
 

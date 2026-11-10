@@ -2,11 +2,41 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { StatoAppuntamento } from '@/lib/database.types';
-import { sendConfirmationEmailAction, sendCancellationEmailAction } from './notifications';
-import { sendNotificationToInstructor } from '@/lib/pushHelper';
+import { sendCancellationEmailAction } from './notifications';
+import { notificaCambioCalendario } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+
+/** Riga di appuntamento arricchita con i dati del cliente (serve solo per i testi delle notifiche). */
+interface RigaAppuntamento {
+  id?: string;
+  data: string;
+  istruttore_id: string | null;
+  durata?: number;
+  clienti?: { nome: string | null; cognome: string | null; email?: string | null } | { nome: string | null; cognome: string | null; email?: string | null }[] | null;
+}
+
+/** "cognome nome", oppure "Impegno" per gli slot di ufficio. */
+function nomeCliente(riga: RigaAppuntamento | null | undefined): string {
+  const cliente = Array.isArray(riga?.clienti) ? riga?.clienti[0] : riga?.clienti;
+  if (!cliente) return 'Guida';
+  if (cliente.nome === 'UFFICIO') return cliente.cognome || 'Impegno';
+  return `${cliente.cognome || ''} ${cliente.nome || ''}`.trim() || 'Guida';
+}
+
+/** "mer 4 giu alle 15:00" */
+function quando(dataISO: string): string {
+  try {
+    return `${format(new Date(dataISO), 'EEE d MMM', { locale: it })} alle ${format(new Date(dataISO), 'HH:mm')}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Nota sulle notifiche: `notificaCambioCalendario` ricava da sé l'autore della modifica
+ * dalla sessione (cookie) e non lo avvisa. Qui non serve passare nulla.
+ */
 
 export async function deleteAppointmentAction(id: string) {
   const supabase = await createClient();
@@ -28,17 +58,15 @@ export async function deleteAppointmentAction(id: string) {
 
   try {
     if (aptToDelete) {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
-      if (currentUserIstruttoreId !== aptToDelete.istruttore_id) {
-        const timeStr = format(new Date(aptToDelete.data), 'dd/MM HH:mm', { locale: it });
-        const clientName = (aptToDelete.clienti as any)?.nome !== 'UFFICIO' ? `${(aptToDelete.clienti as any)?.nome} ${(aptToDelete.clienti as any)?.cognome}` : 'Impegno';
-        await sendNotificationToInstructor(aptToDelete.istruttore_id, {
-          title: 'Guida Eliminata',
-          body: `L'appuntamento per ${clientName} del ${timeStr} è stato eliminato.`,
-          url: '/'
-        });
-      }
+      // Notifica PUSH: la riceve il proprietario del calendario, mai chi ha eliminato.
+      await notificaCambioCalendario({
+        istruttoriCoinvolti: [aptToDelete.istruttore_id],
+        payload: {
+          title: '🗑️ Guida eliminata',
+          body: `${nomeCliente(aptToDelete)} — ${quando(aptToDelete.data)}`,
+          url: '/calendar'
+        },
+      });
       
       // Email to client
       if (aptToDelete.clienti) {
@@ -96,19 +124,22 @@ export async function cancelAppointmentAction(id: string) {
   }
 
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id;
-    
     // We need to fetch the instructor_id and data to send the push
-    const { data: fullApt } = await supabase.from('appuntamenti').select('istruttore_id, data, clienti(nome, cognome)').eq('id', id).single();
-    if (fullApt && currentUserIstruttoreId !== fullApt.istruttore_id) {
-        const timeStr = format(new Date(fullApt.data), 'dd/MM HH:mm', { locale: it });
-        const clientName = (fullApt.clienti as any)?.nome !== 'UFFICIO' ? `${(fullApt.clienti as any)?.nome} ${(fullApt.clienti as any)?.cognome}` : 'Impegno';
-        await sendNotificationToInstructor(fullApt.istruttore_id, {
-          title: 'Guida Annullata',
-          body: `L'appuntamento per ${clientName} del ${timeStr} è stato annullato (con penale).`,
-          url: '/'
-        });
+    const { data: fullApt } = await supabase
+      .from('appuntamenti')
+      .select('istruttore_id, data, clienti(nome, cognome)')
+      .eq('id', id)
+      .single();
+
+    if (fullApt) {
+      await notificaCambioCalendario({
+        istruttoriCoinvolti: [fullApt.istruttore_id],
+        payload: {
+          title: '🚫 Guida annullata',
+          body: `${nomeCliente(fullApt)} — ${quando(fullApt.data)} (con penale)`,
+          url: '/calendar'
+        },
+      });
     }
   } catch (e) {
     console.error('Push error:', e);
@@ -117,6 +148,83 @@ export async function cancelAppointmentAction(id: string) {
   revalidatePath('/calendar');
   revalidatePath('/gestione');
   revalidatePath('/'); // Refresh Agenda
+  return { success: true };
+}
+
+/**
+ * Notifica di uno spostamento fatto direttamente sul calendario (drag & drop) o
+ * da una seduta d'esame: quelle modifiche non passano dalle action di creazione,
+ * quindi senza questa chiamata nessuno riceveva l'avviso.
+ */
+export async function notificaSpostamentoAction(
+  appointmentIds: string[],
+  azione: 'spostamento' | 'aggiornamento' = 'spostamento'
+) {
+  const ids = [...new Set((appointmentIds || []).filter(Boolean))];
+  if (ids.length === 0) return { success: false };
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('appuntamenti')
+    .select('id, data, istruttore_id, durata, clienti(nome, cognome)')
+    .in('id', ids);
+
+  const righe = (data || []) as unknown as RigaAppuntamento[];
+  if (righe.length === 0) return { success: false };
+
+  try {
+    const prima = righe[0];
+    const altre = righe.length > 1 ? ` (+${righe.length - 1})` : '';
+
+    await notificaCambioCalendario({
+      istruttoriCoinvolti: righe.map((riga) => riga.istruttore_id),
+      payload: {
+        title: azione === 'spostamento' ? '🔀 Guida spostata' : '✏️ Guida aggiornata',
+        body: `${nomeCliente(prima)}${altre} — ${quando(prima.data)}`,
+        url: '/calendar'
+      },
+    });
+  } catch (e) {
+    console.error('Push error (spostamento):', e);
+  }
+
+  return { success: true };
+}
+
+/** Notifica per una seduta d'esame modificata o spostata. */
+export async function notificaSessioneEsameAction(
+  sessioneId: string,
+  azione: 'spostamento' | 'aggiornamento' = 'aggiornamento'
+) {
+  if (!sessioneId) return { success: false };
+
+  const supabase = await createClient();
+  const { data: sessione } = await supabase
+    .from('sessioni_esame')
+    .select('id, nome, data, ora_inizio, istruttori_ids')
+    .eq('id', sessioneId)
+    .maybeSingle();
+
+  if (!sessione) return { success: false };
+
+  try {
+    const giorno = sessione.data
+      ? format(new Date(sessione.data), 'EEE d MMM', { locale: it })
+      : '';
+    const ora = (sessione.ora_inizio || '').slice(0, 5);
+
+    await notificaCambioCalendario({
+      istruttoriCoinvolti: sessione.istruttori_ids || [],
+      payload: {
+        title: azione === 'spostamento' ? '🔀 Seduta d\'esame spostata' : '🎓 Seduta d\'esame aggiornata',
+        body: `${sessione.nome || 'Seduta d\'esame'} — ${giorno}${ora ? ` alle ${ora}` : ''}`,
+        url: '/calendar'
+      },
+    });
+  } catch (e) {
+    console.error('Push error (sessione esame):', e);
+  }
+
   return { success: true };
 }
 
@@ -137,5 +245,4 @@ export async function updateAppointmentNoteAction(id: string, note: string | nul
   revalidatePath('/'); // Refresh Agenda
   return { success: true };
 }
-
 

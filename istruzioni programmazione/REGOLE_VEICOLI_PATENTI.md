@@ -125,6 +125,34 @@ Regole:
 - Per un nuovo selettore sul modello "lista di opzioni con ricerca" → usare `OptionPicker`, non copiare il markup.
   Se serve scelta multipla o apertura da un tasto esterno, usare le prop esistenti: **non** creare un secondo modale.
 
+### Elenco patenti nei selettori — usare `caricaPatentiVisibili()`
+
+**Mai** filtrare con `.eq('nascosta', false)` nella query: la colonna `nascosta` non è
+nello schema versionato (`supabase/schema.sql`), è stata aggiunta a mano sul database e
+se manca o è `NULL` il confronto SQL `nascosta = false` **non trova nessuna riga** → il
+selettore patente resta vuoto (bug reale del "nuovo cliente senza patenti").
+Regola: si scaricano tutte le patenti e si scarta in JS solo `nascosta === true`:
+
+```ts
+import { caricaPatentiVisibili, ordinaPatenti } from '@/lib/patenti';
+const patenti = await caricaPatentiVisibili(supabase); // attive
+const ordinate = ordinaPatenti(patenti);               // B per prima, poi A-Z
+```
+
+Usata da: `app/clienti`, `app/clienti/[id]`, `forms/AppointmentForm`, `forms/IstruttoreForm`,
+`forms/VeicoloForm`, `forms/SchedaClienteForm`. La scheda **Gestione → Patenti** invece deve
+vedere anche le nascoste: lì la query resta senza filtro.
+
+### La patente richiesta è OBBLIGATORIA
+
+- `SchedaClienteForm` (nuovo cliente e modifica) non salva senza patente: mostra l'errore
+  sul campo (`errorePatente`), un bordo rosso e un toast.
+- Anche la modifica inline in `app/clienti/[id]` blocca il salvataggio.
+- Lato server `createClienteAction` / `updateClienteAction` rifiutano
+  `patente_richiesta_id` nullo (l'offline sync registra il caso come conflitto).
+- Se non ci sono patenti attive, la scheda cliente lo dice esplicitamente
+  ("configurale da Gestione → Patenti") invece di lasciare un campo vuoto inspiegabile.
+
 ### Visibilità del veicolo fuori dal form
 
 Il mezzo assegnato è un'informazione operativa: deve essere visibile **senza aprire** l'appuntamento.

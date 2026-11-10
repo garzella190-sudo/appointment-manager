@@ -5,6 +5,10 @@ const ASSETS_TO_CACHE = [
   '/app_icon_512.png?v=12'
 ];
 
+/** Icone delle notifiche push (generate da scripts/genera_icone_notifica.js) */
+const NOTIFICA_ICONA = '/notification-icon.png?v=12'; // grande, a colori (cono arancione)
+const NOTIFICA_BADGE = '/notification-badge.png?v=12'; // piccola, silhouette bianca (Android)
+
 // Install: Cache core assets and skip waiting
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -77,8 +81,11 @@ self.addEventListener('push', function(event) {
     const title = data.title || 'Agenda Guide';
     const options = {
       body: data.body,
-      icon: '/app_icon_512.png?v=12',
-      badge: '/app_icon_512.png?v=12',
+      // Immagine grande: a colori, il cono arancione dell'autoscuola.
+      icon: data.icon || NOTIFICA_ICONA,
+      // Icona piccola (barra di stato Android): DEVE essere monocromatica bianca
+      // su sfondo trasparente, altrimenti Android la mostra come quadratino bianco.
+      badge: NOTIFICA_BADGE,
       data: {
         url: data.url || '/'
       },

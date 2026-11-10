@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { TipoCambio } from '@/lib/database.types';
+import { notificaCambioCalendario } from '@/lib/pushHelper';
 
 export async function createClienteAction(payload: {
   nome: string;
@@ -14,6 +15,11 @@ export async function createClienteAction(payload: {
   riceve_email: boolean;
   riceve_whatsapp: boolean;
 }) {
+  // La patente richiesta è OBBLIGATORIA: da essa dipendono durata, veicolo e istruttori
+  if (!payload.patente_richiesta_id) {
+    return { success: false, error: 'Seleziona la patente richiesta: è obbligatoria.' };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.from('clienti').insert(payload).select('id').single();
@@ -39,6 +45,11 @@ export async function updateClienteAction(id: string, payload: {
   riceve_email: boolean;
   riceve_whatsapp: boolean;
 }) {
+  // La patente richiesta è OBBLIGATORIA anche in modifica
+  if (!payload.patente_richiesta_id) {
+    return { success: false, error: 'Seleziona la patente richiesta: è obbligatoria.' };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -214,6 +225,13 @@ export async function registraEsitoEsameAction(
 export async function deleteSessioneEsameAction(sessionId: string) {
   const supabase = await createClient();
 
+  // Istruttori della seduta: servono per la notifica, quindi si leggono prima di cancellare
+  const { data: sessione } = await supabase
+    .from('sessioni_esame')
+    .select('nome, data, istruttori_ids')
+    .eq('id', sessionId)
+    .maybeSingle();
+
   // 1. Unlink candidates
   const { error: clientiError } = await supabase
     .from('clienti')
@@ -242,6 +260,20 @@ export async function deleteSessioneEsameAction(sessionId: string) {
 
   if (sessionError) {
     return { success: false, error: 'Errore nell\'eliminazione della seduta: ' + sessionError.message };
+  }
+
+  // Avviso push: la seduta e i blocchi in calendario degli istruttori sono stati rimossi
+  try {
+    await notificaCambioCalendario({
+      istruttoriCoinvolti: sessione?.istruttori_ids || [],
+      payload: {
+        title: '🗑️ Seduta d\'esame eliminata',
+        body: `${sessione?.nome ? `${sessione.nome} — ` : ''}i blocchi collegati sono stati rimossi dal calendario.`,
+        url: '/calendar'
+      },
+    });
+  } catch (notificaError) {
+    console.error('Push notification error in deleteSessioneEsameAction:', notificaError);
   }
 
   revalidatePath('/calendar');

@@ -9,6 +9,7 @@ import { Modal } from './Modal';
 import { AppointmentForm } from './forms/AppointmentForm';
 import { ConfirmBubble } from './ConfirmBubble';
 import { PushSubscriptionButton } from './PushSubscriptionButton';
+import { StartPageSetting } from './StartPageSetting';
 import { signOutAction } from '@/actions/auth';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -100,9 +101,11 @@ const BottomNav = () => {
   };
 
   // La HOME dell'app è il Calendario; l'Agenda (lista del giorno) resta a portata di un tocco.
+  // Destinazioni FISSE richieste: Home = Agenda ('/'), Calendario = '/calendar'.
+  // La pagina di avvio è invece personale (StartPageRouter + impostazione "Pagina iniziale").
   const navLeft = [
-    { name: 'Home',     href: '/calendar', icon: Home },
-    { name: 'Agenda',   href: '/',         icon: Calendar },
+    { name: 'Home',       href: '/',         icon: Home },
+    { name: 'Calendario', href: '/calendar', icon: Calendar },
   ];
 
   const navRight = [
@@ -129,10 +132,10 @@ const BottomNav = () => {
                 <PlusCircle size={20} strokeWidth={2.5} className="transition-transform duration-300 sm:w-[22px] sm:h-[22px] group-hover:scale-110" />
               </button>
               <Link
-                href="/calendar"
-                title="Home (Calendario)"
+                href="/"
+                title="Home (Agenda)"
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent('calendar-today'));
+                  window.dispatchEvent(new CustomEvent('home-reset-today'));
                 }}
                 className="relative flex flex-col items-center justify-center w-9 h-9 sm:w-12 sm:h-12 rounded-[14px] sm:rounded-[20px] transition-all duration-300 active:scale-95 group shrink-0 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
               >
@@ -329,6 +332,11 @@ const BottomNav = () => {
           <div className="space-y-3">
              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Impostazioni Dispositivo</p>
              <PushSubscriptionButton />
+          </div>
+
+          <div className="space-y-3">
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Pagina iniziale</p>
+             <StartPageSetting />
           </div>
 
           <div className="flex gap-4">

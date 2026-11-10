@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
-import { format, addDays, isSameDay, parseISO } from 'date-fns';
+import { format, addDays, addMinutes, isSameDay, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 import { ConflictsAlert } from '@/components/ConflictsAlert';
@@ -31,6 +31,16 @@ const APPOINTMENT_SELECT = `
   istruttori ( nome, cognome, colore ),
   veicoli ( id, targa, nome, colore )
 `;
+
+/**
+ * Timeline dell'agenda multi-istruttore: passo e altezze delle righe.
+ * Una riga "guida" = 15 minuti (50px) → una guida da 30 min è alta ~100px, una da 60 min ~200px.
+ * Le pause in cui NESSUN istruttore ha nulla vengono compresse in un'unica riga sottile,
+ * così non si spreca mezza schermata quando c'è un buco di due ore.
+ */
+const PASSO_TIMELINE = 15;
+const RIGA_TIMELINE_PX = 50;
+const RIGA_PAUSA_PX = 16;
 
 /** Righe Supabase (relazioni annidate: possono arrivare come oggetto o array). */
 type ClienteRiga = {
@@ -142,6 +152,19 @@ const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => 
     .toUpperCase()
     .slice(0, 2);
 
+  /** Orario di fine: dice subito quanto è lunga la guida (e giustifica l'altezza del blocco) */
+  const oraFine = useMemo(() => {
+    if (!apt.duration || !apt.appointment_time) return null;
+    try {
+      return format(
+        addMinutes(parseISO(`${apt.appointment_date}T${apt.appointment_time}`), apt.duration),
+        'HH:mm'
+      );
+    } catch {
+      return null;
+    }
+  }, [apt.appointment_date, apt.appointment_time, apt.duration]);
+
   return (
     <>
     <div
@@ -165,7 +188,10 @@ const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => 
       onTouchCancel={hoverApri.onTouchCancel}
       onContextMenu={hoverApri.onContextMenu}
       className={cn(
-        "relative border shadow-sm rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-12 sm:pr-14",
+        // `h-full`: nella timeline multi-istruttore la card riempie le righe assegnate
+        // (una guida da 1h è alta il doppio di una da 30 min); nella colonna singola
+        // il contenitore è automatico, quindi `h-full` non cambia nulla.
+        "relative h-full border shadow-sm rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 sm:gap-4 group cursor-pointer hover:border-sky-500/50 hover:shadow-xl hover:shadow-sky-500/5 transition-all text-left pr-12 sm:pr-14",
         apt.stato === 'annullato' ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 opacity-60 grayscale" : "bg-white dark:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800"
       )}
     >
@@ -189,6 +215,11 @@ const CardGuida = ({ apt, onOpen, onDelete }: { apt: Appointment; onOpen: () => 
               "tabular-nums text-xs font-black shrink-0",
               apt.stato === 'annullato' ? "text-zinc-400" : "text-sky-600 dark:text-sky-400"
             )}>{apt.appointment_time}</span>
+            {oraFine && (
+              <span className="tabular-nums text-[10px] font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
+                –{oraFine}
+              </span>
+            )}
             <span className="truncate">{apt.client_name}</span>
             {apt.exam_status && apt.exam_status !== 'none' && (
               <GraduationCap
@@ -397,18 +428,20 @@ export default function Home() {
 
   // Preferenza PERSONALE degli istruttori: condivisa con il Calendario e mai resettata.
   // - se l'utente ha già scelto qualcosa, si riusa quella scelta;
-  // - al primo avvio si parte dal proprio calendario (se l'account è collegato a un istruttore);
+  // - al primo avvio parte dal proprio calendario SOLO l'istruttore "puro": admin,
+  //   AdminDev e segreteria partono da "tutti" (la propria colonna resta comunque
+  //   la prima a sinistra), così la vista multi-istruttore si vede subito;
   // - da quel momento la scelta si salva a ogni modifica manuale e non viene più toccata.
   useEffect(() => {
     if (authLoading || preferenzaLetta.current) return;
     const salvati = leggiIstruttoriSelezionati();
     if (salvati) {
       setSelectedInstructorIds(salvati);
-    } else if (istruttoreId) {
+    } else if (isIstruttore && istruttoreId) {
       setSelectedInstructorIds([istruttoreId]);
     }
     preferenzaLetta.current = true;
-  }, [authLoading, istruttoreId]);
+  }, [authLoading, istruttoreId, isIstruttore]);
 
   // Salvataggio della scelta manuale (vale anche per il Calendario)
   useEffect(() => {
@@ -485,8 +518,15 @@ export default function Home() {
           
           if (elementToScroll && container) {
             hasAutoScrolled.current = true;
+            // La linea dell'ora è posizionata in assoluto dentro la timeline: `offsetTop`
+            // non è riferito al contenitore che scorre, quindi si misura col rect.
+            const rectElemento = elementToScroll.getBoundingClientRect();
+            const rectContenitore = container.getBoundingClientRect();
+            const centroElemento =
+              rectElemento.top - rectContenitore.top + container.scrollTop + rectElemento.height / 2;
+
             container.scrollTo({ 
-              top: elementToScroll.offsetTop - (container.clientHeight / 2) + (elementToScroll.clientHeight / 2), 
+              top: Math.max(0, centroElemento - container.clientHeight / 2), 
               behavior: 'smooth' 
             });
           }
@@ -533,10 +573,18 @@ export default function Home() {
       mappa.get(chiave)!.items.push(apt);
     }
 
-    const gruppi = [...mappa.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+    // Ordine colonne: la MIA colonna sempre per prima (a sinistra), poi le altre
+    // in ordine alfabetico. `istruttoreId` è l'istruttore collegato all'account che
+    // ha fatto l'accesso (ricavato anche da email/nome, non solo dai metadata).
+    const gruppi = [...mappa.values()].sort((a, b) => {
+      const aMio = !!istruttoreId && a.id === istruttoreId;
+      const bMio = !!istruttoreId && b.id === istruttoreId;
+      if (aMio !== bMio) return aMio ? -1 : 1;
+      return a.nome.localeCompare(b.nome, 'it');
+    });
     gruppi.forEach(g => g.items.sort((a, b) => a.appointment_time.localeCompare(b.appointment_time)));
     return gruppi;
-  }, [filteredAppointments]);
+  }, [filteredAppointments, istruttoreId]);
 
   /** Con più di un istruttore si usa la vista a colonne allineate per orario. */
   const vistaMulti = gruppiIstruttori.length > 1;
@@ -544,42 +592,107 @@ export default function Home() {
   /**
    * Timeline dell'agenda per la vista multi-istruttore.
    *
-   * Si costruisce la mappa `ora → istruttore → guide`: così la stessa ora finisce sulla
-   * stessa riga della griglia in TUTTE le colonne (gli appuntamenti restano allineati per
-   * orario anche scorrendo in orizzontale su desktop e tablet).
+   * L'altezza di ogni blocco è PROPORZIONALE ALLA DURATA della guida: con un passo di
+   * 15 minuti una guida da 30 min occupa 2 righe, una da 60 min ne occupa 4. Così due
+   * guide da 30 min di un istruttore stanno esattamente una sopra l'altra e affiancano
+   * una guida da 60 min dell'altro istruttore, che resta alta il doppio.
+   * Lo spazio "vuoto" finisce quindi nella colonna di chi, in quella fascia, non ha
+   * nulla — non nella colonna di chi sta lavorando (era il difetto della versione
+   * precedente, dove ogni riga era alta uguale e un blocco da 1h sembrava da mezz'ora).
    */
   const timelineAgenda = useMemo(() => {
-    const celle = new Map<string, Map<string, Appointment[]>>();
+    type Posizione = { colonna: number; riga: number; span: number };
+    type RigaTimeline = 'guida' | 'pausa';
 
-    for (const apt of filteredAppointments) {
-      const ora = apt.appointment_time;
-      if (!celle.has(ora)) celle.set(ora, new Map());
-      const perGruppo = celle.get(ora)!;
-      const chiave = apt.trainer_id || 'non-assegnato';
-      if (!perGruppo.has(chiave)) perGruppo.set(chiave, []);
-      perGruppo.get(chiave)!.push(apt);
+    const vuoto = {
+      righe: [] as RigaTimeline[],
+      posizioni: new Map<string, Posizione>(),
+      adessoTopPx: null as number | null,
+    };
+
+    if (gruppiIstruttori.length === 0) return vuoto;
+
+    const minutiDi = (hhmm: string) => {
+      const [h, m] = (hhmm || '0:0').split(':').map(Number);
+      return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+    };
+    /** Inizio agganciato al quarto d'ora */
+    const inizioMinuti = (apt: Appointment) => Math.floor(minutiDi(apt.appointment_time) / PASSO_TIMELINE) * PASSO_TIMELINE;
+    /** Durata in quarti d'ora (minimo 1) */
+    const spanDi = (apt: Appointment) =>
+      Math.max(1, Math.round((Number(apt.duration) || PASSO_TIMELINE) / PASSO_TIMELINE));
+
+    // 1. Inizio della giornata mostrata = prima guida
+    let base = Number.POSITIVE_INFINITY;
+    for (const gruppo of gruppiIstruttori) {
+      for (const apt of gruppo.items) base = Math.min(base, inizioMinuti(apt));
     }
+    if (!Number.isFinite(base)) base = 8 * 60;
 
-    const orari = [...celle.keys()].sort();
-    const adesso = format(new Date(), 'HH:mm');
-    const righe: Array<{ tipo: 'orario'; ora: string } | { tipo: 'adesso' }> = [];
-
-    if (isSameDay(currentDate, new Date())) {
-      let inserita = false;
-      for (const ora of orari) {
-        if (!inserita && ora > adesso) {
-          righe.push({ tipo: 'adesso' });
-          inserita = true;
-        }
-        righe.push({ tipo: 'orario', ora });
+    // 2. Posizione di ogni guida in "unità" da 15 minuti (una guida può spingere giù
+    //    quelle successive solo se si sovrappone: caso raro, es. annullata + attiva)
+    const piazzamenti: { apt: Appointment; colonna: number; inizio: number; span: number }[] = [];
+    gruppiIstruttori.forEach((gruppo, indiceColonna) => {
+      let fineColonna = 0;
+      for (const apt of gruppo.items) {
+        const span = spanDi(apt);
+        const inizio = Math.max((inizioMinuti(apt) - base) / PASSO_TIMELINE, fineColonna);
+        piazzamenti.push({ apt, colonna: indiceColonna + 1, inizio, span });
+        fineColonna = inizio + span;
       }
-      if (!inserita) righe.push({ tipo: 'adesso' });
-    } else {
-      for (const ora of orari) righe.push({ tipo: 'orario', ora });
+    });
+
+    const unitaTotali = Math.max(1, ...piazzamenti.map((p) => p.inizio + p.span));
+
+    // 3. Quali quarti d'ora sono occupati da almeno una guida
+    const occupata = new Array<boolean>(unitaTotali).fill(false);
+    for (const p of piazzamenti) {
+      for (let u = p.inizio; u < p.inizio + p.span; u++) occupata[u] = true;
     }
 
-    return { celle, righe, adesso };
-  }, [filteredAppointments, currentDate]);
+    // 4. Righe della griglia: una per quarto d'ora occupato, UNA SOLA riga sottile per
+    //    ogni pausa (buco in cui nessuno ha guide). Una pausa in coda non serve.
+    const rigaDiUnita = new Array<number>(unitaTotali).fill(0);
+    const righe: RigaTimeline[] = [];
+
+    for (let u = 0; u < unitaTotali; u++) {
+      if (occupata[u]) {
+        righe.push('guida');
+        rigaDiUnita[u] = righe.length;
+        continue;
+      }
+      const inizioPausa = u;
+      while (u + 1 < unitaTotali && !occupata[u + 1]) u++;
+      if (u + 1 >= unitaTotali) break; // pausa finale: non si mostra
+      righe.push('pausa');
+      for (let k = inizioPausa; k <= u; k++) rigaDiUnita[k] = righe.length;
+    }
+
+    // 5. Riga di partenza di ogni guida (lo span, in righe, coincide con i quarti d'ora
+    //    della durata perché tutte le sue unità sono occupate)
+    const posizioni = new Map<string, Posizione>();
+    for (const p of piazzamenti) {
+      posizioni.set(p.apt.id, { colonna: p.colonna, riga: rigaDiUnita[p.inizio], span: p.span });
+    }
+
+    // 6. Linea dell'ora attuale (solo se oggi è la data mostrata e l'ora cade su una riga)
+    let adessoTopPx: number | null = null;
+    if (isSameDay(currentDate, new Date())) {
+      const adessoMinuti = minutiDi(format(new Date(), 'HH:mm'));
+      const unitaAdesso = Math.floor((adessoMinuti - base) / PASSO_TIMELINE);
+      if (unitaAdesso >= 0 && unitaAdesso < unitaTotali && occupata[unitaAdesso]) {
+        const rigaAdesso = rigaDiUnita[unitaAdesso];
+        let top = 0;
+        for (let i = 0; i < rigaAdesso - 1; i++) {
+          top += righe[i] === 'pausa' ? RIGA_PAUSA_PX : RIGA_TIMELINE_PX;
+        }
+        top += ((adessoMinuti - base) % PASSO_TIMELINE) / PASSO_TIMELINE * RIGA_TIMELINE_PX;
+        adessoTopPx = top;
+      }
+    }
+
+    return { righe, posizioni, adessoTopPx };
+  }, [gruppiIstruttori, currentDate]);
 
   /** Eliminazione guida (la card è un componente condiviso, quindi il server action arriva da qui). */
   const eliminaGuida = async (id: string) => {
@@ -651,7 +764,11 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-full animate-fade-in overflow-hidden">
-      <div className="pt-2 px-4 md:px-6 pb-1 max-w-2xl mx-auto w-full flex-shrink-0">
+      {/*
+        Larghezza ADATTIVA: su telefono resta piena, su tablet/desktop si allarga fino a
+        1600px invece di restare una striscia da 672px con le bande vuote ai lati.
+      */}
+      <div className="pt-2 px-3 sm:px-4 md:px-6 lg:px-8 pb-1 w-full max-w-[1600px] mx-auto flex-shrink-0">
         <header className="relative mb-2 flex flex-col gap-2 lg:gap-0">
           {/* Riga 1 — Titolo, data e azioni rapide */}
           <div className="flex items-center justify-between gap-2">
@@ -786,10 +903,10 @@ export default function Home() {
       <section 
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto scroll-container px-4 md:px-6 pb-32"
+        className="flex-1 overflow-y-auto scroll-container px-3 sm:px-4 md:px-6 lg:px-8 pb-32"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div className={cn("mx-auto space-y-3", isGlobalSearch ? "max-w-4xl" : "max-w-2xl")}>
+        <div className={cn("mx-auto space-y-3 w-full", isGlobalSearch ? "max-w-5xl" : "max-w-[1600px]")}>
           <div className="flex items-center justify-between px-1 gap-2">
             <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight truncate">
               {isGlobalSearch ? `Ricerca: ${searchQuery.trim()}` : titleText}
@@ -917,18 +1034,18 @@ export default function Home() {
             </div>
           ) : filteredAppointments.length > 0 ? (
             vistaMulti ? (
-              /* ---------- MULTI-ISTRUTTORE: colonne affiancate con le RIGHE ALLINEATE PER ORARIO ---------- */
+              /* ---------- MULTI-ISTRUTTORE: timeline a colonne, altezze = durata della guida ---------- */
               <div
-                className="scroll-x-visible pb-3 snap-x snap-mandatory"
+                className="scroll-x-visible pb-3"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
+                {/* Intestazioni: un istruttore per colonna (stessa griglia della timeline) */}
                 <div
-                  className="grid gap-x-3 gap-y-2 items-start"
-                  style={{ gridTemplateColumns: `repeat(${gruppiIstruttori.length}, min(86vw, 320px))` }}
+                  className="grid gap-x-3"
+                  style={{ gridTemplateColumns: `repeat(${gruppiIstruttori.length}, minmax(min(86vw, 320px), 1fr))` }}
                 >
-                  {/* Intestazioni: un istruttore per colonna */}
                   {gruppiIstruttori.map(gruppo => (
-                    <div key={`head-${gruppo.id}`} className="flex items-center gap-2 px-1 snap-start">
+                    <div key={`head-${gruppo.id}`} className="flex items-center gap-2 px-1">
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: gruppo.colore || '#0ea5e9' }}
@@ -940,33 +1057,87 @@ export default function Home() {
                       <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
                     </div>
                   ))}
+                </div>
 
-                  {/* Righe: una per orario, così le guide della stessa ora sono allineate */}
-                  {timelineAgenda.righe.map((riga, idx) => (
-                    riga.tipo === 'adesso' ? (
-                      <div key={`adesso-${idx}`} className="col-span-full">
-                        <LineaOra time={timelineAgenda.adesso} withId />
-                      </div>
-                    ) : (
-                      <React.Fragment key={`riga-${riga.ora}`}>
-                        {gruppiIstruttori.map(gruppo => {
-                          const items = timelineAgenda.celle.get(riga.ora)?.get(gruppo.id) || [];
-                          return (
-                            <div key={`${riga.ora}-${gruppo.id}`} className="min-w-0 space-y-2">
-                              {items.map(apt => (
-                                <CardGuida
-                                  key={apt.id}
-                                  apt={apt}
-                                  onOpen={() => setSelectedAppointment(apt)}
-                                  onDelete={() => eliminaGuida(apt.id)}
-                                />
-                              ))}
-                            </div>
-                          );
-                        })}
-                      </React.Fragment>
-                    )
+                {/*
+                  Timeline vera: una riga = 15 minuti. Ogni guida occupa tante righe
+                  quanti sono i quarti d'ora della sua durata, quindi le guide da 30 min
+                  stanno una sopra l'altra e affiancano una guida da 60 min alta il doppio.
+                  Le pause in cui nessuno ha guide diventano un'unica riga sottile.
+                */}
+                <div
+                  className="relative mt-2 grid gap-x-3"
+                  style={{
+                    gridTemplateColumns: `repeat(${gruppiIstruttori.length}, minmax(min(86vw, 320px), 1fr))`,
+                    gridTemplateRows: timelineAgenda.righe
+                      .map(tipo => (tipo === 'pausa' ? `${RIGA_PAUSA_PX}px` : `${RIGA_TIMELINE_PX}px`))
+                      .join(' '),
+                  }}
+                >
+                  {/* "Corsie" di sfondo: rendono leggibile anche la parte vuota della colonna */}
+                  {gruppiIstruttori.map((gruppo, indice) => (
+                    <div
+                      key={`corsia-${gruppo.id}`}
+                      aria-hidden
+                      className="rounded-[18px] bg-zinc-900/[0.035] dark:bg-zinc-100/[0.04]"
+                      style={{
+                        gridColumn: indice + 1,
+                        gridRow: `1 / span ${Math.max(1, timelineAgenda.righe.length)}`,
+                      }}
+                    />
                   ))}
+
+                  {/* Pause compresse: una linea tratteggiata al posto del tempo vuoto */}
+                  {timelineAgenda.righe.map((tipo, indice) =>
+                    tipo === 'pausa' ? (
+                      <div
+                        key={`pausa-${indice}`}
+                        aria-hidden
+                        className="flex items-center px-1"
+                        style={{ gridColumn: '1 / -1', gridRow: indice + 1 }}
+                      >
+                        <div className="flex-1 border-t border-dashed border-zinc-300/80 dark:border-zinc-700/80" />
+                      </div>
+                    ) : null
+                  )}
+
+                  {/* Guide posizionate per orario e altezza proporzionale alla durata */}
+                  {gruppiIstruttori.flatMap(gruppo =>
+                    gruppo.items.map(apt => {
+                      const posizione = timelineAgenda.posizioni.get(apt.id);
+                      if (!posizione) return null;
+                      return (
+                        <div
+                          key={apt.id}
+                          className="min-w-0 pb-2"
+                          style={{
+                            gridColumn: posizione.colonna,
+                            gridRow: `${posizione.riga} / span ${posizione.span}`,
+                          }}
+                        >
+                          <CardGuida
+                            apt={apt}
+                            onOpen={() => setSelectedAppointment(apt)}
+                            onDelete={() => eliminaGuida(apt.id)}
+                          />
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {/* Linea dell'ora attuale, alla sua altezza reale */}
+                  {timelineAgenda.adessoTopPx !== null && (
+                    <div
+                      id="current-time-line"
+                      className="pointer-events-none absolute left-0 right-0 z-10 flex -translate-y-1/2 items-center gap-2"
+                      style={{ top: `${timelineAgenda.adessoTopPx}px` }}
+                    >
+                      <span className="text-[10px] font-black text-sky-600 dark:text-sky-400 bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded-md border border-sky-200 dark:border-sky-800 shadow-sm shrink-0">
+                        {format(new Date(), 'HH:mm')}
+                      </span>
+                      <div className="flex-1 h-[2px] bg-sky-500/70 shadow-[0_0_8px_rgba(14,165,233,0.4)]" />
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -987,7 +1158,9 @@ export default function Home() {
                       <div className="flex-1 h-[1px] bg-zinc-200 dark:bg-zinc-800" />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3">
+                    {/* Su desktop/tablet le card riempiono la larghezza disponibile
+                        (2 colonne da 768px, 3 dai 1280px): niente banda laterale. */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       {gruppo.items.map((apt, index) => {
                         const now = new Date();
                         const isToday = isSameDay(currentDate, now);
@@ -1007,13 +1180,21 @@ export default function Home() {
 
                         return (
                           <React.Fragment key={apt.id}>
-                            {insertLineBefore && <LineaOra time={currentTimeStr} withId={groupIdx === 0} />}
+                            {insertLineBefore && (
+                              <div className="col-span-full">
+                                <LineaOra time={currentTimeStr} withId={groupIdx === 0} />
+                              </div>
+                            )}
                             <CardGuida
                               apt={apt}
                               onOpen={() => setSelectedAppointment(apt)}
                               onDelete={() => eliminaGuida(apt.id)}
                             />
-                            {insertLineAfter && <LineaOra time={currentTimeStr} withId={groupIdx === 0} />}
+                            {insertLineAfter && (
+                              <div className="col-span-full">
+                                <LineaOra time={currentTimeStr} withId={groupIdx === 0} />
+                              </div>
+                            )}
                           </React.Fragment>
                         );
                       })}

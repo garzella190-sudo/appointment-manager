@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { Impegno, TipoImpegno } from '@/lib/database.types';
-import { notificaGuidaAgliIstruttori } from '@/lib/pushHelper';
+import { notificaCambioCalendario } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 
 export async function getTipiImpegnoAction() {
@@ -53,17 +53,14 @@ export async function createImpegnoAction(payload: {
 
   try {
     if (payload.istruttore_id) {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
       const dateFormatted = format(new Date(payload.data), 'dd/MM');
       const timeFormatted = payload.ora_inizio.substring(0, 5);
-      await notificaGuidaAgliIstruttori({
-        destinatari: [payload.istruttore_id],
-        attoreIstruttoreId: currentUserIstruttoreId,
+      await notificaCambioCalendario({
+        istruttoriCoinvolti: [payload.istruttore_id],
         payload: {
-          title: '📅 Nuovo Impegno Inserito',
+          title: '📅 Nuovo impegno inserito',
           body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
-          url: '/'
+          url: '/calendar'
         },
       });
     }
@@ -108,17 +105,14 @@ export async function updateImpegnoAction(id: string, payload: {
 
   try {
     if (payload.istruttore_id) {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
       const dateFormatted = format(new Date(payload.data), 'dd/MM');
       const timeFormatted = payload.ora_inizio.substring(0, 5);
-      await notificaGuidaAgliIstruttori({
-        destinatari: [payload.istruttore_id],
-        attoreIstruttoreId: currentUserIstruttoreId,
+      await notificaCambioCalendario({
+        istruttoriCoinvolti: [payload.istruttore_id],
         payload: {
-          title: '✏️ Impegno Modificato',
+          title: '✏️ Impegno modificato',
           body: `${payload.tipo} — ${dateFormatted} alle ${timeFormatted}`,
-          url: '/'
+          url: '/calendar'
         },
       });
     }
@@ -153,17 +147,14 @@ export async function deleteImpegnoAction(id: string) {
 
   try {
     if (impegnoToDelete && impegnoToDelete.istruttore_id) {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserIstruttoreId = session?.user?.user_metadata?.istruttore_id || null;
       const dateFormatted = format(new Date(impegnoToDelete.data), 'dd/MM');
       const timeFormatted = impegnoToDelete.ora_inizio.substring(0, 5);
-      await notificaGuidaAgliIstruttori({
-        destinatari: [impegnoToDelete.istruttore_id],
-        attoreIstruttoreId: currentUserIstruttoreId,
+      await notificaCambioCalendario({
+        istruttoriCoinvolti: [impegnoToDelete.istruttore_id],
         payload: {
-          title: '🗑️ Impegno Eliminato',
+          title: '🗑️ Impegno eliminato',
           body: `${impegnoToDelete.tipo} del ${dateFormatted} alle ${timeFormatted} è stato eliminato.`,
-          url: '/'
+          url: '/calendar'
         },
       });
     }
@@ -180,6 +171,13 @@ export async function deleteImpegnoAction(id: string) {
 export async function deleteImpegniBySessionAction(sessioneId: string) {
   const supabase = await createClient();
 
+  // Istruttori coinvolti: vanno letti PRIMA della cancellazione, servono per la notifica
+  const { data: impegniCollegati } = await supabase
+    .from('appuntamenti')
+    .select('id, istruttore_id')
+    .ilike('note', `%[SEDUTA_ID:${sessioneId}]%`);
+  const istruttoriCoinvolti = (impegniCollegati || []).map((riga) => riga.istruttore_id);
+
   // Cerchiamo impegni che contengono il riferimento [SEDUTA_ID:uuid] nelle note
   const { error } = await supabase
     .from('appuntamenti')
@@ -189,6 +187,19 @@ export async function deleteImpegniBySessionAction(sessioneId: string) {
   if (error) {
     console.error('Error deleting session commitments:', error.message);
     return { success: false, error: error.message };
+  }
+
+  try {
+    await notificaCambioCalendario({
+      istruttoriCoinvolti,
+      payload: {
+        title: '🗑️ Seduta d\'esame eliminata',
+        body: 'Gli impegni collegati sono stati rimossi dal calendario.',
+        url: '/calendar'
+      },
+    });
+  } catch (err) {
+    console.error('Push notification error in deleteImpegniBySessionAction:', err);
   }
 
   revalidatePath('/calendar');

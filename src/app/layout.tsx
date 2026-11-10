@@ -47,6 +47,7 @@ export const viewport: Viewport = {
 };
 
 import { InstallPrompt } from "@/components/InstallPrompt";
+import StartPageRouter from "@/components/StartPageRouter";
 
 export default async function RootLayout({
   children,
@@ -84,6 +85,7 @@ export default async function RootLayout({
             </main>
             <BottomNav />
           </div>
+          <StartPageRouter />
           <Analytics />
           <SWRegister />
           <SyncManager />

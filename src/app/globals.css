@@ -381,7 +381,10 @@
 .scroll-container {
   overflow-y: auto;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  /* NB: niente `-webkit-overflow-scrolling: touch`.
+     Su iOS questa proprietà (inutile da iOS 13: lo scorrimento inerziale è nativo)
+     rompe il ridisegno degli elementi `position: sticky` interni: restano al loro
+     posto ma perdono lo sfondo, con il contenuto che passa sotto. */
   scrollbar-gutter: stable;
 }
 

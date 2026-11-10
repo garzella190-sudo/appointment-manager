@@ -7,6 +7,7 @@ import { Loader2, Phone, Mail, Trash2, AlertCircle, Car, Pencil, User } from 'lu
 import Select from './Select';
 import { useToast } from '@/hooks/useToast';
 import { TipoPatente, Patente } from '@/lib/database.types';
+import { caricaPatentiVisibili } from '@/lib/patenti';
 import { 
   createIstruttoreAction, 
   updateIstruttoreAction, 
@@ -69,12 +70,13 @@ export const IstruttoreForm = ({
 
   useEffect(() => {
     async function fetchData() {
-      const [vRes, pRes] = await Promise.all([
+      const [vRes, patentiAttive] = await Promise.all([
         supabase.from('veicoli').select('id, nome, targa').order('nome'),
-        supabase.from('patenti').select('*').eq('nascosta', false).order('tipo')
+        // Filtro `nascosta` in JS: con la colonna NULL la query non trovava nulla
+        caricaPatentiVisibili(supabase),
       ]);
       if (vRes.data) setVehicles(vRes.data);
-      if (pRes.data) setPatenti(pRes.data);
+      setPatenti(patentiAttive);
     }
     fetchData();
   }, []);

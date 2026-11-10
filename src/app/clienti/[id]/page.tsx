@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { ArrowLeft, Phone, Mail, BadgeCheck, School, Loader2, Pencil, CheckCheck, History, Car, GraduationCap, Calendar, Archive, RotateCcw } from 'lucide-react';
 import { archiveClienteAction } from '@/actions/clienti';
+import { caricaPatentiVisibili, ordinaPatenti } from '@/lib/patenti';
 import { cn } from '@/lib/utils';
 import { PhoneActions } from '@/components/PhoneActions';
 import Select from '@/components/forms/Select';
@@ -99,9 +100,10 @@ export default function SchedaClientePage() {
     setLoading(true);
 
     // 1. Cliente + patenti in parallelo
-    const [cRes, pRes] = await Promise.all([
+    const [cRes, patentiAttive] = await Promise.all([
       supabase.from('clienti').select('*').eq('id', id).single(),
-      supabase.from('patenti').select('*').eq('nascosta', false).order('tipo'),
+      // Filtro `nascosta` in JS: con la colonna NULL la query SQL non trovava nulla
+      caricaPatentiVisibili(supabase),
     ]);
 
     if (cRes.error || !cRes.data) {
@@ -110,7 +112,7 @@ export default function SchedaClientePage() {
     }
 
     const cliente: Cliente = cRes.data;
-    const patenti: Patente[] = pRes.data ?? [];
+    const patenti: Patente[] = patentiAttive;
 
     // 2. trova il tipo della patente richiesta
     const patenteRichiesta = patenti.find(p => p.id === cliente.patente_richiesta_id);
@@ -298,6 +300,17 @@ export default function SchedaClientePage() {
                 /* Form di modifica INLINE */
                 <form onSubmit={async (e) => {
                   e.preventDefault();
+
+                  // La patente richiesta è OBBLIGATORIA anche in modifica
+                  if (!formState.patente_richiesta_id) {
+                    alert(
+                      patenti.length === 0
+                        ? 'Nessuna patente configurata. Aggiungile da Gestione → Patenti, poi riprova.'
+                        : 'Seleziona la patente richiesta: è obbligatoria.'
+                    );
+                    return;
+                  }
+
                   setSaving(true);
                   const payloadNome = formState.nome.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
                   const payloadCognome = formState.cognome.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
@@ -363,19 +376,20 @@ export default function SchedaClientePage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label htmlFor="patente" className={LABEL_CLS}>Patente Richiesta</label>
+                      <label htmlFor="patente" className={LABEL_CLS}>
+                        Patente Richiesta <span className="text-red-500" title="Campo obbligatorio">*</span>
+                      </label>
                       <PatentePicker
-                        options={[...patenti]
-                          .sort((a, b) => {
-                            if (a.tipo === 'B') return -1;
-                            if (b.tipo === 'B') return 1;
-                            return (a.nome_visualizzato || a.tipo).localeCompare(b.nome_visualizzato || b.tipo, 'it');
-                          })
-                          .map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
+                        options={ordinaPatenti(patenti).map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
                         value={formState.patente_richiesta_id}
                         onChange={(val) => setFormState(p => ({ ...p, patente_richiesta_id: val }))}
                         placeholder="Seleziona Patente"
                       />
+                      {patenti.length === 0 && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold ml-1">
+                          Nessuna patente disponibile: configurale da Gestione → Patenti.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <label htmlFor="cambio" className={LABEL_CLS}>Tipo Cambio</label>

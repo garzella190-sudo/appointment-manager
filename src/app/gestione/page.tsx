@@ -12,6 +12,7 @@ import { AppointmentForm } from '@/components/forms/AppointmentForm';
 import { UserForm } from '@/components/forms/UserForm';
 import { PatenteForm } from '@/components/forms/PatenteForm';
 import { InstallPWA } from '@/components/InstallPWA';
+import { StartPageSetting } from '@/components/StartPageSetting';
 import { format, addDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { listUsersAction, updateUserAction } from '@/actions/auth';
@@ -1710,7 +1711,8 @@ const TabImpostazioni = () => {
   const [localSettings, setLocalSettings] = useState({
     viewMode: 'week',
     granularity: 15,
-    showWeekends: true
+    /** true = la domenica non si vede nel calendario (il sabato resta sempre visibile) */
+    nascondiDomenica: false
   });
 
   useEffect(() => {
@@ -1722,12 +1724,17 @@ const TabImpostazioni = () => {
       // Local Config
       const savedViewMode = localStorage.getItem('calendar_viewMode') || 'week';
       const savedGranularity = localStorage.getItem('calendar_granularity') || '15';
-      const savedShowWeekends = localStorage.getItem('calendar_showWeekends') !== 'false';
+      // Migrazione: la vecchia preferenza "nascondi weekend" nascondeva sabato + domenica
+      const salvataDomenica = localStorage.getItem('calendar_nascondiDomenica');
+      const vecchioWeekend = localStorage.getItem('calendar_showWeekends');
+      const nascondiDomenica = salvataDomenica !== null
+        ? salvataDomenica === 'true'
+        : vecchioWeekend === 'false';
       
       setLocalSettings({
         viewMode: savedViewMode,
         granularity: parseInt(savedGranularity),
-        showWeekends: savedShowWeekends
+        nascondiDomenica
       });
       
       setLoading(false);
@@ -1745,7 +1752,7 @@ const TabImpostazioni = () => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
     const storageKey = key === 'viewMode' ? 'calendar_viewMode' : 
                        key === 'granularity' ? 'calendar_granularity' : 
-                       'calendar_showWeekends';
+                       'calendar_nascondiDomenica';
     localStorage.setItem(storageKey, value.toString());
   };
 
@@ -1754,6 +1761,22 @@ const TabImpostazioni = () => {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       
+      {/* SEZIONE: PAGINA INIZIALE (per utente) */}
+      <div className="bg-white dark:bg-zinc-900 p-8 rounded-[32px] border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+            <Smartphone size={24} />
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter">Pagina Iniziale</h3>
+            <p className="text-xs text-zinc-500">
+              Pagina che si apre all&apos;avvio dell&apos;app. Preferenza salvata sul tuo account: vale su tutti i tuoi dispositivi.
+            </p>
+          </div>
+        </div>
+        <StartPageSetting />
+      </div>
+
       {/* SEZIONE: PREFERENZE CALENDARIO */}
       <div className="bg-white dark:bg-zinc-900 p-8 rounded-[32px] border border-zinc-200 dark:border-zinc-800 shadow-sm">
         <div className="flex items-center gap-3 mb-8">
@@ -1800,22 +1823,23 @@ const TabImpostazioni = () => {
             </select>
           </div>
 
-          {/* Mostra Weekend */}
+          {/* Nascondi domenica */}
           <div className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
             <div>
-              <p className="font-bold text-zinc-900 dark:text-white">Mostra Fine Settimana</p>
-              <p className="text-xs text-zinc-500">Visualizza Sabato e Domenica nella griglia.</p>
+              <p className="font-bold text-zinc-900 dark:text-white">Nascondi Domenica</p>
+              <p className="text-xs text-zinc-500">Toglie solo la domenica dal calendario: il sabato resta visibile.</p>
             </div>
             <button 
-              onClick={() => updateLocalSetting('showWeekends', !localSettings.showWeekends)}
+              onClick={() => updateLocalSetting('nascondiDomenica', !localSettings.nascondiDomenica)}
+              title={localSettings.nascondiDomenica ? 'La domenica è nascosta' : 'La domenica è visibile'}
               className={cn(
                 "w-12 h-6 rounded-full transition-all relative",
-                localSettings.showWeekends ? "bg-sky-500" : "bg-zinc-300 dark:bg-zinc-700"
+                localSettings.nascondiDomenica ? "bg-sky-500" : "bg-zinc-300 dark:bg-zinc-700"
               )}
             >
               <div className={cn(
                 "w-4 h-4 bg-white rounded-full absolute top-1 transition-all",
-                localSettings.showWeekends ? "right-1" : "left-1"
+                localSettings.nascondiDomenica ? "right-1" : "left-1"
               )} />
             </button>
           </div>

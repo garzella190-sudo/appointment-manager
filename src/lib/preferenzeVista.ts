@@ -14,6 +14,9 @@ export const CHIAVI_VISTA = {
   giorni: 'calendar_viewDays',
   /** 'week' | 'resource' (solo Calendario). */
   modo: 'calendar_viewMode',
+  /** true = la domenica NON si vede in calendario (il sabato resta sempre visibile). */
+  domenica: 'calendar_nascondiDomenica',
+  /** @deprecated vecchia preferenza "nascondi weekend" (sabato + domenica), letta solo per migrare. */
   weekend: 'calendar_showWeekends',
   granularita: 'calendar_granularity',
 } as const;

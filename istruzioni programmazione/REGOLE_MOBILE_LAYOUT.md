@@ -118,11 +118,14 @@ Scorrendo in orizzontale (vista COL con più istruttori o settimana) la **colonn
 Due dettagli indispensabili, entrambi verificati sul campo:
 
 1. **Fondo opaco** sulla cella sticky, altrimenti le card passano sotto ai numeri.
-2. Il contenitore che scorre in verticale deve usare `.scroll-verticale`
-   (`overflow-y: auto; overflow-x: clip`), **non** `.scroll-container`
-   (`overflow-x: hidden`): `hidden` crea uno scrollport interno alla griglia e la cella
-   `sticky left-0` scorre via con il contenuto. `clip` non crea uno scrollport, quindi la
-   sticky si aggancia al vero contenitore orizzontale.
+2. **Un solo scrollport** per orizzontale e verticale (`overflow-auto` sulla griglia), con la
+   fascia giorni/istruttori `sticky top-0` e le celle orario `sticky left-0` dentro lo stesso
+   contenitore. Non annidare due contenitori che scorrono e **non** usare `.scroll-container`
+   (`overflow-x: hidden`): crea uno scrollport interno alla griglia e le celle `sticky left-0`
+   scorrono via con il contenuto.
+3. **Mai** `-webkit-overflow-scrolling: touch` sulla griglia: su iOS rompe il ridisegno degli
+   elementi `sticky` (restano al loro posto ma perdono lo sfondo). La fascia in alto deve avere
+   sfondo pieno, mai `/50` o `/30`.
 
 Fanno parte della colonna fissa: la cella d'angolo della fascia giorni, la cella con l'icona
 orologio in alto e l'etichetta dell'orario attuale (linea rossa).
@@ -130,6 +133,69 @@ orologio in alto e l'etichetta dell'orario attuale (linea rossa).
 Verifica: con `scrollLeft = 400` su una griglia che scorre (`scrollWidth > clientWidth`)
 **tutte** le celle sticky devono mantenere lo stesso `getBoundingClientRect().left`
 (misurate 60 celle: `left` da 9 a 9, celle accanto da 9 a −391).
+### 6-bis.1 Colonne ancorate (orari a sinistra, istruttori in alto) su iOS
+
+Su iOS/Safari lo sfondo di un elemento `position: sticky` **non viene ridipinto** mentre si
+scorre: la colonna resta al suo posto ma diventa trasparente, con le card delle guide che
+passano sotto ai numeri (su Android/Chrome il difetto non si vede).
+
+- Gli elementi ancorati usano **solo** le classi di `globals.css`:
+  - `.colonna-fissa` → sfondo bianco / `zinc-900` (righe da 15 minuti, etichetta ora corrente);
+  - `.colonna-fissa-alt` → sfondo `zinc-50` / `zinc-900` (ore piene, intestazioni, angolo orario).
+  Le classi dipingono lo sfondo anche con uno pseudo-elemento dedicato (`translateZ(0)`), che
+  Safari compone sempre. **Non** rimettere `bg-white`/`bg-zinc-50`/`dark:bg-*` su quegli
+  elementi: la variante `dark:` può perdere il confronto e tornare trasparente.
+- La fascia in alto (giorni + istruttori) deve avere **sfondo pieno**, mai `/50` o `/30`.
+- **Mai** `-webkit-overflow-scrolling: touch` su un contenitore che ospita elementi `sticky`:
+  rompe il ridisegno degli sfondi su iOS. Da iOS 13 lo scorrimento inerziale è nativo.
+
+---
+
+## 6-quater. Notifiche push — solo il proprietario del calendario, mai l'autore
+
+- La notifica di una modifica del calendario passa **sempre** da
+  `notificaCambioCalendario()` (`src/lib/pushHelper.ts`); la scelta dei destinatari è la
+  funzione pura `risolviDestinatariPush()` in `src/lib/pushDestinatari.ts`.
+- Regola: la notifica arriva **solo al proprietario del calendario toccato** (account
+  collegato all'istruttore via `user_metadata.istruttore_id`, con fallback su nome/email per
+  gli account creati a mano) e **mai a chi ha fatto la modifica**.
+- Se la modifica riguarda **solo il calendario dell'autore**, non arriva niente a
+  **nessuno**: prenotare/annullare/spostare su se stessi è silenzioso.
+- Un **altro utente** che prenota o modifica il mio calendario → la notifica arriva a me.
+  Se sposto una guida da Francesco al mio calendario, la riceve Francesco (il cui
+  calendario è cambiato), non io.
+- Chi non ha un calendario proprio (segreteria/admin "da scrivania") **non** viene
+  avvisato delle modifiche altrui: non è il suo calendario.
+- Unico caso "a tutti": quando il chiamante non sa indicare il calendario (lista istruttori
+  vuota) → si avvisano tutti gli iscritti tranne l'autore.
+- L'elenco utenti si legge **paginato** (`perPage` + `page`): `auth.admin.listUsers()`
+  restituisce 50 utenti per volta e gli account più recenti non venivano mai trovati.
+- Ogni tipo di modifica deve notificare: inserimento, modifica, **spostamento**, annullamento,
+  eliminazione di guide e di altri impegni, sedute d'esame incluse.
+- Gli update fatti **direttamente dal client** (drag & drop nel calendario, sedute d'esame)
+  devono chiamare `notificaSpostamentoAction()` / `notificaSessioneEsameAction()`
+  (`src/actions/appointment_actions.ts`), altrimenti il movimento resta silenzioso.
+- La logica dei destinatari è coperta da test: `npm run verifica:notifiche`
+  (`scripts/verifica_destinatari_push.js`) — va aggiornato se cambiano le regole.
+- **Icone**: `icon` = `/notification-icon.png` (grande, a colori, cono arancione) e
+  `badge` = `/notification-badge.png` (piccola, **silhouette bianca monocromatica** su
+  trasparente). Android disegna `badge` in monocromia: se le si passa l'icona dell'app
+  (JPEG con fondo bianco) diventa un **quadratino bianco**. Rigenerazione:
+  `npm run icone:notifiche`. Cambiando gli asset si bumpa il service worker
+  (`public/sw-vNN.js` + `SW_URL` in `SWRegister.tsx`).
+
+---
+
+## 6-quinquies. Pagina iniziale dell'app (preferenza per utente)
+
+- Il tasto **Home** porta all'Agenda (`/`), il tasto **Calendario** porta a `/calendar`:
+  sono destinazioni fisse e non vanno cambiate.
+- La pagina che si apre all'avvio è invece **personale** e si imposta da "I tuoi Permessi"
+  (barra in basso, raggiungibile da tutti) o da Gestione → Impostazioni.
+- Preferenza salvata su `user_metadata.start_page` (`'agenda' | 'calendar'`) con copia in
+  `localStorage`: vale su tutti i dispositivi dell'utente. **Default: calendario.**
+- `StartPageRouter` (montato nel layout) applica la scelta **una sola volta** per apertura:
+  dopo, Home e Calendario non vengono rimbalzati indietro.
 
 ---
 
@@ -138,6 +204,13 @@ Verifica: con `scrollLeft = 400` su una griglia che scorre (`scrollWidth > clien
 - Il tasto **people** apre un picker **multi-istruttore** (stesso `OptionPicker` in modalità
   `multiple`): si spuntano più nomi, il modale resta aperto e mostra `Conferma (n)`.
   Nessuna selezione = tutti gli istruttori. Il tasto porta un **badge col conteggio** attivo.
+- **La colonna dell'utente che accede è sempre la PRIMA (a sinistra)**, poi le altre in ordine
+  alfabetico. L'istruttore collegato all'account si ricava con `risolviIstruttorePerUtente()`
+  (`src/lib/istruttoreCorrente.ts`): `user_metadata.istruttore_id` → email dell'account uguale a
+  `istruttori.email` → nome **e** cognome presenti in `full_name`/email. Non fidarsi del solo
+  metadata: l'AdminDev `manueleautoscuola@gmail.com` è collegato così e deve valere come istruttore.
+- L'**auto-filtro** sul proprio calendario si applica **solo** al ruolo `istruttore`: admin,
+  AdminDev e segreteria vedono tutte le colonne (con la propria per prima).
 - Le guide sono **raggruppate per istruttore**: intestazione con pallino del colore, nome in
   maiuscolo, conteggio e linea separatrice; dentro il gruppo **ordine cronologico**
   (`appointment_time`), gruppi in ordine alfabetico italiano, non assegnate nel gruppo
@@ -149,30 +222,50 @@ Verifica: con `scrollLeft = 400` su una griglia che scorre (`scrollWidth > clien
   Identico su mobile, tablet e desktop.
 
 ```jsx
-<div className="overflow-x-auto pb-3 snap-x snap-mandatory" style={{ WebkitOverflowScrolling: 'touch' }}>
-  <div className="grid gap-x-3 gap-y-2 items-start"
-       style={{ gridTemplateColumns: `repeat(${n}, min(86vw, 320px))` }}>
-    {/* riga di intestazioni: un istruttore per colonna */}
-    {/* poi UNA RIGA per ogni orario: n celle, una per istruttore */}
-  </div>
+<div className="overflow-x-auto pb-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+  {/* intestazioni: una colonna per istruttore */}
+  <div className="grid gap-x-3" style={{ gridTemplateColumns: `repeat(${n}, min(86vw, 320px))` }} />
+  {/* timeline: righe esplicite (50px = 15 min, 16px = pausa) + card con gridRow/span */}
+  <div className="relative grid gap-x-3"
+       style={{ gridTemplateColumns: `repeat(${n}, min(86vw, 320px))`, gridTemplateRows: righe }} />
 </div>
 ```
 
-  - La mappa `ora → istruttore → guide` (`timelineAgenda`) è ciò che garantisce l'allineamento:
-    cella vuota se l'istruttore non ha guide a quell'ora, riga alta come la card più alta,
-    card allineate in alto (`items-start`).
-  - Colonne a **larghezza fissa** `min(86vw, 320px)`: non si comprimono e non si allargano, quindi
-    con 3+ istruttori il contenitore **scorre in orizzontale anche su PC** (il wrapper della
-    giornata è `max-w-2xl`: 2 colonne entrano, dalla terza si scorre).
+  - **L'altezza del blocco è proporzionale alla DURATA** (`PASSO_TIMELINE = 15`, `RIGA_TIMELINE_PX = 50`):
+    una guida da 30 min occupa 2 righe (~100px), una da 60 min 4 righe (~200px). Quindi due guide
+    da 30 min stanno una sopra l'altra e affiancano esattamente una guida da 60 min alta il doppio:
+    lo spazio vuoto finisce nella colonna di chi in quella fascia non ha nulla, **non** in quella di
+    chi sta lavorando. (Era il difetto della versione a righe uguali: un blocco da 1h sembrava da
+    mezz'ora e lasciava un buco sotto la colonna di chi lavorava.)
+  - Le **pause** (quarti d'ora in cui nessun istruttore ha guide) sono compresse in **una sola riga
+    sottile** (`RIGA_PAUSA_PX = 16`, linea tratteggiata): un buco di due ore non diventa mezza
+    schermata vuota. Una pausa in coda alla giornata non si mostra.
+  - La mappa `posizioni` (`timelineAgenda`) dà `colonna`, `riga` e `span` di ogni card; le guide
+    sovrapposte dello stesso istruttore (es. annullata + attiva) vengono spinte in basso, non
+    sovrapposte.
+  - **Larghezza adattiva (desktop/tablet)**: il contenuto dell'agenda (header + elenco) è
+    `w-full max-w-[1600px] mx-auto` con padding `px-3 sm:px-4 md:px-6 lg:px-8`. Prima era una
+    striscia `max-w-2xl` (672px) centrata: su 1920px restavano due bande vuote enormi.
+  - Colonne della timeline **flessibili**: `repeat(n, minmax(min(86vw, 320px), 1fr))`. Si
+    allargano fino a riempire lo spazio disponibile; su telefono il minimo (320px/86vw) le fa
+    scorrere in orizzontale come prima.
+  - Vista a **colonna singola**: le card stanno in `grid grid-cols-1 md:grid-cols-2
+    xl:grid-cols-3`, così anche con un solo istruttore lo schermo viene usato; la linea dell'ora
+    va avvolta in un `div.col-span-full`.
   - La card della guida è il componente condiviso `CardGuida` (lo stesso della colonna singola):
-    **non duplicare** il markup della card.
-  - La linea dell'orario attuale è una riga a tutta larghezza (`col-span-full`) inserita prima del
-    primo orario successivo ad "adesso" (solo se la data visibile è oggi).
+    **non duplicare** il markup della card. La card ha `h-full` (riempie le righe assegnate) e in
+    testa mostra `HH:mm – HH:mm`, così la durata si legge subito.
+  - Ogni colonna ha una **corsia di sfondo** (`grid-row: 1 / span n`) che rende leggibile anche la
+    parte vuota.
+  - La linea dell'orario attuale è **posizionata in assoluto** (`top` calcolato dalle altezze delle
+    righe) e compare solo se l'ora cade su un quarto d'ora occupato; ha `id="current-time-line"` per
+    lo scroll automatico (che misura col `getBoundingClientRect`, non con `offsetTop`).
   - **MAI mettere `.scroll-container` sul contenitore orizzontale**: quella classe imposta
     `overflow-x: hidden` e uccide lo scorrimento (su mobile si vede solo la prima colonna).
   - Verifica: gli orari condivisi da più istruttori devono avere **la stessa `y`** in tutte le
-    colonne; `getComputedStyle(cont).overflowX === 'auto'`; `scrollWidth > clientWidth` quando le
-    colonne non entrano; `document.scrollWidth === clientWidth` sulla pagina (nessuno sforamento).
+    colonne; una guida da 60 min deve essere alta ~il doppio di una da 30; `getComputedStyle(cont).overflowX === 'auto'`;
+    `scrollWidth > clientWidth` quando le colonne non entrano; `document.scrollWidth === clientWidth`
+    sulla pagina (nessuno sforamento).
 
 **Regola dei dettagli minimi (obbligatoria):** senza aprire l'appuntamento devono essere
 leggibili **orario, patente e veicolo in uso**.

@@ -143,7 +143,10 @@ export function UserForm({ user, isAdmin, onSuccess, onCancel }: UserFormProps) 
           password, 
           full_name, 
           role: role as any,
-          permissions
+          permissions,
+          // Collegamento all'istruttore già alla creazione (es. AdminDev che lavora anche
+          // come istruttore: senza questo va rifatta la modifica dopo)
+          istruttore_id: selectedIstruttoreId || null
         });
       }
 

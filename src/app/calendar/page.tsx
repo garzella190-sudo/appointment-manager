@@ -54,6 +54,7 @@ import DatePickerModal from '@/components/modals/DatePickerModal';
 import { ConfirmMultiInstructorModal } from '@/components/modals/ConfirmMultiInstructorModal';
 import { isItalianHoliday, isWeekend } from '@/utils/holidays';
 import { ConflictsAlert } from '@/components/ConflictsAlert';
+import { notificaSpostamentoAction } from '@/actions/appointment_actions';
 
 class SmartPointerSensor extends PointerSensor {
   static activators = [
@@ -135,7 +136,11 @@ export default function CalendarPage() {
   const [istruttori, setIstruttori] = useState<{ id: string; nome: string; cognome: string }[]>([]);
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
-  const [showWeekends, setShowWeekends] = useState(true);
+  /**
+   * "Nascondi domenica": nasconde SOLO la domenica dal calendario, il sabato resta
+   * sempre visibile. Prima si chiamava "fine settimana" e nascondeva entrambi i giorni.
+   */
+  const [nascondiDomenica, setNascondiDomenica] = useState(false);
   const [granularity, setGranularity] = useState<15 | 30 | 60>(15);
   const [viewMode, setViewMode] = useState<'week' | 'resource'>('week');
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -180,14 +185,21 @@ export default function CalendarPage() {
     // Caricamento impostazioni da localStorage
     const savedInstructorIds = localStorage.getItem('calendar_selectedInstructorIds');
     const savedViewDays = localStorage.getItem('calendar_viewDays');
-    const savedShowWeekends = localStorage.getItem('calendar_showWeekends');
+    const savedNascondiDomenica = localStorage.getItem('calendar_nascondiDomenica');
+    // Migrazione dalla vecchia preferenza "nascondi weekend" (nascondeva sabato e domenica):
+    // chi l'aveva attiva continua a NON vedere la domenica, ma il sabato ricompare.
+    const legacyShowWeekends = localStorage.getItem('calendar_showWeekends');
     const savedDate = localStorage.getItem('calendar_currentDate');
     const savedGranularity = localStorage.getItem('calendar_granularity');
     const savedViewMode = localStorage.getItem('calendar_viewMode');
 
     if (savedInstructorIds) try { setSelectedInstructorIds(JSON.parse(savedInstructorIds)); } catch {}
     if (savedViewDays !== null) setViewDays(parseInt(savedViewDays) as any);
-    if (savedShowWeekends !== null) setShowWeekends(savedShowWeekends === 'true');
+    if (savedNascondiDomenica !== null) {
+      setNascondiDomenica(savedNascondiDomenica === 'true');
+    } else if (legacyShowWeekends !== null) {
+      setNascondiDomenica(legacyShowWeekends === 'false');
+    }
     if (savedGranularity !== null) setGranularity(parseInt(savedGranularity) as any);
     if (savedViewMode !== null) setViewMode(savedViewMode as any);
     if (savedDate !== null) {
@@ -226,11 +238,11 @@ export default function CalendarPage() {
     if (!mounted) return;
     localStorage.setItem('calendar_selectedInstructorIds', JSON.stringify(selectedInstructorIds));
     localStorage.setItem('calendar_viewDays', viewDays.toString());
-    localStorage.setItem('calendar_showWeekends', showWeekends.toString());
+    localStorage.setItem('calendar_nascondiDomenica', nascondiDomenica.toString());
     localStorage.setItem('calendar_currentDate', currentDate.toISOString());
     localStorage.setItem('calendar_granularity', granularity.toString());
     localStorage.setItem('calendar_viewMode', viewMode);
-  }, [selectedInstructorIds, viewDays, showWeekends, currentDate, granularity, viewMode, mounted]);
+  }, [selectedInstructorIds, viewDays, nascondiDomenica, currentDate, granularity, viewMode, mounted]);
 
   // Calcolo dell'istruttore associato (da metadata o da matching nome/email)
   const resolvedIstruttoreId = useMemo(() => {
@@ -309,31 +321,29 @@ export default function CalendarPage() {
   // Forza sempre la partenza dal Lunedì come richiesto
   const displayStart = weekStart; 
   const displayDays = useMemo(() => {
-    // Se la vista è a 7 giorni, mostriamo sempre l'intera settimana (Lun-Dom)
+    // Vista a 7 giorni: settimana Lun-Dom, oppure Lun-Sab se la domenica è nascosta
     if (viewDays === 7) {
-      return Array.from({ length: 7 }, (_, i) => addDays(displayStart, i));
+      return Array.from({ length: nascondiDomenica ? 6 : 7 }, (_, i) => addDays(displayStart, i));
     }
     
-    // Per 1, 3, 5 giorni, partiamo dalla data corrente e saltiamo i weekend se disattivati
+    // Per 1, 3, 5 giorni, partiamo dalla data corrente e saltiamo la domenica se nascosta
     const days: Date[] = [];
     let d = new Date(currentDate);
     
-    // Se oggi è un weekend e showWeekends è off, spostiamoci al lunedì successivo per iniziare la vista?
-    // In realtà è meglio iniziare da oggi, ma se oggi è Sab/Dom e filtriamo, cerchiamo il primo giorno valido.
-    if (!showWeekends && [0, 6].includes(d.getDay())) {
-      // Se è domenica (0), aggiunge 1; se è sabato (6), aggiunge 2
-      const offset = d.getDay() === 0 ? 1 : 2;
-      d = addDays(d, offset);
+    // Se il giorno di partenza è la domenica nascosta, si comincia dal lunedì
+    if (nascondiDomenica && d.getDay() === 0) {
+      d = addDays(d, 1);
     }
 
     while (days.length < viewDays) {
-      if (showWeekends || ![0, 6].includes(d.getDay())) {
+      // Si salta SOLO la domenica (0): il sabato resta sempre visibile
+      if (!nascondiDomenica || d.getDay() !== 0) {
         days.push(new Date(d));
       }
       d = addDays(d, 1);
     }
     return days;
-  }, [displayStart, viewDays, showWeekends, currentDate.getTime()]);
+  }, [displayStart, viewDays, nascondiDomenica, currentDate.getTime()]);
 
   // Generate intervals from 08:00 to 22:00 based on granularity
   const timeSlots = Array.from({ length: Math.floor((14 * 60) / granularity) + 1 }, (_, i) => {
@@ -770,6 +780,19 @@ export default function CalendarPage() {
           message: 'Errore durante il salvataggio dello spostamento. Riprova.',
           type: 'error'
         });
+      } else {
+        // Lo spostamento qui è un update diretto sul database: senza questa chiamata
+        // nessuno riceveva la notifica push del movimento.
+        try {
+          const idsSpostati = targetApt.sessione_esame_id
+            ? appointments
+                .filter(a => a.sessione_esame_id === targetApt.sessione_esame_id)
+                .map(a => a.id)
+            : [active.id as string];
+          await notificaSpostamentoAction(idsSpostati.length > 0 ? idsSpostati : [active.id as string], 'spostamento');
+        } catch (notificaError) {
+          console.error('Notifica spostamento non inviata:', notificaError);
+        }
       }
       
       if (mounted) fetchWeekAppointments();
@@ -1096,27 +1119,23 @@ export default function CalendarPage() {
                   </div>
                 </div>
 
-                {/* WEEKEND */}
+                {/* DOMENICA */}
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2 ml-1">Weekend</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2 ml-1">Domenica</p>
                   <button
-                    onClick={() => setShowWeekends(!showWeekends)}
-                    disabled={viewDays === 7}
+                    onClick={() => setNascondiDomenica(!nascondiDomenica)}
                     className={cn(
                       "h-11 w-full rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border active:scale-95 flex items-center justify-center gap-2",
-                      !showWeekends
+                      nascondiDomenica
                         ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800"
-                        : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500",
-                      viewDays === 7 && "opacity-40 cursor-not-allowed"
+                        : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500"
                     )}
                   >
-                    {showWeekends ? 'Nascondi weekend' : 'Mostra weekend'}
+                    {nascondiDomenica ? 'Mostra domenica' : 'Nascondi domenica'}
                   </button>
-                  {viewDays === 7 && (
-                    <p className="text-[10px] text-zinc-400 font-bold mt-2 ml-1">
-                      Con la vista a 7 giorni il weekend è sempre visibile.
-                    </p>
-                  )}
+                  <p className="text-[10px] text-zinc-400 font-bold mt-2 ml-1">
+                    Nasconde solo la domenica: il sabato resta sempre visibile.
+                  </p>
                 </div>
 
                 {/* LARGHEZZA COLONNE */}

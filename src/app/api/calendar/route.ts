@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { format, parseISO, addMinutes } from 'date-fns';
+import { buildIcs, eventoGuida } from '@/lib/calendario';
 
+/**
+ * GET /api/calendar?id=<appuntamento>
+ *
+ * Vecchio endpoint "link calendario" per utenti già loggati (usa la sessione, quindi
+ * passa dalle policy RLS). Genera lo STESSO .ics del resto dell'app grazie a
+ * `lib/calendario` — un solo generatore, un solo formato.
+ *
+ * Per i link dentro le EMAIL usare invece `/api/calendar/ics` (firmato, senza login).
+ */
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const id = searchParams.get('id');
-
+  const id = request.nextUrl.searchParams.get('id');
   if (!id) return new NextResponse('Missing ID', { status: 400 });
 
-  // Use a minimal client to fetch appointment
-  // Using Service Role might be needed if the appointment is private, 
-  // but for a public calendar link, common ID is usually fine.
   const supabase = await createClient();
-  
+
   const { data: apt, error } = await supabase
     .from('appuntamenti')
     .select(`
-      id, data, durata, inizio, 
+      id, data, durata, inizio, note,
+      clienti ( nome, cognome, email ),
       istruttori ( nome, cognome ),
       veicoli ( nome, targa )
     `)
@@ -25,40 +30,32 @@ export async function GET(request: NextRequest) {
 
   if (error || !apt) return new NextResponse('Not Found', { status: 404 });
 
-  const address = "Via Le Vallicelle, 4, 56043 Fauglia (PI)";
-  const startDate = new Date(apt.inizio);
-  const endDate = addMinutes(startDate, apt.durata || 60);
-  const formatICS = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
+  const istruttore = Array.isArray(apt.istruttori) ? apt.istruttori[0] : apt.istruttori;
+  const veicolo = Array.isArray(apt.veicoli) ? apt.veicoli[0] : apt.veicoli;
 
-  const icsContent = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Autoscuola Toscana Fauglia//Appointment Manager//IT',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:apt-${apt.id}-${startDate.getTime()}@autoscuola.toscana`,
-    `DTSTAMP:${formatICS(new Date())}`,
-    `DTSTART:${formatICS(startDate)}`,
-    `DTEND:${formatICS(endDate)}`,
-    `SUMMARY:Lezione di Guida`,
-    `DESCRIPTION:Sede: Autoscuola Toscana Fauglia\\nIndirizzo: ${address}\\nUn promemoria per la tua lezione di guida.`,
-    'LOCATION:Autoscuola Toscana Fauglia',
-    'STATUS:CONFIRMED',
-    'SEQUENCE:0',
-    'BEGIN:VALARM',
-    'TRIGGER:-PT30M',
-    'ACTION:DISPLAY',
-    'DESCRIPTION:Promemoria Lezione di Guida',
-    'END:VALARM',
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\r\n');
+  const inizio = apt.inizio || apt.data;
+  if (!inizio) return new NextResponse('Appuntamento senza orario', { status: 422 });
 
-  return new NextResponse(icsContent, {
+  const ics = buildIcs(
+    eventoGuida({
+      id: apt.id,
+      inizio,
+      durata: apt.durata || 60,
+      cliente: cliente ? `${cliente.cognome || ''} ${cliente.nome || ''}`.trim() : null,
+      istruttore: istruttore ? `${istruttore.nome || ''} ${istruttore.cognome || ''}`.trim() : null,
+      veicolo: veicolo ? `${veicolo.nome || ''} (${veicolo.targa || ''})` : null,
+      note: apt.note,
+      emailCliente: cliente?.email ?? null,
+    }),
+    'PUBLISH'
+  );
+
+  return new NextResponse(ics, {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': `attachment; filename="guida_${format(startDate, 'yyyyMMdd')}.ics"`,
+      'Content-Disposition': 'attachment; filename="guida.ics"',
+      'Cache-Control': 'no-store',
     },
   });
 }

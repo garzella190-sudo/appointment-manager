@@ -15,6 +15,7 @@ import DatePicker from '@/components/DatePicker';
 import { toggleProntoEsameAction, deleteSessioneEsameAction } from '@/actions/clienti';
 import { createAppointmentAction } from '@/actions/appointments';
 import { deleteImpegniBySessionAction } from '@/actions/impegni';
+import { notificaSessioneEsameAction } from '@/actions/appointment_actions';
 import ExamSessionModal from '@/components/modals/ExamSessionModal';
 
 const supabase = createClient();
@@ -137,6 +138,15 @@ export default function EsamiPage() {
     
     if (!error) {
       showToast(selectedSeduta ? 'Seduta aggiornata' : 'Seduta d\'esame creata', 'success');
+
+      // Avviso push per una seduta MODIFICATA (data, ora, istruttori): l'update qui è diretto
+      if (selectedSeduta) {
+        try {
+          await notificaSessioneEsameAction(selectedSeduta.id, 'spostamento');
+        } catch (notificaError) {
+          console.error('Notifica seduta non inviata:', notificaError);
+        }
+      }
       
       // LOGICA AUTOMAZIONE IMPEGNI (Solo Nuova Seduta o if needed)
       // Se è una nuova seduta, creiamo gli impegni per gli istruttori selezionati

@@ -15,6 +15,8 @@ import {
   deleteClienteAction 
 } from '@/actions/clienti';
 import { addToOfflineQueue } from '@/lib/offlineSync';
+import { ordinaPatenti } from '@/lib/patenti';
+import { cn } from '@/lib/utils';
 
 interface SchedaClienteFormProps {
   clienteId?: string;    // undefined → nuovo cliente
@@ -29,6 +31,8 @@ interface SchedaClienteFormProps {
     riceve_whatsapp?: boolean;
   };
   patenti: Patente[];
+  /** true mentre l'elenco patenti sta ancora caricando (evita falsi "nessuna patente") */
+  patentiLoading?: boolean;
   onSuccess: (id: string) => void;
   onCancel?: () => void;
 }
@@ -42,6 +46,7 @@ export const SchedaClienteForm = ({
   clienteId,
   defaultValues,
   patenti,
+  patentiLoading = false,
   onSuccess,
   onCancel,
 }: SchedaClienteFormProps) => {
@@ -57,13 +62,12 @@ export const SchedaClienteForm = ({
     riceve_whatsapp:      defaultValues?.riceve_whatsapp ?? true,
   });
   const [serverError, setServerError] = useState<string | null>(null);
+  /** Errore sul campo PATENTE (ora obbligatoria) */
+  const [errorePatente, setErrorePatente] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const sortedPatenti = [...patenti].sort((a, b) => {
-    if (a.tipo === 'B') return -1;
-    if (b.tipo === 'B') return 1;
-    return (a.nome_visualizzato || a.tipo).localeCompare(b.nome_visualizzato || b.tipo, 'it');
-  });
+  // La B per prima, poi le altre in ordine alfabetico
+  const sortedPatenti = ordinaPatenti(patenti);
 
   const selectedPatente = patenti.find(p => p.id === form.patente_richiesta_id);
   const isMotoPatente = selectedPatente && ['AM', 'A1', 'A2', 'A'].includes(selectedPatente.tipo.toUpperCase());
@@ -74,6 +78,22 @@ export const SchedaClienteForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // PATENTE RICHIESTA OBBLIGATORIA: senza la patente la scheda non si salva
+    // (da essa dipendono durata della guida, veicolo e istruttori abilitati).
+    if (!form.patente_richiesta_id) {
+      const messaggio = patentiLoading
+        ? 'Attendi il caricamento delle patenti...'
+        : patenti.length === 0
+          ? 'Nessuna patente configurata. Aggiungile da Gestione → Patenti, poi riprova.'
+          : 'Seleziona la patente richiesta: è obbligatoria per creare il cliente.';
+
+      setErrorePatente(messaggio);
+      showToast(messaggio, 'error');
+      return;
+    }
+
+    setErrorePatente(null);
     setLoading(true);
 
     const payloadNome = form.nome.trim().split(/\\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
@@ -197,13 +217,39 @@ export const SchedaClienteForm = ({
 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <label className={LABEL_CLS}>Patente Richiesta</label>
-          <PatentePicker
-            options={sortedPatenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
-            value={form.patente_richiesta_id || ''}
-            onChange={(val) => setForm(prev => ({ ...prev, patente_richiesta_id: val }))}
-            placeholder="Seleziona Patente"
-          />
+          <label className={LABEL_CLS}>
+            Patente Richiesta
+            <span className="text-red-500" title="Campo obbligatorio">*</span>
+            <span className="text-[9px] font-black text-zinc-300 dark:text-zinc-600 tracking-normal normal-case">obbligatoria</span>
+          </label>
+          <div className={cn(errorePatente && 'rounded-[16px] ring-2 ring-red-400')}>
+            <PatentePicker
+              options={sortedPatenti.map(p => ({ id: p.id, label: p.nome_visualizzato || p.tipo }))}
+              value={form.patente_richiesta_id || ''}
+              onChange={(val) => {
+                setForm(prev => ({ ...prev, patente_richiesta_id: val }));
+                setErrorePatente(null);
+              }}
+              placeholder="Seleziona Patente"
+            />
+          </div>
+          {errorePatente && (
+            <p className="text-[11px] text-red-500 font-bold ml-1 flex items-center gap-1">
+              <AlertCircle size={12} className="shrink-0" />
+              {errorePatente}
+            </p>
+          )}
+          {!errorePatente && patentiLoading && (
+            <p className="text-[11px] text-zinc-400 font-bold ml-1 flex items-center gap-1">
+              <Loader2 size={12} className="animate-spin shrink-0" />
+              Caricamento patenti...
+            </p>
+          )}
+          {!errorePatente && !patentiLoading && patenti.length === 0 && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold ml-1">
+              Nessuna patente disponibile: configurale da Gestione → Patenti.
+            </p>
+          )}
         </div>
 
         {isMotoPatente && (
