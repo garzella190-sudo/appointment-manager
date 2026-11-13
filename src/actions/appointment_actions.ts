@@ -72,7 +72,8 @@ export async function deleteAppointmentAction(id: string) {
         },
       });
       
-      // Email to client
+      // Email to client: "la guida è stata annullata" (stesso testo dell'annullamento:
+      // per il cliente l'evento è lo stesso, la guida non c'è più).
       if (aptToDelete.clienti) {
         await sendCancellationEmailAction(aptToDelete);
       }
@@ -93,13 +94,16 @@ export async function cancelAppointmentAction(id: string) {
   // Need to fetch current details to calculate penalty
   const { data: apt, error: fetchErr } = await supabase
     .from('appuntamenti')
-    .select('durata, note, importo, patente_id')
+    .select('durata, note, importo, patente_id, stato, data, clienti(nome, cognome, email)')
     .eq('id', id)
     .single();
     
   if (fetchErr) {
     return { success: false, error: fetchErr.message };
   }
+
+  // Già annullata in precedenza: non si rischia un secondo avviso al cliente
+  const giaAnnullata = apt.stato === 'annullato';
 
   let penalty = 25;
   if (apt.durata === 30) penalty = 25;
@@ -133,6 +137,20 @@ export async function cancelAppointmentAction(id: string) {
     await annullaPromemoriaProgrammato(id);
   } catch (e) {
     console.error('Errore annullamento promemoria programmato:', e);
+  }
+
+  // AVVISO AL CLIENTE: "la guida è stata annullata", nient'altro (niente penale:
+  // quella si vede in segreteria). Una sola volta per guida.
+  if (!giaAnnullata && apt.clienti) {
+    try {
+      const esito = await sendCancellationEmailAction({
+        data: apt.data,
+        clienti: Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti
+      });
+      if (!esito.success) console.warn('Avviso di annullamento non inviato:', esito.error);
+    } catch (e) {
+      console.error('Errore invio avviso di annullamento:', e);
+    }
   }
 
   try {

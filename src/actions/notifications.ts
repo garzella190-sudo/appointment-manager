@@ -38,7 +38,9 @@ function getItalyTimeStr(dateString: string) {
   isReminder = false,
   isCancellation = false,
   isModification = false,
-  aggiungiAlCalendario
+  aggiungiAlCalendario,
+  testo,
+  nascondiNota = false
 }: {
   title: string;
   name: string;
@@ -52,6 +54,10 @@ function getItalyTimeStr(dateString: string) {
   isModification?: boolean;
   /** Link "aggiungi al calendario": assente nelle email di eliminazione */
   aggiungiAlCalendario?: { google: string; ics: string } | null;
+  /** Testo centrale su misura: sostituisce la frase automatica */
+  testo?: string;
+  /** Nasconde la nota rossa sulle 24 ore e la riga "per disdire chiama..." */
+  nascondiNota?: boolean;
 }) {
   let accentColor = '#3b82f6'; // Blue
   if (isReminder) accentColor = '#3b82f6';
@@ -80,14 +86,14 @@ function getItalyTimeStr(dateString: string) {
         <div class="card">
           <div class="title" style="color: ${accentColor}">${title}</div>
           <div class="subtitle">
-            ${isCancellation 
+            ${testo ?? (isCancellation 
               ? `La tua guida del ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })} è stata ELIMINATA`
               : isModification
                 ? `La tua guida è stata MODIFICATA per il ${format(parseISO(`${date}T${time}`), "EEEE d MMMM 'alle' HH:mm", { locale: it })}\nDurata: ${duration} min`
                 : isReminder
                   ? `Ricordati la guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time}\nDurata: ${duration} min`
                   : `La guida per il giorno ${format(parseISO(date), 'dd/MM/yyyy')} alle ore ${time} è stata prenotata correttamente\nDurata: ${duration} min`
-            }
+            )}
           </div>
 
           ${
@@ -110,6 +116,10 @@ function getItalyTimeStr(dateString: string) {
               : ''
           }
 
+          ${
+            nascondiNota
+              ? ''
+              : `
           <div class="disclaimer">
             NB: le guide vanno disdette 24h prima, pena addebito dell'importo
           </div>
@@ -117,6 +127,8 @@ function getItalyTimeStr(dateString: string) {
             Per disdire le guide chiama in autoscuola oppure contatta il tuo istruttore<br>
             ${SEDE.nome} — ${SEDE.indirizzo}
           </div>
+          `
+          }
         </div>
         <div class="footer">
           &copy; ${new Date().getFullYear()} Autoscuola Toscana Fauglia. Tutti i diritti riservati.
@@ -739,39 +751,71 @@ export async function sendReminderImpegnoEmailAction(appointmentId: string) {
   }
 }
 
-export async function sendCancellationEmailAction(appointmentData: any) {
-  // appointmentData is the object before deletion
-  if (!appointmentData?.clienti?.email) return { success: false };
+/**
+ * AVVISO DI GUIDA ANNULLATA al cliente.
+ *
+ * Stesso formato delle altre email (template grafico solito), con una sola frase:
+ *   "La guida del giorno 13/11/2026 alle ore 15:00 è stata annullata"
+ * Nessun importo della penale e nessuna nota sulle 24 ore: il cliente deve solo
+ * sapere che la guida non c'è più.
+ *
+ * Usata sia dall'annullamento (✕ con penale) sia dall'eliminazione definitiva:
+ * per il cliente l'evento è lo stesso.
+ */
+export async function sendCancellationEmailAction(appointmentData: {
+  data: string;
+  durata?: number | null;
+  clienti?:
+    | { nome?: string | null; cognome?: string | null; email?: string | null }
+    | { nome?: string | null; cognome?: string | null; email?: string | null }[]
+    | null;
+}) {
+  const cliente = Array.isArray(appointmentData?.clienti)
+    ? appointmentData.clienti[0]
+    : appointmentData?.clienti;
+  const emailCliente = cliente?.email;
+  if (!emailCliente) return { success: false, error: 'Email cliente mancante' };
 
   try {
     const resendApiKey = process.env.RESEND_API_KEY;
-    if (!resendApiKey) return { success: false };
+    if (!resendApiKey) return { success: false, error: 'Configurazione email mancante (API Key)' };
 
     const dateStr = appointmentData.data.split('T')[0];
     const timeStr = getItalyTimeStr(appointmentData.data);
+    const giorno = format(parseISO(dateStr), 'd MMMM', { locale: it });
 
     const html = getEmailTemplate({
-      title: 'Guida Eliminata',
-      name: appointmentData.clienti.nome,
+      title: 'Guida annullata',
+      name: cliente.nome || '',
       date: dateStr,
       time: timeStr,
-      duration: appointmentData.durata,
+      duration: appointmentData.durata || 0,
       instructor: '',
       vehicle: '',
-      isCancellation: true
+      isCancellation: true,
+      // La frase richiesta, identica allo stile delle altre email
+      testo: `La guida del giorno ${format(parseISO(dateStr), 'dd/MM/yyyy')} alle ore ${timeStr} è stata annullata`,
+      // Niente nota sulle 24 ore né "per disdire chiama...": la guida è già annullata
+      nascondiNota: true
     });
 
     const resend = new Resend(resendApiKey);
-    await resend.emails.send({
+    const { error: resendError } = await resend.emails.send({
       from: SENDER,
-      to: appointmentData.clienti.email,
-      subject: `ELIMINATA: Guida del ${format(parseISO(dateStr), 'd MMMM', { locale: it })} alle ${timeStr}`,
+      to: emailCliente,
+      subject: `Guida annullata - ${giorno} alle ${timeStr}`,
       html
     });
 
+    if (resendError) {
+      console.error('Cancellation Email Error:', resendError);
+      return { success: false, error: resendError.message };
+    }
+
+    console.log('Avviso di annullamento inviato a:', emailCliente);
     return { success: true };
   } catch (e) {
     console.error('Cancellation Email Error:', e);
-    return { success: false };
+    return { success: false, error: 'Errore imprevisto durante l\'invio' };
   }
 }
