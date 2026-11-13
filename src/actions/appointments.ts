@@ -270,7 +270,7 @@ export async function updateAppointmentAction(id: string, payload: any) {
   // Istruttore attuale: serve per avvisare anche il "vecchio" calendario se la guida viene spostata
   const { data: primaDellaModifica } = await supabase
     .from('appuntamenti')
-    .select('istruttore_id, data, inizio, clienti ( nome, cognome )')
+    .select('istruttore_id, veicolo_id, data, inizio, clienti ( nome, cognome )')
     .eq('id', id)
     .maybeSingle();
   const istruttorePrecedente: string | null = primaDellaModifica?.istruttore_id ?? null;
@@ -392,9 +392,23 @@ export async function updateAppointmentAction(id: string, payload: any) {
     data_solo: dateOnly
   };
 
+  /**
+   * Confronto fra due istanti ISO che possono avere formati diversi
+   * (`...T08:30:00.000Z` da toISOString, `...T08:30:00+00:00` da Postgres).
+   * Confrontarli come stringhe diceva sempre "cambiato": ogni salvataggio
+   * riarmava il promemoria già inviato e rispediva la mail di modifica.
+   */
+  const stessoIstante = (a?: string | null, b?: string | null): boolean => {
+    if (!a || !b) return false;
+    const ta = new Date(a).getTime();
+    const tb = new Date(b).getTime();
+    if (Number.isNaN(ta) || Number.isNaN(tb)) return String(a) === String(b);
+    return ta === tb;
+  };
+
   // Impegno spostato in data/ora: il promemoria già inviato va riarmato, altrimenti
   // quello nuovo non arriverebbe più (il marcatore resta valorizzato).
-  const orarioCambiato = Boolean(primaDellaModifica?.inizio && primaDellaModifica.inizio !== startISO);
+  const orarioCambiato = Boolean(primaDellaModifica?.inizio) && !stessoIstante(primaDellaModifica?.inizio, startISO);
   if (orarioCambiato && payload.is_impegno) {
     rigaAggiornata.promemoria_inviato_il = null;
   }
@@ -437,9 +451,20 @@ export async function updateAppointmentAction(id: string, payload: any) {
   }
 
   // 3. Email notification (Centralized logic)
+  //
+  // Il cliente riceve UNA mail alla prenotazione e UNA di promemoria (dal cron).
+  // La mail di "guida modificata" va spedita solo se qualcosa di concreto è cambiato
+  // — data/ora, istruttore o veicolo — altrimenti salvare due note o cambiare una
+  // preferenza generava un'altra mail identica al cliente.
+  const istruttoreCambiato = Boolean(istruttorePrecedente && istruttorePrecedente !== payload.istruttore_id);
+  const veicoloCambiato = Boolean(
+    primaDellaModifica?.veicolo_id && primaDellaModifica.veicolo_id !== payload.veicolo_id
+  );
+  const modificaDaAvvisare = orarioCambiato || istruttoreCambiato || veicoloCambiato;
+
   let notificationSent = false;
   let emailError = null;
-  if (data && payload.send_email) {
+  if (data && payload.send_email && modificaDaAvvisare) {
     try {
       const emailRes = await sendConfirmationEmailAction(data.id, true);
       if (emailRes.success) {
