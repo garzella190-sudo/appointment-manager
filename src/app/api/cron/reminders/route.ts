@@ -53,6 +53,19 @@ export async function GET(request: Request) {
   const domaniInizio = startOfDay(domani).toISOString();
   const domaniFine = endOfDay(domani).toISOString();
 
+  /**
+   * ORARIO DI INVIO.
+   * Il cron ora gira ogni 15 minuti: senza questa guardia la mail del "giorno prima"
+   * sarebbe partita al primo giro dopo la mezzanotte UTC, cioè all'01:00 di notte.
+   * Le mail ai clienti si spediscono solo fra le 07:00 e le 21:00 italiane.
+   * I promemoria degli impegni (sotto) NON sono toccati: lì conta l'ora esatta del
+   * preavviso scelto (2/4/12 ore prima).
+   */
+  const oraItaliana = Number(
+    new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }).format(new Date())
+  );
+  const orarioUtile = oraItaliana >= 7 && oraItaliana < 21;
+
   const cerca = (conMarcatore: boolean) => {
     const colonne = conMarcatore ? 'id, send_email, stato, promemoria_email_inviato_il' : 'id, send_email, stato';
     return supabase
@@ -64,19 +77,27 @@ export async function GET(request: Request) {
       .lte('inizio', domaniFine);
   };
 
-  let { data: appointments, error } = await cerca(true);
+  let appointments: unknown[] = [];
 
-  if (error && /promemoria_email_inviato_il/.test(error.message)) {
-    console.warn('Colonna promemoria_email_inviato_il assente: esegui la migrazione 20261110140000_promemoria.sql');
-    ({ data: appointments, error } = await cerca(false));
-  } else if (error) {
-    console.error('Error fetching appointments for cron:', error.message);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (!orarioUtile) {
+    console.log(`Promemoria ai clienti sospesi: sono le ${oraItaliana} in Italia (si inviano fra le 07:00 e le 21:00)`);
+  } else {
+    let { data, error } = await cerca(true);
+
+    if (error && /promemoria_email_inviato_il/.test(error.message)) {
+      console.warn('Colonna promemoria_email_inviato_il assente: esegui la migrazione 20261110140000_promemoria.sql');
+      ({ data, error } = await cerca(false));
+    } else if (error) {
+      console.error('Error fetching appointments for cron:', error.message);
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    appointments = data || [];
   }
 
   const risultatiClienti: { id: string; inviato: boolean; saltato: boolean; errore?: string }[] = [];
 
-  for (const apt of appointments || []) {
+  for (const apt of appointments) {
     const riga = apt as unknown as RigaPromemoria;
     if (riga.promemoria_email_inviato_il) {
       risultatiClienti.push({ id: riga.id, inviato: false, saltato: true });
@@ -112,6 +133,9 @@ export async function GET(request: Request) {
       valutati: risultatiClienti.length,
       inviati: risultatiClienti.filter(r => r.inviato).length,
       saltati: risultatiClienti.filter(r => r.saltato).length,
+      /** Le mail ai clienti partono solo fra le 07:00 e le 21:00 italiane */
+      orarioUtile,
+      oraItaliana,
       dettaglio: risultatiClienti,
     },
     impegni: {
