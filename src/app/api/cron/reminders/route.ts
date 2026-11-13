@@ -133,10 +133,10 @@ export async function GET(request: Request) {
 async function inviaPromemoriaImpegni(
   supabase: ReturnType<typeof createAdminClient>
 ): Promise<{
-  esiti: { id: string; inviato: boolean; errore?: string }[];
+  esiti: { id: string; inviato: boolean; saltato?: boolean; errore?: string }[];
   inAttesa: { id: string; avvisoAlle: string; preavvisoMinuti: number }[];
 }> {
-  const esiti: { id: string; inviato: boolean; errore?: string }[] = [];
+  const esiti: { id: string; inviato: boolean; saltato?: boolean; errore?: string }[] = [];
   const inAttesa: { id: string; avvisoAlle: string; preavvisoMinuti: number }[] = [];
 
   const { data: candidati, error } = await supabase
@@ -182,6 +182,42 @@ async function inviaPromemoriaImpegni(
     const nomeImpegno = ufficio?.cognome || 'Impegno';
     const giorno = format(new Date(riga.inizio || riga.data), "EEE d MMM 'alle' HH:mm", { locale: it });
 
+    // ── PRENOTAZIONE ATOMICA (push + email insieme) ─────────────────────────
+    // Si scrive il marcatore *prima* di avvisare, con un UPDATE condizionato:
+    // se due giri di cron si sovrappongono, solo uno trova la riga ancora da
+    // marcare. Senza questo, la push e la mail partivano due volte.
+    const marcatoAlle = new Date().toISOString();
+    const { data: prenotato, error: errorePrenotazione } = await supabase
+      .from('appuntamenti')
+      .update({ promemoria_inviato_il: marcatoAlle })
+      .eq('id', riga.id)
+      .is('promemoria_inviato_il', null)
+      .select('id');
+
+    if (errorePrenotazione) {
+      if (/promemoria_inviato_il/.test(errorePrenotazione.message)) {
+        // Colonna assente: si prosegue senza marcatore (come prima della migrazione)
+        console.warn('Colonna promemoria_inviato_il assente: promemoria senza marcatore');
+      } else {
+        esiti.push({ id: riga.id, inviato: false, errore: errorePrenotazione.message });
+        continue;
+      }
+    } else if (!prenotato || prenotato.length === 0) {
+      // Un altro giro l'ha già preso in carico
+      esiti.push({ id: riga.id, inviato: false, saltato: true });
+      continue;
+    }
+
+    /** L'invio è fallito: si libera il marcatore così un giro successivo riprova. */
+    const rilascia = async () => {
+      const { error } = await supabase
+        .from('appuntamenti')
+        .update({ promemoria_inviato_il: null })
+        .eq('id', riga.id)
+        .eq('promemoria_inviato_il', marcatoAlle);
+      if (error) console.error('Impossibile liberare il promemoria impegno:', error.message);
+    };
+
     try {
       // PUSH al proprietario del calendario
       if (riga.istruttore_id) {
@@ -197,19 +233,20 @@ async function inviaPromemoriaImpegni(
 
       // EMAIL al proprietario (istruttori.email)
       if (istruttore?.email) {
-        await sendReminderImpegnoEmailAction(riga.id);
+        const esito = await sendReminderImpegnoEmailAction(riga.id);
+        if (!esito.success) {
+          await rilascia();
+          esiti.push({ id: riga.id, inviato: false, errore: esito.error });
+          continue;
+        }
       }
 
-      const { error: erroreMarchio } = await supabase
-        .from('appuntamenti')
-        .update({ promemoria_inviato_il: new Date().toISOString() })
-        .eq('id', riga.id);
-
-      if (erroreMarchio) console.error('Promemoria impegno non marcato:', erroreMarchio.message);
-      esiti.push({ id: riga.id, inviato: !erroreMarchio });
+      // Il marcatore è già scritto: l'impegno non riceverà altri avvisi
+      esiti.push({ id: riga.id, inviato: true });
     } catch (err: unknown) {
       const messaggio = err instanceof Error ? err.message : 'errore sconosciuto';
       console.error(`Errore promemoria impegno ${riga.id}:`, err);
+      await rilascia();
       esiti.push({ id: riga.id, inviato: false, errore: messaggio });
     }
   }

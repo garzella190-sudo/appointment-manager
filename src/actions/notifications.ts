@@ -257,10 +257,13 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
 /**
  * Promemoria al CLIENTE (email).
  *
- * IDEMPOTENTE: prima di spedire controlla `promemoria_email_inviato_il`. Se è già
- * valorizzato il promemoria è stato mandato e la funzione esce senza inviare nulla.
- * Dopo l'invio scrive il timestamp, così nessun altro giro (cron, riprova, chiamata
- * manuale) può rispedirlo: il cliente riceve UNA sola mail per appuntamento.
+ * UNA SOLA MAIL PER APPUNTAMENTO, anche se due giri di cron si sovrappongono:
+ * prima di spedire la funzione PRENOTA l'invio con un aggiornamento atomico
+ *     update appuntamenti set promemoria_email_inviato_il = adesso
+ *     where id = X and promemoria_email_inviato_il is null
+ * Solo chi riesce a scrivere il marcatore spedisce; chi arriva secondo non trova
+ * più la riga da marcare e salta. Se l'invio fallisce, il marcatore viene rimesso
+ * a NULL così un giro successivo può riprovare.
  */
 export async function sendReminderEmailAction(appointmentId: string) {
   const supabase = createAdminClient();
@@ -280,7 +283,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
     .eq('id', appointmentId)
     .single();
 
-  const colonnaMancante = Boolean(error && /promemoria_email_inviato_il/.test(error.message));
+  let colonnaMancante = Boolean(error && /promemoria_email_inviato_il/.test(error.message));
   if (colonnaMancante) {
     console.warn('Colonna promemoria_email_inviato_il assente: esegui la migrazione 20261110140000_promemoria.sql');
     ({ data: apt, error } = await supabase
@@ -298,6 +301,47 @@ export async function sendReminderEmailAction(appointmentId: string) {
     console.log('Promemoria email già inviato il', promemoriaGiaInviato, 'per', appointmentId, '- salto');
     return { success: true, saltato: true };
   }
+
+  // ── PRENOTAZIONE ATOMICA dell'invio ────────────────────────────────────────
+  // Il controllo letto sopra non basta: fra la lettura e l'invio un altro giro di
+  // cron può fare la stessa cosa (era la causa delle mail doppie). Qui si scrive il
+  // marcatore *prima* di spedire, e solo chi lo scrive davvero ha il permesso di
+  // inviare (UPDATE ... WHERE promemoria_email_inviato_il IS NULL).
+  const marcatoAlle = new Date().toISOString();
+  if (!colonnaMancante) {
+    const { data: prenotato, error: errorePrenotazione } = await supabase
+      .from('appuntamenti')
+      .update({ promemoria_email_inviato_il: marcatoAlle })
+      .eq('id', appointmentId)
+      .is('promemoria_email_inviato_il', null)
+      .select('id');
+
+    if (errorePrenotazione && /promemoria_email_inviato_il/.test(errorePrenotazione.message)) {
+      colonnaMancante = true;
+    } else if (errorePrenotazione) {
+      return { success: false, error: `Impossibile marcare il promemoria: ${errorePrenotazione.message}` };
+    } else if (!prenotato || prenotato.length === 0) {
+      // Un altro giro l'ha già prenotato: niente seconda mail
+      console.log('Promemoria già in corso da un altro giro per', appointmentId, '- salto');
+      return { success: true, saltato: true };
+    }
+  }
+
+  /**
+   * L'invio non è riuscito: si rimette il marcatore a NULL (solo se è ancora il nostro,
+   * grazie al confronto sul timestamp) così un giro successivo può riprovare. Senza
+   * questo, un errore temporaneo di Resend brucerebbe il promemoria per sempre.
+   */
+  const rilasciaPrenotazione = async () => {
+    if (colonnaMancante) return;
+    const { error: erroreRilascio } = await supabase
+      .from('appuntamenti')
+      .update({ promemoria_email_inviato_il: null })
+      .eq('id', appointmentId)
+      .eq('promemoria_email_inviato_il', marcatoAlle);
+
+    if (erroreRilascio) console.error('Impossibile liberare il promemoria:', erroreRilascio.message);
+  };
 
   const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
   const istruttore = Array.isArray(apt.istruttori) ? apt.istruttori[0] : apt.istruttori;
@@ -330,6 +374,7 @@ export async function sendReminderEmailAction(appointmentId: string) {
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) {
       console.error('RESEND_API_KEY is not defined in the environment variables');
+      await rilasciaPrenotazione();
       return { success: false, error: 'Configurazione email mancante (API Key)' };
     }
 
@@ -350,25 +395,17 @@ export async function sendReminderEmailAction(appointmentId: string) {
 
     if (resendError) {
       console.error('Resend Reminder Error:', resendError);
+      await rilasciaPrenotazione();
       return { success: false, error: `Errore Resend Promemoria: ${resendError.message}` };
     }
 
-    // Marca l'invio: da qui in poi questo appuntamento non riceverà altri promemoria
-    if (!colonnaMancante) {
-      const { error: erroreMarchio } = await supabase
-        .from('appuntamenti')
-        .update({ promemoria_email_inviato_il: new Date().toISOString() })
-        .eq('id', appointmentId);
-
-      if (erroreMarchio) {
-        console.error('Promemoria inviato ma non marcato (rischio doppio invio):', erroreMarchio.message);
-      }
-    }
-
+    // Il marcatore è già stato scritto PRIMA dell'invio (prenotazione atomica):
+    // da qui in poi nessun altro giro può rispedire questa email.
     console.log('Reminder email sent successfully to:', cliente.email, 'Data:', data);
     return { success: true };
   } catch (error) {
     console.error('Errore imprevisto invio promemoria:', error);
+    await rilasciaPrenotazione();
     return { success: false, error: 'Errore imprevisto durante l\'invio del promemoria' };
   }
 }
