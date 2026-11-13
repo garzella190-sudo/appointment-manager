@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { sendConfirmationEmailAction } from './notifications';
+import { sendConfirmationEmailAction, programmaPromemoriaEmail, annullaPromemoriaProgrammato } from './notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
 
 // Initialized lazily inside the action
@@ -229,6 +229,18 @@ export async function createAppointmentAction(payload: {
     } catch (e: any) {
       console.error('Notification Error:', e);
       emailError = e.message;
+    }
+
+    // Promemoria: si programma SUBITO su Resend per "inizio guida − 24 ore".
+    // Non serve nessun cron frequente: la precisione la garantisce Resend.
+    // Un errore qui non deve far fallire la prenotazione (che è già salvata).
+    try {
+      const esitoPromemoria = await programmaPromemoriaEmail(appointment.id);
+      if (!esitoPromemoria.success) {
+        console.warn('Promemoria non programmato:', esitoPromemoria.error);
+      }
+    } catch (e) {
+      console.error('Errore programmazione promemoria:', e);
     }
   }
 
@@ -475,6 +487,22 @@ export async function updateAppointmentAction(id: string, payload: any) {
     } catch (e: any) {
       console.error('Notification Error:', e);
       emailError = e.message;
+    }
+  }
+
+  // Promemoria: se la guida è stata spostata, quello programmato non è più valido.
+  // Si annulla e si riprogramma 24 ore prima del NUOVO orario. Se invece non è
+  // cambiato nulla, la chiamata qui sotto non fa niente (salta se già programmato):
+  // serve solo a coprire il caso "email attivata dopo", senza rischiare doppioni.
+  if (data) {
+    try {
+      if (modificaDaAvvisare) await annullaPromemoriaProgrammato(id);
+      const esitoPromemoria = await programmaPromemoriaEmail(id);
+      if (!esitoPromemoria.success) {
+        console.warn('Promemoria non programmato:', esitoPromemoria.error);
+      }
+    } catch (e) {
+      console.error('Errore programmazione promemoria:', e);
     }
   }
 

@@ -410,6 +410,263 @@ export async function sendReminderEmailAction(appointmentId: string) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMEMORIA PROGRAMMATO (senza cron frequente)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Alla prenotazione partono due cose:
+//   1) la mail di conferma, subito;
+//   2) la mail di promemoria, PROGRAMMATA su Resend per "inizio guida − 24 ore".
+//
+// Così la precisione non dipende dal fatto che un cron giri spesso: Resend sa
+// spedire all'istante richiesto. Il cron giornaliero resta solo come rete di
+// sicurezza per gli appuntamenti rimasti senza programmazione.
+
+/**
+ * Preavviso del promemoria al cliente: 24 ore prima dell'orario della guida.
+ * NB: non è esportata perché in un modulo `'use server'` si possono esportare solo
+ * funzioni async; l'endpoint del cron ha la sua copia qui sotto.
+ */
+const ANTICIPO_PROMEMORIA_MS = 24 * 60 * 60 * 1000;
+
+/** Resend accetta programmazioni fino a 30 giorni in avanti. */
+const MASSIMO_PROGRAMMAZIONE_MS = 30 * 24 * 60 * 60 * 1000;
+
+type ClienteEmail = { nome: string; cognome: string; email: string | null };
+type IstruttoreEmail = { nome: string; cognome: string };
+type VeicoloEmail = { nome: string; targa: string };
+type AppuntamentoEmail = {
+  id: string;
+  data: string;
+  durata: number;
+  inizio: string | null;
+  clienti?: ClienteEmail | ClienteEmail[] | null;
+  istruttori?: IstruttoreEmail | IstruttoreEmail[] | null;
+  veicoli?: VeicoloEmail | VeicoloEmail[] | null;
+};
+
+/**
+ * Costruisce la mail di promemoria di una guida: identica sia per l'invio immediato
+ * sia per quello programmato, così il testo non può divergere fra i due percorsi.
+ */
+function costruisciPromemoriaCliente(apt: AppuntamentoEmail):
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      email: string;
+      subject: string;
+      html: string;
+      attachments: { filename: string; content: string; contentType: string }[];
+    } {
+  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
+  const istruttore = Array.isArray(apt.istruttori) ? apt.istruttori[0] : apt.istruttori;
+  const veicolo = Array.isArray(apt.veicoli) ? apt.veicoli[0] : apt.veicoli;
+
+  if (!cliente?.email) return { ok: false, error: 'Email cliente mancante' };
+
+  const instructorName = istruttore ? `${istruttore.nome} ${istruttore.cognome}` : 'Non assegnato';
+  const vehicleName = veicolo ? `${veicolo.nome} (${veicolo.targa})` : 'Non assegnato';
+  const dateStr = apt.data.split('T')[0];
+  const timeStr = getItalyTimeStr(apt.inizio || apt.data);
+
+  // Promemoria: stesso tasto "Aggiungi al calendario" (chi non l'ha aggiunta prima, la aggiunge ora)
+  const calendario = calendarioGuida(apt, cliente, instructorName, vehicleName);
+
+  const html = getEmailTemplate({
+    title: 'Promemoria Guida Prenotata',
+    name: cliente.nome,
+    date: dateStr,
+    time: timeStr,
+    duration: apt.durata,
+    instructor: instructorName,
+    vehicle: vehicleName,
+    isReminder: true,
+    aggiungiAlCalendario: calendario.links
+  });
+
+  return {
+    ok: true,
+    email: cliente.email,
+    subject: 'Promemoria Guida Prenotata',
+    html,
+    attachments: [
+      {
+        filename: 'guida.ics',
+        content: Buffer.from(calendario.ics).toString('base64'),
+        contentType: 'text/calendar'
+      }
+    ]
+  };
+}
+
+/**
+ * Programma la mail di promemoria 24 ore prima dell'orario della guida.
+ * Da chiamare alla creazione dell'appuntamento e quando viene spostato.
+ *
+ * Casi:
+ *  - guida già iniziata            → non si fa nulla;
+ *  - guida fra meno di 24h         → la mail parte subito (il momento giusto è passato);
+ *  - guida oltre 30 giorni         → Resend non può programmare: si segnala l'errore
+ *                                    e ci penserà il cron giornaliero più avanti;
+ *  - già programmata o già inviata → non si duplica.
+ */
+export async function programmaPromemoriaEmail(appointmentId: string) {
+  const supabase = createAdminClient();
+
+  const colonneBase = `
+      id, data, durata, inizio, send_email,
+      clienti ( nome, cognome, email ),
+      istruttori ( nome, cognome ),
+      veicoli ( nome, targa )
+    `;
+
+  let { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`${colonneBase}, promemoria_email_inviato_il, promemoria_email_id`)
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  let colonneNuove = true;
+  if (error && /promemoria_email_id|promemoria_email_inviato_il/.test(error.message)) {
+    colonneNuove = false;
+    console.warn('Colonne promemoria assenti: esegui la migrazione 20261113180000_promemoria_programmato.sql');
+    ({ data: apt, error } = await supabase
+      .from('appuntamenti')
+      .select(colonneBase)
+      .eq('id', appointmentId)
+      .maybeSingle());
+  }
+
+  if (error || !apt) return { success: false, error: 'Appuntamento non trovato' };
+
+  const riga = apt as unknown as AppuntamentoEmail & {
+    send_email?: boolean | null;
+    promemoria_email_inviato_il?: string | null;
+    promemoria_email_id?: string | null;
+  };
+
+  if (!riga.send_email) return { success: true, saltato: true, motivo: 'cliente senza email attiva' };
+  if (riga.promemoria_email_inviato_il) return { success: true, saltato: true, motivo: 'già inviato' };
+  if (riga.promemoria_email_id) return { success: true, saltato: true, motivo: 'già programmato' };
+
+  const preparata = costruisciPromemoriaCliente(riga);
+  if (!preparata.ok) return { success: false, error: preparata.error };
+
+  const inizio = new Date(riga.inizio || riga.data).getTime();
+  if (Number.isNaN(inizio)) return { success: false, error: 'Orario della guida non valido' };
+
+  const adesso = Date.now();
+  if (inizio <= adesso) return { success: true, saltato: true, motivo: 'guida già iniziata' };
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    console.error('RESEND_API_KEY is not defined in the environment variables');
+    return { success: false, error: 'Configurazione email mancante (API Key)' };
+  }
+
+  const resend = new Resend(resendApiKey);
+  const quando = inizio - ANTICIPO_PROMEMORIA_MS;
+  // Con meno di un minuto di anticipo non ha senso programmare: si spedisce subito.
+  const mandareSubito = quando <= adesso + 60 * 1000;
+
+  if (!mandareSubito && quando - adesso > MASSIMO_PROGRAMMAZIONE_MS) {
+    console.warn(
+      'Promemoria non programmato (oltre i 30 giorni consentiti da Resend):',
+      new Date(inizio).toISOString()
+    );
+    return { success: false, error: 'Guida troppo lontana per programmare la mail (max 30 giorni)' };
+  }
+
+  const { data: inviata, error: resendError } = await resend.emails.send({
+    from: SENDER,
+    to: preparata.email,
+    subject: preparata.subject,
+    html: preparata.html,
+    attachments: preparata.attachments,
+    ...(mandareSubito ? {} : { scheduledAt: new Date(quando).toISOString() })
+  });
+
+  if (resendError) {
+    console.error('Resend Promemoria Error:', resendError);
+    return { success: false, error: `Errore Resend Promemoria: ${resendError.message}` };
+  }
+
+  if (mandareSubito) {
+    if (colonneNuove) {
+      await supabase
+        .from('appuntamenti')
+        .update({ promemoria_email_inviato_il: new Date().toISOString() })
+        .eq('id', appointmentId);
+    }
+    console.log('Promemoria inviato subito (guida entro 24 ore):', preparata.email);
+    return { success: true, subito: true };
+  }
+
+  if (colonneNuove && inviata?.id) {
+    const { error: erroreSalvataggio } = await supabase
+      .from('appuntamenti')
+      .update({
+        promemoria_email_id: inviata.id,
+        promemoria_email_per: new Date(quando).toISOString()
+      })
+      .eq('id', appointmentId);
+
+    if (erroreSalvataggio) {
+      console.error('Promemoria programmato ma non salvato in tabella:', erroreSalvataggio.message);
+    }
+  }
+
+  console.log('Promemoria programmato per', new Date(quando).toISOString(), '→', preparata.email);
+  return { success: true, programmatoPer: new Date(quando).toISOString() };
+}
+
+/**
+ * Annulla il promemoria programmato (guida spostata o cancellata) e libera i campi,
+ * così chi sposta l'appuntamento può riprogrammarlo subito dopo.
+ */
+export async function annullaPromemoriaProgrammato(appointmentId: string) {
+  const supabase = createAdminClient();
+
+  const { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select('id, promemoria_email_id')
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  if (error) {
+    if (/promemoria_email_id/.test(error.message)) return { success: true, saltato: true };
+    console.error('Errore lettura promemoria programmato:', error.message);
+    return { success: false, error: error.message };
+  }
+
+  const idResend = (apt as { promemoria_email_id?: string | null } | null)?.promemoria_email_id || null;
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (idResend && resendApiKey) {
+    try {
+      await new Resend(resendApiKey).emails.cancel(idResend);
+      console.log('Promemoria programmato annullato su Resend:', idResend);
+    } catch (errore) {
+      // Se era già partito non si può annullare: non è un errore bloccante.
+      console.warn(
+        'Impossibile annullare il promemoria programmato:',
+        errore instanceof Error ? errore.message : errore
+      );
+    }
+  }
+
+  const { error: erroreReset } = await supabase
+    .from('appuntamenti')
+    .update({ promemoria_email_id: null, promemoria_email_per: null })
+    .eq('id', appointmentId);
+
+  if (erroreReset && !/promemoria_email_(id|per)/.test(erroreReset.message)) {
+    console.error('Impossibile azzerare il promemoria programmato:', erroreReset.message);
+  }
+
+  return { success: true };
+}
+
 /**
  * Promemoria al PROPRIETARIO DEL CALENDARIO per un "altro impegno"
  * (es. Manuele Garzella sabato ha "R.C. ACI Collesalvetti").

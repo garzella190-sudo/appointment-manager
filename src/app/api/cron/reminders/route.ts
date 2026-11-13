@@ -1,16 +1,22 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
-import { sendReminderEmailAction, sendReminderImpegnoEmailAction } from '@/actions/notifications';
+import {
+  programmaPromemoriaEmail,
+  sendReminderImpegnoEmailAction
+} from '@/actions/notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
-import { startOfDay, endOfDay, format } from 'date-fns';
+import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 
 /**
- * Cron dei promemoria. Due lavori, entrambi IDEMPOTENTI (colonne `promemoria_*_inviato_il`):
+ * Cron dei promemoria. Due lavori, entrambi IDEMPOTENTI (colonne `promemoria_*`):
  *
- * 1) PROMEMORIA AL CLIENTE per le guide di domani (`sendReminderEmailAction`):
- *    salta gli appuntamenti già avvisati, così il cliente riceve UNA sola mail
- *    per appuntamento anche se il cron (o l'endpoint) viene chiamato più volte.
+ * 1) RETE DI SICUREZZA per il promemoria al CLIENTE.
+ *    Il promemoria vero non passa più da qui: alla prenotazione viene programmato
+ *    su Resend per l'istante esatto "inizio guida − 24 ore" (`programmaPromemoriaEmail`),
+ *    così non serve nessun cron frequente. Questo giro recupera solo le guide rimaste
+ *    senza programmazione (inserite da versioni precedenti, o se la programmazione è
+ *    fallita) che iniziano entro 24 ore: per loro la mail parte subito.
  *
  * 2) PROMEMORIA AL PROPRIETARIO DEL CALENDARIO per gli "altri impegni" con preavviso
  *    (`promemoria_minuti`: 120/240/720/1440): push + email all'istruttore del
@@ -18,13 +24,16 @@ import { it } from 'date-fns/locale';
  *
  * NB: il punto 2 per essere puntuale richiede che questo endpoint venga chiamato
  * spesso (consigliato ogni 15 minuti). Il cron di Vercel su piano Hobby gira una
- * volta al giorno: vedi le istruzioni nel file di migrazione per schedularlo da
+ * volta al giorno: vedi le istruzioni nei file di migrazione per schedularlo da
  * Supabase (pg_cron) o con un servizio esterno.
  */
 export const dynamic = 'force-dynamic';
 
 /** Preavvisi ammessi per il promemoria al proprietario (minuti) */
 const PREAVVISI_AMMESSI = [120, 240, 720, 1440];
+
+/** Preavviso del promemoria al cliente: 24 ore prima dell'orario della guida. */
+const ANTICIPO_PROMEMORIA_MS = 24 * 60 * 60 * 1000;
 
 type RigaPromemoria = {
   id: string;
@@ -33,6 +42,8 @@ type RigaPromemoria = {
   istruttore_id: string | null;
   promemoria_minuti?: number | null;
   promemoria_email_inviato_il?: string | null;
+  /** ID dell'email di promemoria già programmata su Resend */
+  promemoria_email_id?: string | null;
   clienti?: { nome?: string | null; cognome?: string | null } | { nome?: string | null; cognome?: string | null }[] | null;
   istruttori?: { nome?: string | null; cognome?: string | null; email?: string | null } | { nome?: string | null; cognome?: string | null; email?: string | null }[] | null;
 };
@@ -47,34 +58,45 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
 
-  // ── 1) Promemoria al CLIENTE per le guide di domani ───────────────────────
-  const domani = new Date();
-  domani.setDate(domani.getDate() + 1);
-  const domaniInizio = startOfDay(domani).toISOString();
-  const domaniFine = endOfDay(domani).toISOString();
+  // ── 1) RETE DI SICUREZZA per i promemoria ai clienti ──────────────────────
+  //
+  // Il promemoria NON dipende più da questo cron: alla prenotazione viene
+  // PROGRAMMATO su Resend per l'istante esatto "inizio guida − 24 ore".
+  // Qui si recuperano solo gli appuntamenti rimasti senza programmazione
+  // (guide inserite da versioni precedenti, o programmazione fallita) che
+  // iniziano entro 24 ore: per loro la mail parte subito.
+  const adesso = new Date();
+  /** +24h: oltre questa distanza il promemoria non è ancora "di domani" */
+  const limitePromemoria = new Date(adesso.getTime() + ANTICIPO_PROMEMORIA_MS);
+  /**
+   * Guida fra meno di 2 ore: il promemoria non serve (arriverebbe insieme alla mail
+   * di conferma). Serve solo a non tempestare di mail chi prenota all'ultimo.
+   */
+  const minimoPreavviso = new Date(adesso.getTime() + 2 * 60 * 60 * 1000);
 
   /**
    * ORARIO DI INVIO.
-   * Il cron ora gira ogni 15 minuti: senza questa guardia la mail del "giorno prima"
-   * sarebbe partita al primo giro dopo la mezzanotte UTC, cioè all'01:00 di notte.
-   * Le mail ai clienti si spediscono solo fra le 07:00 e le 21:00 italiane.
-   * I promemoria degli impegni (sotto) NON sono toccati: lì conta l'ora esatta del
-   * preavviso scelto (2/4/12 ore prima).
+   * Fra le 21:00 e le 07:00 italiane le mail ai clienti non partono: restano in coda
+   * e vengono spedite al primo giro dopo le 07:00, sempre prima della guida.
+   * I promemoria degli impegni (sotto) NON sono toccati: lì conta il preavviso scelto.
    */
   const oraItaliana = Number(
-    new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }).format(new Date())
+    new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }).format(adesso)
   );
   const orarioUtile = oraItaliana >= 7 && oraItaliana < 21;
 
-  const cerca = (conMarcatore: boolean) => {
-    const colonne = conMarcatore ? 'id, send_email, stato, promemoria_email_inviato_il' : 'id, send_email, stato';
+  const cerca = (conMarcatori: boolean) => {
+    const colonne = conMarcatori
+      ? 'id, send_email, stato, inizio, promemoria_email_inviato_il, promemoria_email_id'
+      : 'id, send_email, stato, inizio';
     return supabase
       .from('appuntamenti')
       .select(colonne)
       .eq('send_email', true)
       .neq('stato', 'annullato')
-      .gte('inizio', domaniInizio)
-      .lte('inizio', domaniFine);
+      .gte('inizio', minimoPreavviso.toISOString())
+      .lte('inizio', limitePromemoria.toISOString())
+      .order('inizio', { ascending: true });
   };
 
   let appointments: unknown[] = [];
@@ -84,8 +106,8 @@ export async function GET(request: Request) {
   } else {
     let { data, error } = await cerca(true);
 
-    if (error && /promemoria_email_inviato_il/.test(error.message)) {
-      console.warn('Colonna promemoria_email_inviato_il assente: esegui la migrazione 20261110140000_promemoria.sql');
+    if (error && /promemoria_email_id|promemoria_email_inviato_il/.test(error.message)) {
+      console.warn('Colonne promemoria assenti: esegui la migrazione 20261113180000_promemoria_programmato.sql');
       ({ data, error } = await cerca(false));
     } else if (error) {
       console.error('Error fetching appointments for cron:', error.message);
@@ -99,12 +121,15 @@ export async function GET(request: Request) {
 
   for (const apt of appointments) {
     const riga = apt as unknown as RigaPromemoria;
-    if (riga.promemoria_email_inviato_il) {
+    // Già inviato o già programmato su Resend: niente da fare
+    if (riga.promemoria_email_inviato_il || riga.promemoria_email_id) {
       risultatiClienti.push({ id: riga.id, inviato: false, saltato: true });
       continue;
     }
     try {
-      const res = await sendReminderEmailAction(riga.id);
+      // Guida entro 24 ore senza programmazione: la mail parte subito (una volta sola,
+      // perché `programmaPromemoriaEmail` marca l'invio).
+      const res = await programmaPromemoriaEmail(riga.id);
       risultatiClienti.push({
         id: riga.id,
         inviato: Boolean(res.success),
@@ -136,6 +161,8 @@ export async function GET(request: Request) {
       /** Le mail ai clienti partono solo fra le 07:00 e le 21:00 italiane */
       orarioUtile,
       oraItaliana,
+      /** Finestra guardata: guide che iniziano fra 2 e 24 ore da adesso */
+      finestra: { da: minimoPreavviso.toISOString(), a: limitePromemoria.toISOString() },
       dettaglio: risultatiClienti,
     },
     impegni: {

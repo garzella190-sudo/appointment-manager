@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { sendCancellationEmailAction } from './notifications';
+import { sendCancellationEmailAction, annullaPromemoriaProgrammato } from './notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -58,6 +58,10 @@ export async function deleteAppointmentAction(id: string) {
 
   try {
     if (aptToDelete) {
+      // Il promemoria programmato su Resend va annullato: la guida non esiste più.
+      // Senza questo, il cliente riceverebbe "Ricordati la guida" per una guida disdetta.
+      await annullaPromemoriaProgrammato(id);
+
       // Notifica PUSH: la riceve il proprietario del calendario, mai chi ha eliminato.
       await notificaCambioCalendario({
         istruttoriCoinvolti: [aptToDelete.istruttore_id],
@@ -121,6 +125,14 @@ export async function cancelAppointmentAction(id: string) {
   if (error) {
     console.error('Error cancelling appointment:', error.message);
     return { success: false, error: error.message };
+  }
+
+  // Guida disdetta: il promemoria programmato va annullato, altrimenti il cliente
+  // riceve "Ricordati la guida" per una guida che non farà.
+  try {
+    await annullaPromemoriaProgrammato(id);
+  } catch (e) {
+    console.error('Errore annullamento promemoria programmato:', e);
   }
 
   try {
