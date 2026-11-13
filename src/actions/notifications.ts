@@ -254,21 +254,50 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
   }
 }
 
+/**
+ * Promemoria al CLIENTE (email).
+ *
+ * IDEMPOTENTE: prima di spedire controlla `promemoria_email_inviato_il`. Se è già
+ * valorizzato il promemoria è stato mandato e la funzione esce senza inviare nulla.
+ * Dopo l'invio scrive il timestamp, così nessun altro giro (cron, riprova, chiamata
+ * manuale) può rispedirlo: il cliente riceve UNA sola mail per appuntamento.
+ */
 export async function sendReminderEmailAction(appointmentId: string) {
   const supabase = createAdminClient();
 
-  const { data: apt, error } = await supabase
-    .from('appuntamenti')
-    .select(`
+  const colonneBase = `
       id, data, durata, inizio, note,
       clienti ( nome, cognome, email ),
       istruttori ( nome, cognome ),
       veicoli ( nome, targa )
-    `)
+    `;
+
+  // Si prova a leggere anche il marcatore di invio; se la migrazione non è ancora
+  // stata applicata si continua senza (comportamento precedente, nessun crash).
+  let { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`${colonneBase}, promemoria_email_inviato_il`)
     .eq('id', appointmentId)
     .single();
 
+  const colonnaMancante = Boolean(error && /promemoria_email_inviato_il/.test(error.message));
+  if (colonnaMancante) {
+    console.warn('Colonna promemoria_email_inviato_il assente: esegui la migrazione 20261110140000_promemoria.sql');
+    ({ data: apt, error } = await supabase
+      .from('appuntamenti')
+      .select(colonneBase)
+      .eq('id', appointmentId)
+      .single());
+  }
+
   if (error || !apt) return { success: false, error: 'Dati appuntamento non trovati' };
+
+  // Già inviato → non si rispedisce (una sola mail per appuntamento)
+  const promemoriaGiaInviato = (apt as { promemoria_email_inviato_il?: string | null }).promemoria_email_inviato_il;
+  if (promemoriaGiaInviato) {
+    console.log('Promemoria email già inviato il', promemoriaGiaInviato, 'per', appointmentId, '- salto');
+    return { success: true, saltato: true };
+  }
 
   const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
   const istruttore = Array.isArray(apt.istruttori) ? apt.istruttori[0] : apt.istruttori;
@@ -324,11 +353,95 @@ export async function sendReminderEmailAction(appointmentId: string) {
       return { success: false, error: `Errore Resend Promemoria: ${resendError.message}` };
     }
 
+    // Marca l'invio: da qui in poi questo appuntamento non riceverà altri promemoria
+    if (!colonnaMancante) {
+      const { error: erroreMarchio } = await supabase
+        .from('appuntamenti')
+        .update({ promemoria_email_inviato_il: new Date().toISOString() })
+        .eq('id', appointmentId);
+
+      if (erroreMarchio) {
+        console.error('Promemoria inviato ma non marcato (rischio doppio invio):', erroreMarchio.message);
+      }
+    }
+
     console.log('Reminder email sent successfully to:', cliente.email, 'Data:', data);
     return { success: true };
   } catch (error) {
     console.error('Errore imprevisto invio promemoria:', error);
     return { success: false, error: 'Errore imprevisto durante l\'invio del promemoria' };
+  }
+}
+
+/**
+ * Promemoria al PROPRIETARIO DEL CALENDARIO per un "altro impegno"
+ * (es. Manuele Garzella sabato ha "R.C. ACI Collesalvetti").
+ *
+ * Il preavviso è scelto alla creazione dell'impegno (`promemoria_minuti`:
+ * 120 = 2 ore prima, 240 = 4 ore, 720 = 12 ore, 1440 = 1 giorno, NULL = mai).
+ * Va all'EMAIL dell'istruttore collegato (`istruttori.email`); la notifica push
+ * viene inviata dallo stesso cron con `notificaCambioCalendario`.
+ * Anche qui l'invio è marcato (`promemoria_inviato_il`) per non duplicarlo.
+ */
+export async function sendReminderImpegnoEmailAction(appointmentId: string) {
+  const supabase = createAdminClient();
+
+  const { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`
+      id, data, inizio, durata, note,
+      clienti ( nome, cognome ),
+      istruttori ( nome, cognome, email )
+    `)
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  if (error || !apt) return { success: false, error: 'Impegno non trovato' };
+
+  const istruttore = Array.isArray(apt.istruttori) ? apt.istruttori[0] : apt.istruttori;
+  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
+
+  if (!istruttore?.email) return { success: false, error: 'Email istruttore mancante' };
+
+  const nomeImpegno = cliente?.cognome || 'Impegno';
+  const giorno = format(new Date(apt.inizio || apt.data), "EEEE d MMMM 'alle' HH:mm", { locale: it });
+
+  try {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) return { success: false, error: 'Configurazione email mancante (API Key)' };
+
+    const resend = new Resend(resendApiKey);
+    const { error: resendError } = await resend.emails.send({
+      from: SENDER,
+      to: istruttore.email,
+      subject: `Promemoria impegno: ${nomeImpegno} — ${format(new Date(apt.inizio || apt.data), 'd MMMM', { locale: it })}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+          <div style="background: #ffffff; border-radius: 24px; padding: 40px; border: 1px solid #f3f4f6; text-align: center;">
+            <div style="color: #f59e0b; font-size: 18px; font-weight: 700; margin-bottom: 24px;">Promemoria impegno</div>
+            <div style="color: #111827; font-size: 20px; font-weight: 600; line-height: 1.6;">
+              ${nomeImpegno}<br>
+              ${giorno}
+              ${apt.durata ? `<br>Durata: ${apt.durata} min` : ''}
+            </div>
+            ${apt.note ? `<div style="margin-top: 24px; color: #6b7280; font-size: 14px; font-style: italic;">${apt.note}</div>` : ''}
+            <div style="margin-top: 32px; color: #6b7280; font-size: 14px;">
+              ${istruttore.nome} ${istruttore.cognome} — ${SEDE.nome}
+            </div>
+          </div>
+        </div>
+      `,
+    });
+
+    if (resendError) {
+      console.error('Resend Impegno Reminder Error:', resendError);
+      return { success: false, error: resendError.message };
+    }
+
+    return { success: true };
+  } catch (errore) {
+    console.error('Errore invio promemoria impegno:', errore);
+    return { success: false, error: 'Errore imprevisto' };
   }
 }
 

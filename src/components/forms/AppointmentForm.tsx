@@ -176,6 +176,12 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
   // Form State
   const [isImpegno, setIsImpegno] = useState(defaultIsImpegno);
   const [nomeImpegno, setNomeImpegno] = useState('');
+  /**
+   * Promemoria per gli "altri impegni": minuti di preavviso con cui avvisare il
+   * proprietario del calendario (push + email). `null` = nessun promemoria.
+   * 120 = 2 ore prima, 240 = 4 ore, 720 = 12 ore, 1440 = 1 giorno.
+   */
+  const [promemoriaImpegno, setPromemoriaImpegno] = useState<number | null>(null);
   const [impegniNames, setImpegniNames] = useState<string[]>([]);
   const [clientiUfficio, setClientiUfficio] = useState<Array<{ id: string; cognome: string; telefono: string | null }>>([]);
   const [showImpegniDropdown, setShowImpegniDropdown] = useState(false);
@@ -355,6 +361,10 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
               if (clienteCaricato?.nome === 'UFFICIO') {
                 setIsImpegno(true);
                 setNomeImpegno(clienteCaricato.cognome);
+                // Preavviso del promemoria già impostato su questo impegno
+                setPromemoriaImpegno(
+                  typeof apt.promemoria_minuti === 'number' ? apt.promemoria_minuti : null
+                );
               }
               setSelectedCliente(clienteCaricato);
             }
@@ -1012,6 +1022,8 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         send_whatsapp: !isImpegno,
         email_fallback: emailFallback || null,
         preferenza_cambio: isImpegno ? null : form.cambio,
+        // Promemoria al proprietario del calendario: solo per gli "altri impegni"
+        promemoria_minuti: isImpegno ? promemoriaImpegno : null,
       };
 
       if (!navigator.onLine) {
@@ -1454,6 +1466,49 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   {form.note}
                 </div>
               )}
+            </div>
+          )}
+
+          {/*
+            PROMEMORIA dell'impegno: avvisa il PROPRIETARIO DEL CALENDARIO
+            (push + email all'indirizzo dell'istruttore) con il preavviso scelto.
+            Es. "R.C. ACI Collesalvetti" di sabato → 1 giorno prima / 2 ore prima.
+          */}
+          {isImpegno && (
+            <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-top-2">
+              <label className={LABEL_CLS}>⏰ PROMEMORIA</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { minuti: null, label: 'Mai' },
+                  { minuti: 120, label: '2 ore prima' },
+                  { minuti: 240, label: '4 ore prima' },
+                  { minuti: 720, label: '12 ore prima' },
+                  { minuti: 1440, label: '1 giorno prima' },
+                ].map(opzione => {
+                  const attivo = promemoriaImpegno === opzione.minuti;
+                  return (
+                    <button
+                      key={String(opzione.minuti)}
+                      type="button"
+                      disabled={isView}
+                      onClick={() => setPromemoriaImpegno(opzione.minuti)}
+                      className={cn(
+                        'h-10 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all active:scale-95 disabled:opacity-60',
+                        attivo
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-500/20'
+                          : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-300'
+                      )}
+                    >
+                      {opzione.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-zinc-400 font-bold ml-1 leading-snug">
+                {promemoriaImpegno
+                  ? `Ti arriverà una notifica e una mail ${promemoriaImpegno >= 1440 ? '1 giorno' : promemoriaImpegno >= 60 ? `${promemoriaImpegno / 60} ore` : `${promemoriaImpegno} minuti`} prima.`
+                  : 'Nessun promemoria per questo impegno.'}
+              </p>
             </div>
           )}
         </div>

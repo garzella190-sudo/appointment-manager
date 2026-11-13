@@ -27,6 +27,8 @@ export async function createAppointmentAction(payload: {
   email_fallback?: string | null;
   preferenza_cambio?: string | null;
   sessione_esame_id?: string | null;
+  /** Minuti di preavviso per il promemoria al proprietario (impegni). null = mai */
+  promemoria_minuti?: number | null;
 }) {
   const supabase = await createClient();
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -177,18 +179,26 @@ export async function createAppointmentAction(payload: {
     else if (payload.durata === 60) finalImporto = 50;
   }
   
-  const { data: appointment, error: appointmentError } = await supabase
-    .from('appuntamenti')
-    .insert({
-      ...dbPayload,
-      importo: finalImporto,
-      cliente_id: finalClienteId,
-      inizio: startISO,
-      fine: endISO,
-      data_solo: dateOnly // Helper column for performance
-    })
-    .select()
-    .single();
+  const rigaNuova: Record<string, unknown> = {
+    ...dbPayload,
+    importo: finalImporto,
+    cliente_id: finalClienteId,
+    inizio: startISO,
+    fine: endISO,
+    data_solo: dateOnly // Helper column for performance
+  };
+
+  let inserimento = await supabase.from('appuntamenti').insert(rigaNuova).select().single();
+
+  // Se la migrazione dei promemoria non è ancora stata applicata, la colonna
+  // `promemoria_minuti` non esiste: si riprova senza, invece di bloccare il salvataggio.
+  if (inserimento.error && /promemoria_minuti/.test(inserimento.error.message)) {
+    console.warn('Colonna promemoria_minuti assente: esegui la migrazione 20261110140000_promemoria.sql');
+    const { promemoria_minuti, ...senzaPromemoria } = rigaNuova;
+    inserimento = await supabase.from('appuntamenti').insert(senzaPromemoria).select().single();
+  }
+
+  const { data: appointment, error: appointmentError } = inserimento;
 
   if (appointmentError) {
     console.error('APPOINTMENT_CREATE_ERROR:', appointmentError);
@@ -368,18 +378,41 @@ export async function updateAppointmentAction(id: string, payload: any) {
   }
 
   const { email_fallback, preferenza_cambio, is_impegno, nome_impegno, ...dbPayload } = payload;
-  const { data, error } = await supabase
+  const rigaAggiornata: Record<string, unknown> = {
+    ...dbPayload,
+    cliente_id: finalClienteId,
+    inizio: startISO,
+    fine: endISO,
+    data_solo: dateOnly
+  };
+
+  // Impegno spostato in data/ora: il promemoria già inviato va riarmato, altrimenti
+  // quello nuovo non arriverebbe più (il marcatore resta valorizzato).
+  const orarioCambiato = Boolean(primaDellaModifica?.inizio && primaDellaModifica.inizio !== startISO);
+  if (orarioCambiato && payload.is_impegno) {
+    rigaAggiornata.promemoria_inviato_il = null;
+  }
+
+  let aggiornamento = await supabase
     .from('appuntamenti')
-    .update({
-      ...dbPayload,
-      cliente_id: finalClienteId,
-      inizio: startISO,
-      fine: endISO,
-      data_solo: dateOnly
-    })
+    .update(rigaAggiornata)
     .eq('id', id)
     .select()
     .single();
+
+  // Migrazione promemoria non applicata: si aggiorna senza le colonne nuove
+  if (aggiornamento.error && /promemoria_minuti|promemoria_inviato_il/.test(aggiornamento.error.message)) {
+    console.warn('Colonne promemoria assenti: esegui la migrazione 20261110140000_promemoria.sql');
+    const { promemoria_minuti, promemoria_inviato_il, ...senzaPromemoria } = rigaAggiornata;
+    aggiornamento = await supabase
+      .from('appuntamenti')
+      .update(senzaPromemoria)
+      .eq('id', id)
+      .select()
+      .single();
+  }
+
+  const { data, error } = aggiornamento;
 
   if (error) {
     return { 
