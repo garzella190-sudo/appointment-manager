@@ -98,7 +98,7 @@ export async function GET(request: Request) {
   }
 
   // ── 2) Promemoria al PROPRIETARIO per gli "altri impegni" ────────────────
-  const risultatiImpegni = await inviaPromemoriaImpegni(supabase);
+  const { esiti: risultatiImpegni, inAttesa } = await inviaPromemoriaImpegni(supabase);
 
   console.log(
     `Cron promemoria: ${risultatiClienti.filter(r => r.inviato).length} email ai clienti, ` +
@@ -117,6 +117,8 @@ export async function GET(request: Request) {
     impegni: {
       valutati: risultatiImpegni.length,
       inviati: risultatiImpegni.filter(r => r.inviato).length,
+      /** Impegni con promemoria impostato ma non ancora scattato (con l'ora prevista) */
+      inAttesa,
       dettaglio: risultatiImpegni,
     },
   });
@@ -125,11 +127,17 @@ export async function GET(request: Request) {
 /**
  * Impegni il cui preavviso è scattato e non ancora avvisati: push + email al
  * proprietario del calendario, poi `promemoria_inviato_il = now()`.
+ * Restituisce anche quelli IN ATTESA con l'ora in cui partirà l'avviso: chiamando
+ * l'endpoint a mano si vede subito se e quando il promemoria è programmato.
  */
 async function inviaPromemoriaImpegni(
   supabase: ReturnType<typeof createAdminClient>
-): Promise<{ id: string; inviato: boolean; errore?: string }[]> {
+): Promise<{
+  esiti: { id: string; inviato: boolean; errore?: string }[];
+  inAttesa: { id: string; avvisoAlle: string; preavvisoMinuti: number }[];
+}> {
   const esiti: { id: string; inviato: boolean; errore?: string }[] = [];
+  const inAttesa: { id: string; avvisoAlle: string; preavvisoMinuti: number }[] = [];
 
   const { data: candidati, error } = await supabase
     .from('appuntamenti')
@@ -145,10 +153,10 @@ async function inviaPromemoriaImpegni(
   if (error) {
     if (/promemoria_minuti|promemoria_inviato_il/.test(error.message)) {
       console.warn('Colonne promemoria impegni assenti: promemoria al proprietario disattivati fino alla migrazione');
-      return esiti;
+      return { esiti, inAttesa };
     }
     console.error('Errore lettura impegni con promemoria:', error.message);
-    return esiti;
+    return { esiti, inAttesa };
   }
 
   const adesso = Date.now();
@@ -162,7 +170,11 @@ async function inviaPromemoriaImpegni(
     if (Number.isNaN(inizio)) continue;
 
     const quandoAvvisare = inizio - preavviso * 60000;
-    if (adesso < quandoAvvisare) continue; // troppo presto
+    if (adesso < quandoAvvisare) {
+      // troppo presto: si riporta quando partirà (diagnostica)
+      inAttesa.push({ id: riga.id, avvisoAlle: new Date(quandoAvvisare).toISOString(), preavvisoMinuti: preavviso });
+      continue;
+    }
     if (adesso > inizio) continue;         // impegno già iniziato/finito
 
     const istruttore = Array.isArray(riga.istruttori) ? riga.istruttori[0] : riga.istruttori;
@@ -202,5 +214,5 @@ async function inviaPromemoriaImpegni(
     }
   }
 
-  return esiti;
+  return { esiti, inAttesa };
 }

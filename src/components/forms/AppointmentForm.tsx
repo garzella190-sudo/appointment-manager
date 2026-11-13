@@ -1058,6 +1058,28 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
         showToast(successMsg, 'success');
       }
 
+      // Promemoria non salvato (migrazione mancante): va detto, altrimenti l'utente
+      // crede di aver impostato un avviso che non arriverà mai.
+      const avvisoPromemoria = (result as { avviso?: string | null }).avviso;
+      if (avvisoPromemoria) {
+        showToast(avvisoPromemoria, 'error');
+        setServerError(avvisoPromemoria);
+      }
+
+      // Conferma esplicita del promemoria: dice QUANDO arriverà la notifica
+      if (!avvisoPromemoria && isImpegno && promemoriaImpegno) {
+        try {
+          const quando = new Date(`${form.data}T${form.ora || '00:00'}`);
+          const avviso = new Date(quando.getTime() - promemoriaImpegno * 60000);
+          showToast(
+            `Promemoria impostato: notifica e mail il ${format(avviso, "d MMM 'alle' HH:mm", { locale: it })}`,
+            'info'
+          );
+        } catch {
+          showToast('Promemoria impostato', 'info');
+        }
+      }
+
       // 3. WhatsApp Redirect (Free notification)
       if (sendWhatsApp && selectedCliente?.telefono) {
         const dateStr = format(parseISO(form.data), 'dd/MM/yyyy', { locale: it });

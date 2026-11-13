@@ -37,34 +37,67 @@ where table_name = 'appuntamenti'
 order by column_name;
 
 -- ============================================================
--- PROMEMORIA DEGLI IMPEGNI: serve una chiamata frequente all'endpoint
+-- SCHEDULAZIONE DEL CRON (automatica): chiama /api/cron/reminders ogni 15 minuti
 -- ============================================================
--- Il promemoria "2/4/12 ore prima" deve essere puntuale: l'endpoint
---   https://<dominio>/api/cron/reminders
--- va chiamato ogni 15 minuti. Il cron di Vercel sul piano Hobby gira una sola
--- volta al giorno, quindi si può schedularlo da Supabase (gratis) con pg_cron
--- + pg_net (estensioni già disponibili: Database → Extensions).
+-- Perché serve: i preavvisi "2/4/12 ore prima" devono essere PUNTUALI. Il cron di
+-- Vercel sul piano Hobby gira una sola volta al giorno e non incontrerebbe mai la
+-- finestra giusta (promemoria mai inviato). Qui lo schedula Supabase con pg_cron +
+-- pg_net: nessun servizio esterno, nessun costo.
 --
--- 1) Abilita le estensioni (se non attive): pg_cron, pg_net
--- 2) Salva la URL e il token del cron in una tabella di supporto, oppure incolla
---    direttamente l'URL qui sotto (con CRON_SECRET se configurato su Vercel):
---
--- select cron.schedule(
---   'promemoria-agenda-ogni-15-min',
---   '*/15 * * * *',
---   $$
---     select net.http_get(
---       url := 'https://agenda-guide-manu.vercel.app/api/cron/reminders'
---     );
---   $$
--- );
---
--- Se hai configurato CRON_SECRET su Vercel, usa net.http_get con l'header:
---   select net.http_get(
---     url := 'https://agenda-guide-manu.vercel.app/api/cron/reminders',
---     headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>')
+-- Se il blocco qui sotto non riesce (estensioni non disponibili), abilita a mano
+-- Database → Extensions → pg_cron e pg_net e rilancia questo file.
+do $$
+begin
+  -- Estensioni (se già attive non fa nulla)
+  begin
+    create extension if not exists pg_cron;
+  exception when others then
+    raise notice 'pg_cron non disponibile: %', sqlerrm;
+  end;
+  begin
+    create extension if not exists pg_net;
+  exception when others then
+    raise notice 'pg_net non disponibile: %', sqlerrm;
+  end;
+
+  -- Rimuove l'eventuale job precedente (migrazione ri-eseguibile)
+  begin
+    if exists (select 1 from cron.job where jobname = 'promemoria-agenda-ogni-15-min') then
+      perform cron.unschedule('promemoria-agenda-ogni-15-min');
+    end if;
+  exception when others then
+    raise notice 'Impossibile rimuovere il job precedente: %', sqlerrm;
+  end;
+
+  -- Schedula ogni 15 minuti la chiamata all'endpoint dei promemoria.
+  -- Se su Vercel hai configurato CRON_SECRET, sostituisci la query con la versione
+  -- con header (la trovi in fondo al file, commentata).
+  begin
+    perform cron.schedule(
+      'promemoria-agenda-ogni-15-min',
+      '*/15 * * * *',
+      $cron$ select net.http_get('https://agenda-guide-manu.vercel.app/api/cron/reminders'); $cron$
+    );
+    raise notice 'OK: cron promemoria schedato ogni 15 minuti';
+  exception when others then
+    raise notice 'Impossibile schedulare il cron: % (schedula a mano, vedi commenti in fondo)', sqlerrm;
+  end;
+end $$;
+
+-- Controlli utili:
+--   select jobid, jobname, schedule, active from cron.job;
+--   select * from cron.job_run_details order by start_time desc limit 10;
+--   select cron.unschedule('promemoria-agenda-ogni-15-min');
+
+-- Versione CON header (se hai CRON_SECRET su Vercel):
+--   select cron.schedule(
+--     'promemoria-agenda-ogni-15-min',
+--     '*/15 * * * *',
+--     $$
+--       select net.http_get(
+--         url := 'https://agenda-guide-manu.vercel.app/api/cron/reminders',
+--         headers := jsonb_build_object('Authorization', 'Bearer IL_TUO_CRON_SECRET')
+--       );
+--     $$
 --   );
---
--- Per controllare i lavori attivi:  select * from cron.job;
--- Per rimuoverli:                   select cron.unschedule('promemoria-agenda-ogni-15-min');
 

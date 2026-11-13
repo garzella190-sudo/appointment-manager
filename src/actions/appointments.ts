@@ -189,11 +189,17 @@ export async function createAppointmentAction(payload: {
   };
 
   let inserimento = await supabase.from('appuntamenti').insert(rigaNuova).select().single();
+  let avviso: string | null = null;
 
   // Se la migrazione dei promemoria non è ancora stata applicata, la colonna
   // `promemoria_minuti` non esiste: si riprova senza, invece di bloccare il salvataggio.
+  // Però il promemoria NON viene salvato: va detto all'utente, altrimenti imposta un
+  // preavviso che non partirà mai.
   if (inserimento.error && /promemoria_minuti/.test(inserimento.error.message)) {
     console.warn('Colonna promemoria_minuti assente: esegui la migrazione 20261110140000_promemoria.sql');
+    if (rigaNuova.promemoria_minuti) {
+      avviso = 'Promemoria NON salvato: manca la colonna promemoria_minuti. Esegui la migrazione 20261110140000_promemoria.sql su Supabase.';
+    }
     const { promemoria_minuti, ...senzaPromemoria } = rigaNuova;
     inserimento = await supabase.from('appuntamenti').insert(senzaPromemoria).select().single();
   }
@@ -255,7 +261,7 @@ export async function createAppointmentAction(payload: {
   revalidatePath('/gestione');
   revalidatePath('/');
 
-  return { success: true, appointment, notificationSent, emailError };
+  return { success: true, appointment, notificationSent, emailError, avviso };
 }
 
 export async function updateAppointmentAction(id: string, payload: any) {
