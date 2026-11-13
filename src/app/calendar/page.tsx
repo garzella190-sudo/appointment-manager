@@ -443,7 +443,7 @@ export default function CalendarPage() {
       const apptQuery = supabase
         .from('appuntamenti')
         .select(`
-          id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id,
+          id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id, promemoria_minuti, promemoria_inviato_il,
           clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
           istruttori ( nome, cognome, colore ),
           veicoli ( id, targa, nome, colore ),
@@ -531,7 +531,9 @@ export default function CalendarPage() {
           tipo_impegno: tipoImpegno,
           exam_status: row.clienti?.sessione_esame_id ? 'scheduled' : (row.clienti?.pronto_esame ? 'ready' : 'none'),
           candidates: row.sessioni_esame?.clienti || [],
-          sessione_esame_id: row.sessione_esame_id
+          sessione_esame_id: row.sessione_esame_id,
+          promemoria_minuti: row.promemoria_minuti ?? null,
+          promemoria_inviato_il: row.promemoria_inviato_il ?? null
         };
       });
 
@@ -1735,6 +1737,7 @@ export default function CalendarPage() {
               await fetchWeekAppointments();
             }}
             appointmentId={selectedAppointment.id}
+            isImpegno={Boolean(selectedAppointment.is_impegno)}
           />
         )
       )}

@@ -358,15 +358,28 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
             else setDurationMode('custom');
             
             if (apt.cliente_id) {
-              if (clienteCaricato?.nome === 'UFFICIO') {
+              // Gli impegni usano un cliente fittizio "UFFICIO", che è ESCLUSO dalla lista
+              // dei clienti caricata sopra: senza questo recupero il dettaglio di un impegno
+              // si apriva come "Guida cliente" e non mostrava il blocco PROMEMORIA.
+              let clientePerTipo = clienteCaricato;
+              if (!clientePerTipo) {
+                const { data: clienteUff } = await supabase
+                  .from('clienti')
+                  .select('id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id')
+                  .eq('id', apt.cliente_id)
+                  .maybeSingle();
+                clientePerTipo = (clienteUff as unknown as Cliente) ?? null;
+              }
+
+              if (clientePerTipo?.nome === 'UFFICIO') {
                 setIsImpegno(true);
-                setNomeImpegno(clienteCaricato.cognome);
+                setNomeImpegno(clientePerTipo.cognome);
                 // Preavviso del promemoria già impostato su questo impegno
                 setPromemoriaImpegno(
                   typeof apt.promemoria_minuti === 'number' ? apt.promemoria_minuti : null
                 );
               }
-              setSelectedCliente(clienteCaricato);
+              setSelectedCliente(clientePerTipo);
             }
             setSelectedIstruttore((sortedIstruttori as Istruttore[]).find((i: Istruttore) => i.id === apt.istruttore_id) || null);
             setSelectedVeicolo(veicoloCaricato);
@@ -1132,24 +1145,29 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
     <div className="animate-fade-in p-1">
       <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* TIPO APPUNTAMENTO TOGGLE */}
+        {/* TIPO APPUNTAMENTO TOGGLE — in visualizzazione è solo indicativo: si apre
+            direttamente sulla scheda giusta (guida o altro impegno) e non si cambia */}
         <div className="flex bg-[#F4F4F4] p-1 rounded-2xl h-12 items-center shadow-inner">
           <button 
             type="button" 
-            onClick={() => setIsImpegno(false)} 
+            onClick={() => { if (!isView) setIsImpegno(false); }}
+            disabled={isView}
             className={cn(
               "flex-1 h-10 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest", 
-              !isImpegno ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400"
+              !isImpegno ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400",
+              isView && "cursor-default"
             )}
           >
             Guida Cliente
           </button>
           <button 
             type="button" 
-            onClick={() => setIsImpegno(true)} 
+            onClick={() => { if (!isView) setIsImpegno(true); }}
+            disabled={isView}
             className={cn(
               "flex-1 h-10 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest", 
-              isImpegno ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400"
+              isImpegno ? "bg-white text-blue-600 shadow-sm border border-zinc-100" : "text-zinc-400",
+              isView && "cursor-default"
             )}
           >
             Altro Impegno
@@ -1527,9 +1545,25 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                 })}
               </div>
               <p className="text-[10px] text-zinc-400 font-bold ml-1 leading-snug">
-                {promemoriaImpegno
-                  ? `Ti arriverà una notifica e una mail ${promemoriaImpegno >= 1440 ? '1 giorno' : promemoriaImpegno >= 60 ? `${promemoriaImpegno / 60} ore` : `${promemoriaImpegno} minuti`} prima.`
-                  : 'Nessun promemoria per questo impegno.'}
+                {promemoriaImpegno ? (() => {
+                  // "Attivo" + QUANDO arriverà (data e ora esatte), così si capisce subito
+                  const etichetta = promemoriaImpegno >= 1440
+                    ? '1 giorno prima'
+                    : promemoriaImpegno >= 60
+                      ? `${promemoriaImpegno / 60} ore prima`
+                      : `${promemoriaImpegno} minuti prima`;
+                  let quando = '';
+                  try {
+                    const inizio = new Date(`${form.data}T${form.ora || '00:00'}`);
+                    if (!Number.isNaN(inizio.getTime())) {
+                      const avviso = new Date(inizio.getTime() - promemoriaImpegno * 60000);
+                      quando = ` (${format(avviso, "d MMM 'alle' HH:mm", { locale: it })})`;
+                    }
+                  } catch {
+                    /* data non valida: si mostra solo il preavviso */
+                  }
+                  return `Promemoria ATTIVO: notifica e mail ${etichetta}${quando}.`;
+                })() : 'Nessun promemoria per questo impegno.'}
               </p>
             </div>
           )}

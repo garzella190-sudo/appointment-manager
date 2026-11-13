@@ -33,5 +33,13 @@ export interface Appointment {
   };
   vehicle_color?: string;
   exam_status?: 'scheduled' | 'ready' | 'none';
+  /**
+   * Preavviso del promemoria in MINUTI per gli "altri impegni"
+   * (120 = 2 ore, 240 = 4 ore, 720 = 12 ore, 1440 = 1 giorno).
+   * `null` o assente = nessun promemoria impostato.
+   */
+  promemoria_minuti?: number | null;
+  /** Quando è partito il promemoria al proprietario del calendario (null = non ancora) */
+  promemoria_inviato_il?: string | null;
   candidates?: { id: string; nome: string; cognome: string }[];
 }

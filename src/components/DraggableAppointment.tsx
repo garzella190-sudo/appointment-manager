@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle, StickyNote, Trash2, GraduationCap, Car } from 'lucide-react';
+import { AlertTriangle, StickyNote, Trash2, GraduationCap, Car, BellRing } from 'lucide-react';
 import { Appointment } from '@/types';
 import { cn } from '@/lib/utils';
 import { isSameDay, parseISO, format } from 'date-fns';
@@ -136,6 +136,22 @@ export const DraggableAppointment = ({ appointment, isOverlapping, onClick, isSt
              )}>
                {appointment.client_name}
              </p>
+             {/*
+               Promemoria impostato (altri impegni): campanella sempre visibile sulla card.
+               Gialla piena = ancora da inviare, sbiadita = già inviato.
+             */}
+             {appointment.promemoria_minuti ? (
+               <BellRing
+                 size={totalColumns > 1 ? 10 : 13}
+                 className={cn(
+                   "shrink-0",
+                   appointment.promemoria_inviato_il ? "text-amber-300 dark:text-amber-700" : "text-amber-500"
+                 )}
+                 aria-label="Promemoria attivo"
+               >
+                 <title>{`Promemoria: ${appointment.promemoria_minuti >= 1440 ? '1 giorno prima' : `${appointment.promemoria_minuti / 60} ore prima`}`}</title>
+               </BellRing>
+             ) : null}
              {appointment.exam_status && appointment.exam_status !== 'none' && (
                <GraduationCap 
                  size={totalColumns > 1 ? 10 : 14} 

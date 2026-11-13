@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Users, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote, Trash2, GraduationCap } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Clock, Loader2, User, Users, Calendar as CalendarIconSmall, Search, Car, Phone, StickyNote, Trash2, GraduationCap, BellRing } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
 import { Appointment } from '@/types';
@@ -26,7 +26,7 @@ import { AnteprimaAppuntamento } from '@/components/AnteprimaAppuntamento';
 
 /** Campi necessari alla vista agenda (giorno singolo e ricerca globale). */
 const APPOINTMENT_SELECT = `
-  id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, sessione_esame_id,
+  id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, sessione_esame_id, promemoria_minuti, promemoria_inviato_il,
   clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
   istruttori ( nome, cognome, colore ),
   veicoli ( id, targa, nome, colore )
@@ -54,6 +54,8 @@ type RigaAppuntamento = {
   id: string; data: string; durata: number; stato: string; note: string | null;
   importo: number | null; istruttore_id: string | null; veicolo_id: string | null;
   inizio: string | null; fine: string | null; sessione_esame_id: string | null;
+  /** Promemoria degli "altri impegni" (minuti di preavviso) e quando è stato inviato */
+  promemoria_minuti?: number | null; promemoria_inviato_il?: string | null;
   clienti: ClienteRiga | ClienteRiga[] | null;
   istruttori: IstruttoreRiga | IstruttoreRiga[] | null;
   veicoli: VeicoloRiga | VeicoloRiga[] | null;
@@ -94,7 +96,10 @@ const mapAppointmentRows = (
       color: istruttoreObj?.colore || '#3b82f6'
     },
     exam_status: clienteObj?.sessione_esame_id ? 'scheduled' : (clienteObj?.pronto_esame ? 'ready' : 'none'),
-    sessione_esame_id: row.sessione_esame_id
+    sessione_esame_id: row.sessione_esame_id,
+    // Promemoria degli "altri impegni" (campanella sulla card)
+    promemoria_minuti: (row as { promemoria_minuti?: number | null }).promemoria_minuti ?? null,
+    promemoria_inviato_il: (row as { promemoria_inviato_il?: string | null }).promemoria_inviato_il ?? null
   };
 }) as unknown as Appointment[];
 
@@ -275,6 +280,17 @@ const CardGuida = ({
                   )}
                 />
               )}
+              {/* Promemoria attivo sull'impegno: campanella piena = da inviare, sbiadita = inviato */}
+              {apt.promemoria_minuti ? (
+                <BellRing
+                  size={densita === 'completa' ? 13 : 11}
+                  className={cn(
+                    "shrink-0",
+                    apt.promemoria_inviato_il ? "text-amber-300 dark:text-amber-700" : "text-amber-500"
+                  )}
+                  aria-label="Promemoria attivo"
+                />
+              ) : null}
             </h4>
 
             {/* Riga chip: sempre presente ma più compatta nei blocchi bassi.
@@ -1337,6 +1353,7 @@ export default function Home() {
             onClose={() => setSelectedAppointment(null)}
             onSuccess={fetchAppointments}
             appointmentId={selectedAppointment.id}
+            isImpegno={Boolean(selectedAppointment.is_impegno)}
           />
         )
       )}
