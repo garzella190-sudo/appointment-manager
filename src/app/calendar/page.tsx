@@ -20,7 +20,9 @@ import {
   StickyNote,
   Maximize2,
   Minimize2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  TriangleAlert,
+  X
 } from 'lucide-react';
 import { Modal } from '@/components/Modal';
 import Select from '@/components/forms/Select';
@@ -126,6 +128,9 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Messaggio d'errore del caricamento: prima un errore rendeva il calendario
+   *  muto e vuoto, senza capire il perché. */
+  const [erroreCaricamento, setErroreCaricamento] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -443,7 +448,7 @@ export default function CalendarPage() {
       const apptQuery = supabase
         .from('appuntamenti')
         .select(`
-          id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id, promemoria_minuti, promemoria_inviato_il,
+          id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, data_solo, sessione_esame_id,
           clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
           istruttori ( nome, cognome, colore ),
           veicoli ( id, targa, nome, colore ),
@@ -466,6 +471,31 @@ export default function CalendarPage() {
       ]);
 
       if (dbError) throw dbError;
+      setErroreCaricamento(null);
+
+      /**
+       * I PROMEMORIA vivono in colonne aggiunte da una migrazione a parte.
+       * Vengono letti con una query separata e tollerante: se sul database le colonne
+       * non esistono ancora, fallisce soltanto questa query e la settimana si vede
+       * comunque. (Prima erano nella select principale: un errore lì faceva sparire
+       * TUTTI gli appuntamenti dal calendario, senza nessun messaggio.)
+       */
+      const promemoriaPerId = new Map<string, { minuti: number | null; inviatoIl: string | null }>();
+      try {
+        const { data: promemoriaData } = await supabase
+          .from('appuntamenti')
+          .select('id, promemoria_minuti, promemoria_inviato_il')
+          .gte('data_solo', format(fetchStartDate, 'yyyy-MM-dd'))
+          .lt('data_solo', format(fetchEndDate, 'yyyy-MM-dd'));
+        for (const riga of (promemoriaData || []) as { id: string; promemoria_minuti: number | null; promemoria_inviato_il: string | null }[]) {
+          promemoriaPerId.set(riga.id, {
+            minuti: riga.promemoria_minuti ?? null,
+            inviatoIl: riga.promemoria_inviato_il ?? null
+          });
+        }
+      } catch {
+        // campanella assente: gli appuntamenti restano visibili
+      }
 
       // Costruisce la lista istruttori unendo quelli dalla tabella + quelli negli appuntamenti
       // (per coprire casi dove un istruttore ha appuntamenti ma non compare nella tabella)
@@ -532,14 +562,16 @@ export default function CalendarPage() {
           exam_status: row.clienti?.sessione_esame_id ? 'scheduled' : (row.clienti?.pronto_esame ? 'ready' : 'none'),
           candidates: row.sessioni_esame?.clienti || [],
           sessione_esame_id: row.sessione_esame_id,
-          promemoria_minuti: row.promemoria_minuti ?? null,
-          promemoria_inviato_il: row.promemoria_inviato_il ?? null
+          promemoria_minuti: promemoriaPerId.get(row.id)?.minuti ?? null,
+          promemoria_inviato_il: promemoriaPerId.get(row.id)?.inviatoIl ?? null
         };
       });
 
       setAppointments(mappedAppointments);
     } catch (error) {
       console.error('Error fetching calendar data:', error);
+      const messaggio = (error as { message?: string })?.message;
+      setErroreCaricamento(messaggio || 'Errore nel caricamento del calendario');
     } finally {
       setLoading(false);
     }
@@ -1215,6 +1247,37 @@ export default function CalendarPage() {
           </header>
 
           <ConflictsAlert />
+
+          {/*
+            Se il caricamento fallisce (colonne mancanti, rete, permessi) il calendario
+            resta vuoto: meglio dirlo, invece di far credere che non ci siano guide.
+          */}
+          {erroreCaricamento && (
+            <div className="mx-2 mb-1 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 px-3 py-2">
+              <TriangleAlert size={16} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-black uppercase tracking-wider text-red-700 dark:text-red-300">
+                  Appuntamenti non caricati
+                </p>
+                <p className="text-[11px] text-red-600/90 dark:text-red-300/80 break-words">{erroreCaricamento}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void fetchWeekAppointments()}
+                className="shrink-0 rounded-lg border border-red-300 dark:border-red-800 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-red-700 dark:text-red-300 active:scale-95"
+              >
+                Riprova
+              </button>
+              <button
+                type="button"
+                onClick={() => setErroreCaricamento(null)}
+                aria-label="Chiudi avviso"
+                className="shrink-0 text-red-500 dark:text-red-400 active:scale-95"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           <div
             className="flex-1 px-0.5 sm:px-1 md:px-2 pb-2 md:pb-4 overflow-hidden flex flex-col"

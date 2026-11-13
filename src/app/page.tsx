@@ -26,11 +26,42 @@ import { AnteprimaAppuntamento } from '@/components/AnteprimaAppuntamento';
 
 /** Campi necessari alla vista agenda (giorno singolo e ricerca globale). */
 const APPOINTMENT_SELECT = `
-  id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, sessione_esame_id, promemoria_minuti, promemoria_inviato_il,
+  id, data, durata, stato, note, importo, istruttore_id, veicolo_id, inizio, fine, sessione_esame_id,
   clienti ( id, nome, cognome, telefono, preferenza_cambio, patente_richiesta_id, sessione_esame_id, pronto_esame ),
   istruttori ( nome, cognome, colore ),
   veicoli ( id, targa, nome, colore )
 `;
+
+/** Minuti di preavviso e data di invio del promemoria di un appuntamento. */
+type PromemoriaRiga = { minuti: number | null; inviatoIl: string | null };
+
+/**
+ * I PROMEMORIA vivono in colonne aggiunte da una migrazione a parte: si leggono con una
+ * query separata e tollerante. Se sul database le colonne non esistono ancora fallisce
+ * solo questa query e l'agenda mostra comunque tutte le guide (prima erano nella select
+ * principale e un errore lì svuotava l'intera vista, senza alcun messaggio).
+ */
+const caricaPromemoria = async (
+  client: ReturnType<typeof createClient>,
+  giorno: string
+): Promise<Map<string, PromemoriaRiga>> => {
+  const mappa = new Map<string, PromemoriaRiga>();
+  try {
+    const { data } = await client
+      .from('appuntamenti')
+      .select('id, promemoria_minuti, promemoria_inviato_il')
+      .eq('data_solo', giorno);
+    const righe = (data || []) as unknown as {
+      id: string; promemoria_minuti: number | null; promemoria_inviato_il: string | null;
+    }[];
+    for (const riga of righe) {
+      mappa.set(riga.id, { minuti: riga.promemoria_minuti ?? null, inviatoIl: riga.promemoria_inviato_il ?? null });
+    }
+  } catch {
+    // colonne non ancora presenti: si perde solo la campanella
+  }
+  return mappa;
+};
 
 /**
  * Timeline dell'agenda multi-istruttore: passo e altezze delle righe.
@@ -64,7 +95,8 @@ type RigaAppuntamento = {
 /** Converte le righe Supabase nel modello usato dalla UI (usato da giorno e ricerca). */
 const mapAppointmentRows = (
   rows: RigaAppuntamento[],
-  patentiMap: Map<string, string>
+  patentiMap: Map<string, string>,
+  promemoria?: Map<string, PromemoriaRiga>
 ): Appointment[] => rows.map((row) => {
   const rowDate = new Date(row.data);
   const clienteObj = Array.isArray(row.clienti) ? row.clienti[0] : row.clienti;
@@ -98,8 +130,8 @@ const mapAppointmentRows = (
     exam_status: clienteObj?.sessione_esame_id ? 'scheduled' : (clienteObj?.pronto_esame ? 'ready' : 'none'),
     sessione_esame_id: row.sessione_esame_id,
     // Promemoria degli "altri impegni" (campanella sulla card)
-    promemoria_minuti: (row as { promemoria_minuti?: number | null }).promemoria_minuti ?? null,
-    promemoria_inviato_il: (row as { promemoria_inviato_il?: string | null }).promemoria_inviato_il ?? null
+    promemoria_minuti: promemoria?.get(row.id)?.minuti ?? null,
+    promemoria_inviato_il: promemoria?.get(row.id)?.inviatoIl ?? null
   };
 }) as unknown as Appointment[];
 
@@ -458,14 +490,15 @@ export default function Home() {
     const dateStr = format(currentDate, 'yyyy-MM-dd');
 
     try {
-      const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }] = await Promise.all([
+      const [{ data: dbData, error: dbError }, { data: patentiData }, { data: istruttoriData }, promemoriaMap] = await Promise.all([
         supabase
           .from('appuntamenti')
           .select(APPOINTMENT_SELECT)
           .eq('data_solo', dateStr)
           .order('data'),
         supabase.from('patenti').select('id, tipo'),
-        supabase.from('istruttori').select('id, nome, cognome').order('cognome')
+        supabase.from('istruttori').select('id, nome, cognome').order('cognome'),
+        caricaPromemoria(supabase, dateStr)
       ]);
 
       if (dbError) throw dbError;
@@ -473,7 +506,7 @@ export default function Home() {
 
       const patentiMap = new Map<string, string>((patentiData || []).map((p: { id: string; tipo: string }) => [p.id, p.tipo]));
 
-      const mappedAppointments = mapAppointmentRows((dbData || []) as unknown as RigaAppuntamento[], patentiMap);
+      const mappedAppointments = mapAppointmentRows((dbData || []) as unknown as RigaAppuntamento[], patentiMap, promemoriaMap);
 
       setAppointments(mappedAppointments);
       
