@@ -558,24 +558,40 @@ async function diagnosticaPromemoria(
     guide
   };
 
-  // Iscrizioni push: quante, e per quali utenti. Senza iscrizioni nessuna notifica
+  // Iscrizioni push: quante, e per QUALI account. Senza iscrizione nessuna notifica
   // può partire, indipendentemente dal cron. (Letto col client admin: la tabella
   // ha RLS e con la chiave pubblica risulterebbe vuota.)
   try {
     const { data: iscrizioni, error: erroreIscrizioni } = await supabase
       .from('push_subscriptions')
       .select('user_id, created_at');
-    risposta.push = erroreIscrizioni
-      ? { errore: erroreIscrizioni.message }
-      : {
-          iscrizioni: (iscrizioni || []).length,
-          utenti: [...new Set((iscrizioni || []).map((i) => (i as { user_id?: string }).user_id))],
-          ultima: (iscrizioni || [])
-            .map((i) => (i as { created_at?: string }).created_at)
-            .filter(Boolean)
-            .sort()
-            .pop() || null
-        };
+
+    if (erroreIscrizioni) {
+      risposta.push = { errore: erroreIscrizioni.message };
+    } else {
+      // Mappa user_id → email, per capire a chi appartengono i dispositivi iscritti
+      const mappaUtenti = new Map<string, string>();
+      for (let pagina = 1; pagina <= 20; pagina++) {
+        const { data: blocco, error: erroreUtenti } = await supabase.auth.admin.listUsers({
+          page: pagina,
+          perPage: 200
+        });
+        if (erroreUtenti || !blocco?.users?.length) break;
+        for (const u of blocco.users) mappaUtenti.set(u.id, u.email || '(senza email)');
+        if (blocco.users.length < 200) break;
+      }
+
+      risposta.push = {
+        iscrizioni: (iscrizioni || []).length,
+        dispositivi: (iscrizioni || []).map((i) => {
+          const riga = i as { user_id?: string | null; created_at?: string | null };
+          return {
+            utente: riga.user_id ? mappaUtenti.get(riga.user_id) || riga.user_id : null,
+            dal: riga.created_at || null
+          };
+        })
+      };
+    }
   } catch (e) {
     risposta.push = { errore: e instanceof Error ? e.message : 'sconosciuto' };
   }
