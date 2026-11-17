@@ -7,6 +7,7 @@ import {
 import { notificaCambioCalendario } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { Resend } from 'resend';
 
 /**
  * Cron dei promemoria. Due lavori, entrambi IDEMPOTENTI (colonne `promemoria_*`):
@@ -35,6 +36,10 @@ const PREAVVISI_AMMESSI = [120, 240, 720, 1440];
 /** Preavviso del promemoria al cliente: 24 ore prima dell'orario della guida. */
 const ANTICIPO_PROMEMORIA_MS = 24 * 60 * 60 * 1000;
 
+/** Mittente e indirizzo sicuro usati dalla diagnostica */
+const SENDER_EMAIL = 'Autoscuola Toscana <notifiche@guide.autoscuolatoscanasnc.it>';
+const INDIRIZZO_PROVA = 'manueleautoscuola@gmail.com';
+
 type RigaPromemoria = {
   id: string;
   inizio: string | null;
@@ -57,6 +62,15 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  // ── DIAGNOSTICA (temporanea) ──────────────────────────────────────────────
+  // Chiamando l'endpoint con ?diagnostica=1 non si invia nessun promemoria: si
+  // ottiene lo stato tecnico e una prova di programmazione su Resend (mail di
+  // test verso l'autoscuola, annullata subito). Serve a capire perché una mail
+  // non arriva senza poter leggere i log di Vercel.
+  if (new URL(request.url).searchParams.get('diagnostica') === '1') {
+    return NextResponse.json(await diagnosticaPromemoria(supabase));
+  }
 
   // ── 1) RETE DI SICUREZZA per i promemoria ai clienti ──────────────────────
   //
@@ -305,4 +319,127 @@ async function inviaPromemoriaImpegni(
   }
 
   return { esiti, inAttesa };
+}
+
+/**
+ * DIAGNOSTICA (temporanea, si attiva con ?diagnostica=1).
+ *
+ * Risponde a "perché il promemoria al cliente non arriva?" senza leggere i log:
+ *  - quali colonne della programmazione esistono davvero nel database;
+ *  - le prossime guide con l'email attiva e quando sarebbe dovuto partire il
+ *    promemoria (24 ore prima dell'inizio);
+ *  - una prova REALE di programmazione su Resend: stessa forma della mail vera
+ *    (con allegato .ics), verso l'indirizzo dell'autoscuola, annullata subito.
+ *
+ * Non espone dati personali: solo stato tecnico.
+ */
+async function diagnosticaPromemoria(supabase: ReturnType<typeof createAdminClient>) {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const adesso = new Date();
+  const fra24h = new Date(adesso.getTime() + ANTICIPO_PROMEMORIA_MS);
+  const oggi = adesso.toISOString().slice(0, 10);
+
+  const colonne: Record<string, boolean> = {};
+  for (const nome of ['promemoria_email_inviato_il', 'promemoria_email_id', 'promemoria_email_per']) {
+    const { error } = await supabase.from('appuntamenti').select(`id, ${nome}`).limit(1);
+    colonne[nome] = !error;
+  }
+
+  const { data: prossime, error: erroreLettura } = await supabase
+    .from('appuntamenti')
+    .select('id, inizio, send_email, stato, created_at, clienti ( nome, cognome, email )')
+    .eq('send_email', true)
+    .neq('stato', 'annullato')
+    .gte('data_solo', oggi)
+    .order('inizio', { ascending: true })
+    .limit(10);
+
+  const righe = (prossime || []) as unknown as {
+    id: string;
+    inizio: string | null;
+    created_at?: string | null;
+    clienti?:
+      | { nome?: string | null; cognome?: string | null; email?: string | null }
+      | { nome?: string | null; cognome?: string | null; email?: string | null }[]
+      | null;
+  }[];
+
+  const guide = righe.map((riga) => {
+    const cliente = Array.isArray(riga.clienti) ? riga.clienti[0] : riga.clienti;
+    const inizio = new Date(riga.inizio || '').getTime();
+    return {
+      id: riga.id,
+      inizio: riga.inizio,
+      creatoIl: riga.created_at || null,
+      haEmailCliente: Boolean(cliente?.email),
+      promemoriaDovevaPartireIl: Number.isNaN(inizio) ? null : new Date(inizio - ANTICIPO_PROMEMORIA_MS).toISOString(),
+      entro24h: !Number.isNaN(inizio) && inizio <= fra24h.getTime()
+    };
+  });
+
+  const risposta: Record<string, unknown> = {
+    adesso: adesso.toISOString(),
+    oraItaliana: Number(
+      new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }).format(adesso)
+    ),
+    chiaveResendPresente: Boolean(resendApiKey),
+    colonne,
+    erroreLettura: erroreLettura?.message || null,
+    guideConEmailAttiva: guide.length,
+    guide
+  };
+
+  if (!resendApiKey) {
+    risposta.prova = { esito: 'saltata', motivo: 'RESEND_API_KEY assente' };
+    return risposta;
+  }
+
+  const resend = new Resend(resendApiKey);
+  const quando = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Autoscuola Toscana//IT',
+    'BEGIN:VEVENT',
+    'DTSTART:20261120T090000Z',
+    'DTEND:20261120T100000Z',
+    'SUMMARY:Prova',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  const { data, error } = await resend.emails.send({
+    from: SENDER_EMAIL,
+    to: INDIRIZZO_PROVA,
+    subject: 'Prova programmazione promemoria (ignorare)',
+    html: '<p>Prova della diagnostica. Se lo ricevi, l\'annullamento non ha funzionato: ignoralo.</p>',
+    attachments: [
+      { filename: 'prova.ics', content: Buffer.from(ics).toString('base64'), contentType: 'text/calendar' }
+    ],
+    scheduledAt: quando
+  });
+
+  if (error) {
+    risposta.prova = {
+      esito: 'ERRORE su scheduledAt',
+      quando,
+      errore: error,
+      spiegazione:
+        'Resend rifiuta la programmazione per questo account: i promemoria vanno inviati dal cron, non programmati.'
+    };
+    return risposta;
+  }
+
+  let annullamento = 'non tentato';
+  if (data?.id) {
+    try {
+      const cancellata = await resend.emails.cancel(data.id);
+      annullamento = cancellata.error ? `errore: ${JSON.stringify(cancellata.error)}` : 'ok';
+    } catch (e) {
+      annullamento = `eccezione: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  risposta.prova = { esito: 'OK: programmazione accettata da Resend', quando, id: data?.id, annullamento };
+  return risposta;
 }
