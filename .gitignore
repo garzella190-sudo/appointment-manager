@@ -54,3 +54,6 @@ documenti_pdf/
 
 # log e file temporanei locali
 tmp/
+
+# chiavi temporanee di diagnostica
+.anon.txt
