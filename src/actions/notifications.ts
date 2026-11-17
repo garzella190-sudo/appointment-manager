@@ -562,7 +562,11 @@ export async function programmaPromemoriaEmail(appointmentId: string) {
   if (riga.promemoria_email_id) return { success: true, saltato: true, motivo: 'già programmato' };
 
   const preparata = costruisciPromemoriaCliente(riga);
-  if (!preparata.ok) return { success: false, error: preparata.error };
+  if (!preparata.ok) {
+    // Cliente senza indirizzo email: non è un errore da segnalare né un controllo da
+    // ripetere, semplicemente non c'è nulla da inviare. Si esce senza fare niente.
+    return { success: true, saltato: true, motivo: 'cliente senza email' };
+  }
 
   const inizio = new Date(riga.inizio || riga.data).getTime();
   if (Number.isNaN(inizio)) return { success: false, error: 'Orario della guida non valido' };
@@ -862,7 +866,11 @@ export async function programmaPromemoriaImpegno(appointmentId: string) {
   }
 
   const preparata = costruisciPromemoriaImpegno(riga);
-  if (!preparata.ok) return { success: false, error: preparata.error };
+  if (!preparata.ok) {
+    // Istruttore senza email: come per il cliente, non c'è nulla da inviare e non
+    // deve diventare un errore ripetuto.
+    return { success: true, saltato: true, motivo: 'istruttore senza email' };
+  }
 
   const inizio = new Date(riga.inizio || riga.data).getTime();
   if (Number.isNaN(inizio)) return { success: false, error: 'Orario non valido' };

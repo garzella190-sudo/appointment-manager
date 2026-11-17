@@ -386,12 +386,14 @@ async function recuperaPromemoria(supabase: ReturnType<typeof createAdminClient>
 
   const { data, error } = await supabase
     .from('appuntamenti')
-    .select('id')
+    .select('id, clienti!inner ( email )')
     .eq('send_email', true)
     .neq('stato', 'annullato')
     .gte('data_solo', oggi)
     .is('promemoria_email_id', null)
     .is('promemoria_email_inviato_il', null)
+    // Cliente senza indirizzo: escluso alla fonte, non va né controllato né conteggiato
+    .not('clienti.email', 'is', null)
     .gt('inizio', adesso.toISOString())
     .order('inizio', { ascending: true })
     .limit(300);
