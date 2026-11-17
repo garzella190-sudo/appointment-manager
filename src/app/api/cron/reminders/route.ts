@@ -74,6 +74,13 @@ export async function GET(request: Request) {
     );
   }
 
+  // ── RECUPERO DEI PROMEMORIA MANCANTI (una tantum, ?recupera=1) ────────────
+  // Le guide prenotate PRIMA dell'introduzione della programmazione non hanno
+  // nessuna mail in coda: qui si sistema tutto in un colpo.
+  if (new URL(request.url).searchParams.get('recupera') === '1') {
+    return NextResponse.json(await recuperaPromemoria(supabase));
+  }
+
   // ── 1) RETE DI SICUREZZA per i promemoria ai clienti ──────────────────────
   //
   // Il promemoria NON dipende più da questo cron: alla prenotazione viene
@@ -321,6 +328,72 @@ async function inviaPromemoriaImpegni(
   }
 
   return { esiti, inAttesa };
+}
+
+/**
+ * RECUPERO DEI PROMEMORIA MANCANTI (una tantum, si chiama con ?recupera=1).
+ *
+ * Le guide prenotate prima dell'introduzione della programmazione non hanno nessuna
+ * mail in coda. Qui si programma il promemoria per tutte quelle future e si invia
+ * subito per quelle che iniziano entro 24 ore.
+ *
+ * IDEMPOTENTE: chi ha già `promemoria_email_id` (programmato) o
+ * `promemoria_email_inviato_il` (già avvisato) viene saltato, quindi si può
+ * rilanciare senza rischiare doppioni.
+ */
+async function recuperaPromemoria(supabase: ReturnType<typeof createAdminClient>) {
+  const adesso = new Date();
+  const oggi = adesso.toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from('appuntamenti')
+    .select('id')
+    .eq('send_email', true)
+    .neq('stato', 'annullato')
+    .gte('data_solo', oggi)
+    .is('promemoria_email_id', null)
+    .is('promemoria_email_inviato_il', null)
+    .gt('inizio', adesso.toISOString())
+    .order('inizio', { ascending: true })
+    .limit(300);
+
+  if (error) {
+    return {
+      success: false,
+      errore: error.message,
+      suggerimento: /promemoria_email_id/.test(error.message)
+        ? 'Esegui prima la migrazione 20261113180000_promemoria_programmato.sql: senza la colonna promemoria_email_id il recupero non può ricordare cosa ha già programmato.'
+        : undefined
+    };
+  }
+
+  const esiti: { id: string; esito: string; dettaglio?: string }[] = [];
+
+  for (const riga of (data || []) as { id: string }[]) {
+    try {
+      const res = await programmaPromemoriaEmail(riga.id);
+      const saltato = Boolean((res as { saltato?: boolean }).saltato);
+      const subito = Boolean((res as { subito?: boolean }).subito);
+      esiti.push({
+        id: riga.id,
+        esito: res.success ? (saltato ? 'saltato' : subito ? 'inviato subito' : 'programmato') : 'errore',
+        dettaglio: (res as { error?: string }).error
+      });
+    } catch (e) {
+      esiti.push({ id: riga.id, esito: 'errore', dettaglio: e instanceof Error ? e.message : 'sconosciuto' });
+    }
+  }
+
+  return {
+    success: true,
+    adesso: adesso.toISOString(),
+    valutati: esiti.length,
+    programmati: esiti.filter((e) => e.esito === 'programmato').length,
+    inviatiSubito: esiti.filter((e) => e.esito === 'inviato subito').length,
+    saltati: esiti.filter((e) => e.esito === 'saltato').length,
+    errori: esiti.filter((e) => e.esito === 'errore').length,
+    esiti
+  };
 }
 
 /**
