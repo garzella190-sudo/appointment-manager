@@ -22,6 +22,9 @@ import { notificaCambioCalendario } from '@/lib/pushHelper';
  */
 export const dynamic = 'force-dynamic';
 
+// NB: richiede RESEND_WEBHOOK_SECRET su Vercel (Environment Variables, Production).
+// Senza, l'endpoint risponde 503 e non manda nessuna push.
+
 export async function POST(request: Request) {
   const segreto = process.env.RESEND_WEBHOOK_SECRET;
   const chiave = process.env.RESEND_API_KEY;
