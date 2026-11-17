@@ -69,7 +69,9 @@ export async function GET(request: Request) {
   // test verso l'autoscuola, annullata subito). Serve a capire perché una mail
   // non arriva senza poter leggere i log di Vercel.
   if (new URL(request.url).searchParams.get('diagnostica') === '1') {
-    return NextResponse.json(await diagnosticaPromemoria(supabase));
+    return NextResponse.json(
+      await diagnosticaPromemoria(supabase, new URL(request.url).searchParams)
+    );
   }
 
   // ── 1) RETE DI SICUREZZA per i promemoria ai clienti ──────────────────────
@@ -333,11 +335,28 @@ async function inviaPromemoriaImpegni(
  *
  * Non espone dati personali: solo stato tecnico.
  */
-async function diagnosticaPromemoria(supabase: ReturnType<typeof createAdminClient>) {
+async function diagnosticaPromemoria(
+  supabase: ReturnType<typeof createAdminClient>,
+  parametri: URLSearchParams
+) {
   const resendApiKey = process.env.RESEND_API_KEY;
   const adesso = new Date();
   const fra24h = new Date(adesso.getTime() + ANTICIPO_PROMEMORIA_MS);
   const oggi = adesso.toISOString().slice(0, 10);
+
+  // Se è stato passato un id, si riporta lo STATO dell'email su Resend: serve a
+  // capire se la mail programmata è rimasta "scheduled", è stata "delivered"
+  // oppure è "failed". Con una API key a permessi limitati la lettura non è
+  // consentita (404) e questo spiega anche l'annullamento impossibile.
+  const idEmail = parametri.get('id');
+  if (idEmail && resendApiKey) {
+    try {
+      const esito = await new Resend(resendApiKey).emails.get(idEmail);
+      return { statoEmail: esito.data ?? null, errore: esito.error ?? null };
+    } catch (e) {
+      return { statoEmail: null, errore: e instanceof Error ? e.message : String(e) };
+    }
+  }
 
   const colonne: Record<string, boolean> = {};
   for (const nome of ['promemoria_email_inviato_il', 'promemoria_email_id', 'promemoria_email_per']) {
