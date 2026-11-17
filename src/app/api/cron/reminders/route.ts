@@ -82,6 +82,19 @@ export async function GET(request: Request) {
     return NextResponse.json(await recuperaPromemoria(supabase));
   }
 
+  // ── PUSH MANUALE DI UN IMPEGNO (protetta) ────────────────────────────────
+  // ?spingi=<idAppuntamento> con header `x-chiave: <RESEND_WEBHOOK_SECRET>`
+  // Fa partire subito la push dell'impegno, SENZA spedire nessuna mail.
+  // Serve per prove mirate senza consumare quota Resend.
+  const spingi = new URL(request.url).searchParams.get('spingi');
+  if (spingi) {
+    const chiave = request.headers.get('x-chiave');
+    if (!process.env.RESEND_WEBHOOK_SECRET || chiave !== process.env.RESEND_WEBHOOK_SECRET) {
+      return NextResponse.json({ ok: false, errore: 'non autorizzato' }, { status: 401 });
+    }
+    return NextResponse.json(await spingiPushImpegno(supabase, spingi));
+  }
+
   // ── 1) RETE DI SICUREZZA per i promemoria ai clienti ──────────────────────
   //
   // Il promemoria NON dipende più da questo cron: alla prenotazione viene
@@ -367,6 +380,59 @@ async function inviaPromemoriaImpegni(
   }
 
   return { esiti, inAttesa };
+}
+
+/**
+ * Manda SUBITO la push di un impegno al proprietario del suo calendario, senza
+ * spedire nessuna mail e senza aspettare l'orario del preavviso.
+ * Usata solo dal comando protetto `?spingi=<id>`.
+ */
+async function spingiPushImpegno(
+  supabase: ReturnType<typeof createAdminClient>,
+  id: string
+): Promise<Record<string, unknown>> {
+  const { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`
+      id, inizio, data, istruttore_id, promemoria_minuti, promemoria_inviato_il,
+      clienti ( nome, cognome ),
+      istruttori ( nome, cognome, email )
+    `)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error || !apt) return { ok: false, errore: error?.message || 'impegno non trovato' };
+
+  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
+  const istruttore = Array.isArray(apt.istruttori) ? apt.istruttori[0] : apt.istruttori;
+  const nomeImpegno = cliente?.cognome || 'Impegno';
+  const quando = new Date(apt.inizio || apt.data);
+  const giorno = format(quando, "EEE d MMM 'alle' HH:mm", { locale: it });
+
+  const esito = await notificaCambioCalendario({
+    istruttoriCoinvolti: [apt.istruttore_id],
+    payload: {
+      title: '⏰ Promemoria impegno',
+      body: `${nomeImpegno} — ${giorno}`,
+      url: '/calendar'
+    }
+  });
+
+  // Marca l'avviso come inviato, così non arriva una seconda volta
+  await supabase
+    .from('appuntamenti')
+    .update({ promemoria_inviato_il: new Date().toISOString() })
+    .eq('id', id);
+
+  return {
+    ok: true,
+    impegno: nomeImpegno,
+    quando: quando.toISOString(),
+    istruttore: istruttore ? `${istruttore.nome} ${istruttore.cognome}` : null,
+    destinatari: esito.destinatari,
+    dispositivi: esito.dispositivi,
+    mailInviata: false
+  };
 }
 
 /**
