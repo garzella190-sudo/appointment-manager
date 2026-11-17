@@ -40,6 +40,9 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
     !request.nextUrl.pathname.startsWith('/api/cron') &&
+    // Webhook di Resend: lo chiama il servizio di invio email, non un utente.
+    // La protezione è la firma (RESEND_WEBHOOK_SECRET) verificata nell'endpoint.
+    !request.nextUrl.pathname.startsWith('/api/webhook') &&
     // Il file .ics delle email deve funzionare dal telefono del CLIENTE (nessun login):
     // la protezione lì è la firma HMAC sull'id, non la sessione. Vedi api/calendar/ics.
     !request.nextUrl.pathname.startsWith('/api/calendar/ics')
