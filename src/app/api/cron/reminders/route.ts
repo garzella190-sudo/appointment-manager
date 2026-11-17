@@ -76,14 +76,16 @@ export async function GET(request: Request) {
 
   /**
    * ORARIO DI INVIO.
-   * Fra le 21:00 e le 07:00 italiane le mail ai clienti non partono: restano in coda
-   * e vengono spedite al primo giro dopo le 07:00, sempre prima della guida.
+   * Fra le 21:00 e le 06:00 italiane le mail ai clienti non partono: restano in coda
+   * e vengono spedite al primo giro utile, sempre prima della guida.
+   * NB: la soglia è 6 e non 7 perché il cron di Vercel gira alle 05:30 UTC, cioè le
+   * 06:30 italiane d'inverno: con la soglia a 7 la rete di sicurezza non girava mai.
    * I promemoria degli impegni (sotto) NON sono toccati: lì conta il preavviso scelto.
    */
   const oraItaliana = Number(
     new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', hour12: false }).format(adesso)
   );
-  const orarioUtile = oraItaliana >= 7 && oraItaliana < 21;
+  const orarioUtile = oraItaliana >= 6 && oraItaliana < 21;
 
   const cerca = (conMarcatori: boolean) => {
     const colonne = conMarcatori
