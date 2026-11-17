@@ -920,6 +920,69 @@ export async function programmaPromemoriaImpegno(appointmentId: string) {
 }
 
 /**
+ * PROVA DELLA PUSH DI UN IMPEGNO (pulsante "Prova push" nel form, solo admin).
+ *
+ * Programma la mail dell'impegno fra N minuti (default 3). Quando Resend la spedisce
+ * chiama il nostro webhook, che manda la push: così si verifica TUTTA la catena in
+ * pochi minuti, senza aspettare un preavviso vero.
+ *
+ * Sostituisce l'eventuale promemoria già programmato per quell'impegno.
+ * Consuma una mail: va usata solo per le prove.
+ */
+export async function provaPromemoriaImpegno(appointmentId: string, fraMinuti = 3) {
+  const supabase = createAdminClient();
+
+  const { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`
+      id, data, inizio, durata, note,
+      clienti ( nome, cognome ),
+      istruttori ( nome, cognome, email )
+    `)
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  if (error || !apt) return { success: false, error: 'Impegno non trovato' };
+
+  const preparata = costruisciPromemoriaImpegno(apt as unknown as RigaImpegnoEmail);
+  if (!preparata.ok) return { success: false, error: preparata.error };
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) return { success: false, error: 'Configurazione email mancante (API Key)' };
+
+  const minuti = Math.max(1, fraMinuti);
+  const quando = new Date(Date.now() + minuti * 60 * 1000);
+
+  const resend = new Resend(resendApiKey);
+  const { data: inviata, error: resendError } = await resend.emails.send({
+    from: SENDER,
+    to: preparata.email,
+    subject: `PROVA promemoria (fra ${minuti} min) — ${preparata.subject}`,
+    html: preparata.html,
+    scheduledAt: quando.toISOString()
+  });
+
+  if (resendError) {
+    console.error('Prova promemoria impegno: errore Resend', resendError);
+    return { success: false, error: resendError.message };
+  }
+
+  // La mail è in coda: quando parte, il webhook manderà la push. Il marcatore
+  // dell'avviso va azzerato, altrimenti la push verrebbe saltata come "già inviata".
+  await supabase
+    .from('appuntamenti')
+    .update({
+      promemoria_email_id: inviata?.id || null,
+      promemoria_email_per: quando.toISOString(),
+      promemoria_inviato_il: null
+    })
+    .eq('id', appointmentId);
+
+  console.log(`Prova push programmata per ${quando.toISOString()} → ${preparata.email}`);
+  return { success: true, quando: quando.toISOString(), a: preparata.email };
+}
+
+/**
  * AVVISO DI GUIDA ANNULLATA al cliente.
  *
  * Stesso formato delle altre email (template grafico solito), con una sola frase:

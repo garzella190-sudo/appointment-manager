@@ -47,13 +47,13 @@ export async function POST(request: Request) {
     signature: request.headers.get('svix-signature') || ''
   };
 
-  let evento: { type?: string; data?: { email_id?: string } };
+  let evento: { type?: string; data?: { email_id?: string; subject?: string } };
   try {
     evento = new Resend(chiave).webhooks.verify({
       payload: corpo,
       headers: intestazioni,
       webhookSecret: segreto
-    }) as unknown as { type?: string; data?: { email_id?: string } };
+    }) as unknown as { type?: string; data?: { email_id?: string; subject?: string } };
   } catch (errore) {
     console.warn('Webhook Resend: firma non valida', errore instanceof Error ? errore.message : errore);
     return NextResponse.json({ ok: false, errore: 'firma non valida' }, { status: 401 });
@@ -85,8 +85,19 @@ export async function POST(request: Request) {
   }
   if (!apt) return NextResponse.json({ ok: true, ignorato: 'nessun appuntamento collegato' });
 
-  // Solo gli IMPEGNI mandano la push: il promemoria delle guide è per il cliente
-  if (!apt.promemoria_minuti) return NextResponse.json({ ok: true, ignorato: 'non è un impegno' });
+  // Solo gli IMPEGNI mandano la push: il promemoria delle guide è per il cliente.
+  // Il tipo si riconosce dal cliente fittizio UFFICIO.
+  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
+  if (cliente?.nome !== 'UFFICIO') return NextResponse.json({ ok: true, ignorato: 'non è un impegno' });
+
+  // RISPETTO DEL "MAI": se il promemoria dell'impegno è disattivato non si manda
+  // nessuna push. L'unica eccezione è la mail di PROVA generata dal pulsante
+  // "Prova push fra 3 minuti", riconosciuta dal suo oggetto.
+  const oggetto = evento.data?.subject || '';
+  const eProva = oggetto.startsWith('PROVA promemoria');
+  if (!apt.promemoria_minuti && !eProva) {
+    return NextResponse.json({ ok: true, ignorato: 'promemoria disattivato (Mai)' });
+  }
 
   if (apt.promemoria_inviato_il) return NextResponse.json({ ok: true, saltato: 'già avvisato' });
 
@@ -102,7 +113,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, saltato: 'già preso in carico' });
   }
 
-  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
   const nomeImpegno = cliente?.cognome || 'Impegno';
   const giorno = format(new Date(apt.inizio || apt.data), "EEE d MMM 'alle' HH:mm", { locale: it });
 

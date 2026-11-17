@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 const supabase = createClient();
-import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil, X, Plus, ChevronDown, Check, CalendarPlus } from 'lucide-react';
+import { Loader2, Clock, Car, User, ShieldCheck, Trash2, Edit3, ExternalLink, Phone, MessageCircle, Save, Pencil, X, Plus, ChevronDown, Check, CalendarPlus, BellRing } from 'lucide-react';
 import { format, addMinutes, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Cliente, Istruttore, Veicolo, Patente, StatoAppuntamento } from '@/lib/database.types';
@@ -159,7 +159,16 @@ const isStoricoValido = (
 
 
 export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime, initialIstruttoreId, appointmentId, initialMode = 'create', defaultIsImpegno = false }: FormProps) => {
-  const { role, isAdmin, isSegreteria, istruttoreId } = useAuth();
+  const { role, isAdmin, isSegreteria, istruttoreId, user } = useAuth();
+  /**
+   * Pulsante "Prova push fra 3 minuti": solo amministratori e l'account di Manuele.
+   * Programma una mail 3 minuti avanti; quando Resend la spedisce, il webhook manda
+   * la push. Funziona anche se il promemoria è su "Mai" (serve proprio a provare).
+   */
+  const mayTestPush = Boolean(
+    isAdmin || (user?.email || '').toLowerCase() === 'manueleautoscuola@gmail.com'
+  );
+  const [provaPushInCorso, setProvaPushInCorso] = useState(false);
   const [mode, setMode] = useState<'create' | 'edit' | 'view'>(appointmentId ? initialMode : 'create');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -1565,6 +1574,41 @@ export const AppointmentForm = ({ onSuccess, onCancel, initialDate, initialTime,
                   return `Promemoria ATTIVO: notifica e mail ${etichetta}${quando}.`;
                 })() : 'Nessun promemoria per questo impegno.'}
               </p>
+
+              {/*
+                PROVA PUSH (solo amministratori / account di Manuele).
+                Programma la mail fra 3 minuti: quando Resend la spedisce, il webhook
+                manda la push. Serve a verificare la catena senza aspettare il preavviso.
+              */}
+              {mayTestPush && appointmentId && mode !== 'view' && (
+                <button
+                  type="button"
+                  disabled={provaPushInCorso}
+                  onClick={async () => {
+                    setProvaPushInCorso(true);
+                    try {
+                      const { provaPushImpegnoAction } = await import('@/actions/appointment_actions');
+                      const esito = await provaPushImpegnoAction(appointmentId);
+                      if (esito.success && 'quando' in esito && esito.quando) {
+                        showToast(
+                          `Push di prova programmata per le ${format(new Date(esito.quando), 'HH:mm')} (fra 3 min). Nessuna mail di prova al cliente.`,
+                          'success'
+                        );
+                      } else {
+                        showToast(('error' in esito && esito.error) || 'Prova non programmata', 'error');
+                      }
+                    } catch {
+                      showToast('Errore durante la prova push', 'error');
+                    } finally {
+                      setProvaPushInCorso(false);
+                    }
+                  }}
+                  className="mt-2 w-full h-9 rounded-xl border border-dashed border-amber-400 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {provaPushInCorso ? <Loader2 size={12} className="animate-spin" /> : <BellRing size={12} />}
+                  Prova push fra 3 minuti
+                </button>
+              )}
             </div>
           )}
         </div>

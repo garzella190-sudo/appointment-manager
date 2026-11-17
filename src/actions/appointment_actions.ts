@@ -2,7 +2,11 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { sendCancellationEmailAction, annullaPromemoriaProgrammato } from './notifications';
+import {
+  sendCancellationEmailAction,
+  annullaPromemoriaProgrammato,
+  provaPromemoriaImpegno
+} from './notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -256,6 +260,33 @@ export async function notificaSessioneEsameAction(
   }
 
   return { success: true };
+}
+
+/**
+ * PROVA PUSH di un impegno (pulsante nel form "Altro impegno").
+ *
+ * Programma la mail dell'impegno fra 3 minuti: quando Resend la spedisce, il
+ * webhook manda la push. Serve a verificare in pochi minuti che la catena
+ * mail → webhook → push funzioni, senza aspettare un preavviso reale.
+ *
+ * Riservata agli amministratori (e all'account di Manuele): consuma una mail.
+ */
+export async function provaPushImpegnoAction(appointmentId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const ruolo = user?.user_metadata?.role;
+  const email = (user?.email || '').toLowerCase();
+  const autorizzato =
+    ruolo === 'admin' ||
+    ruolo === 'AdminDev' ||
+    email === 'manueleautoscuola@gmail.com';
+
+  if (!autorizzato) {
+    return { success: false, error: 'Riservato agli amministratori' };
+  }
+
+  return provaPromemoriaImpegno(appointmentId, 3);
 }
 
 export async function updateAppointmentNoteAction(id: string, note: string | null) {
