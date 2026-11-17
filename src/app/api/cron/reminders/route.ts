@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import {
   programmaPromemoriaEmail,
+  programmaPromemoriaImpegno,
   sendReminderImpegnoEmailAction
 } from '@/actions/notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
@@ -223,16 +224,26 @@ async function inviaPromemoriaImpegni(
   const esiti: { id: string; inviato: boolean; saltato?: boolean; errore?: string }[] = [];
   const inAttesa: { id: string; avvisoAlle: string; preavvisoMinuti: number }[] = [];
 
-  const { data: candidati, error } = await supabase
-    .from('appuntamenti')
-    .select(`
-      id, inizio, data, durata, istruttore_id, promemoria_minuti, promemoria_inviato_il,
-      clienti ( nome, cognome ),
-      istruttori ( nome, cognome, email )
-    `)
-    .not('promemoria_minuti', 'is', null)
-    .is('promemoria_inviato_il', null)
-    .neq('stato', 'annullato');
+  const cercaCandidati = (conEmailId: boolean) =>
+    supabase
+      .from('appuntamenti')
+      .select(`
+        id, inizio, data, durata, istruttore_id, promemoria_minuti, promemoria_inviato_il${conEmailId ? ', promemoria_email_id' : ''},
+        clienti ( nome, cognome ),
+        istruttori ( nome, cognome, email )
+      `)
+      .not('promemoria_minuti', 'is', null)
+      .is('promemoria_inviato_il', null)
+      .neq('stato', 'annullato');
+
+  let { data: candidati, error } = await cercaCandidati(true);
+
+  // Migrazione della programmazione non applicata: si lavora senza quella colonna
+  // (l'email verrà inviata subito dal cron invece che programmata su Resend).
+  if (error && /promemoria_email_id/.test(error.message)) {
+    console.warn('Colonna promemoria_email_id assente: promemoria impegni senza programmazione');
+    ({ data: candidati, error } = await cercaCandidati(false));
+  }
 
   if (error) {
     if (/promemoria_minuti|promemoria_inviato_il/.test(error.message)) {
@@ -315,8 +326,11 @@ async function inviaPromemoriaImpegni(
         });
       }
 
-      // EMAIL al proprietario (istruttori.email)
-      if (istruttore?.email) {
+      // EMAIL al proprietario (istruttori.email).
+      // Se la mail è già PROGRAMMATA su Resend (promemoria_email_id valorizzato) non
+      // si rispedisce: partirebbe due volte. La mail programmata è precisa al minuto,
+      // quindi questa è solo la rete di sicurezza per i preavvisi già scattati.
+      if (istruttore?.email && !riga.promemoria_email_id) {
         const esito = await sendReminderImpegnoEmailAction(riga.id);
         if (!esito.success) {
           await rilascia();
@@ -392,15 +406,51 @@ async function recuperaPromemoria(supabase: ReturnType<typeof createAdminClient>
     }
   }
 
+  // ── Impegni con ⏰: stessa cosa, con il preavviso scelto (2/4/12 ore / 1 giorno)
+  const esitiImpegni: { id: string; esito: string; dettaglio?: string }[] = [];
+
+  const { data: impegni } = await supabase
+    .from('appuntamenti')
+    .select('id')
+    .not('promemoria_minuti', 'is', null)
+    .is('promemoria_email_id', null)
+    .is('promemoria_inviato_il', null)
+    .gt('inizio', adesso.toISOString())
+    .order('inizio', { ascending: true })
+    .limit(200);
+
+  for (const riga of (impegni || []) as { id: string }[]) {
+    try {
+      const res = await programmaPromemoriaImpegno(riga.id);
+      const saltato = Boolean((res as { saltato?: boolean }).saltato);
+      esitiImpegni.push({
+        id: riga.id,
+        esito: res.success ? (saltato ? 'saltato' : 'programmato') : 'errore',
+        dettaglio: (res as { error?: string }).error
+      });
+    } catch (e) {
+      esitiImpegni.push({ id: riga.id, esito: 'errore', dettaglio: e instanceof Error ? e.message : 'sconosciuto' });
+    }
+  }
+
   return {
     success: true,
     adesso: adesso.toISOString(),
-    valutati: esiti.length,
-    programmati: esiti.filter((e) => e.esito === 'programmato').length,
-    inviatiSubito: esiti.filter((e) => e.esito === 'inviato subito').length,
-    saltati: esiti.filter((e) => e.esito === 'saltato').length,
-    errori: esiti.filter((e) => e.esito === 'errore').length,
-    esiti
+    guide: {
+      valutati: esiti.length,
+      programmati: esiti.filter((e) => e.esito === 'programmato').length,
+      inviatiSubito: esiti.filter((e) => e.esito === 'inviato subito').length,
+      saltati: esiti.filter((e) => e.esito === 'saltato').length,
+      errori: esiti.filter((e) => e.esito === 'errore').length,
+      dettaglio: esiti
+    },
+    impegni: {
+      valutati: esitiImpegni.length,
+      programmati: esitiImpegni.filter((e) => e.esito === 'programmato').length,
+      saltati: esitiImpegni.filter((e) => e.esito === 'saltato').length,
+      errori: esitiImpegni.filter((e) => e.esito === 'errore').length,
+      dettaglio: esitiImpegni
+    }
   };
 }
 

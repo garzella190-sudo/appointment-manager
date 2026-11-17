@@ -751,6 +751,166 @@ export async function sendReminderImpegnoEmailAction(appointmentId: string) {
   }
 }
 
+/** Riga impegno usata per costruire la mail di promemoria. */
+type RigaImpegnoEmail = {
+  id: string;
+  data: string;
+  inizio: string | null;
+  durata: number | null;
+  note: string | null;
+  clienti?:
+    | { nome?: string | null; cognome?: string | null }
+    | { nome?: string | null; cognome?: string | null }[]
+    | null;
+  istruttori?:
+    | { nome?: string | null; cognome?: string | null; email?: string | null }
+    | { nome?: string | null; cognome?: string | null; email?: string | null }[]
+    | null;
+};
+
+/**
+ * Costruisce la mail di promemoria di un impegno: identica per l'invio immediato
+ * (cron) e per quello programmato su Resend, così il testo non può divergere.
+ */
+function costruisciPromemoriaImpegno(riga: RigaImpegnoEmail):
+  | { ok: false; error: string }
+  | { ok: true; email: string; subject: string; html: string } {
+  const istruttore = Array.isArray(riga.istruttori) ? riga.istruttori[0] : riga.istruttori;
+  const cliente = Array.isArray(riga.clienti) ? riga.clienti[0] : riga.clienti;
+
+  if (!istruttore?.email) return { ok: false, error: 'Email istruttore mancante' };
+
+  const nomeImpegno = cliente?.cognome || 'Impegno';
+  const quando = new Date(riga.inizio || riga.data);
+  const giorno = format(quando, "EEEE d MMMM 'alle' HH:mm", { locale: it });
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+      <div style="background: #ffffff; border-radius: 24px; padding: 40px; border: 1px solid #f3f4f6; text-align: center;">
+        <div style="color: #f59e0b; font-size: 18px; font-weight: 700; margin-bottom: 24px;">Promemoria impegno</div>
+        <div style="color: #111827; font-size: 20px; font-weight: 600; line-height: 1.6;">
+          ${nomeImpegno}<br>
+          ${giorno}
+          ${riga.durata ? `<br>Durata: ${riga.durata} min` : ''}
+        </div>
+        ${riga.note ? `<div style="margin-top: 24px; color: #6b7280; font-size: 14px; font-style: italic;">${riga.note}</div>` : ''}
+        <div style="margin-top: 32px; color: #6b7280; font-size: 14px;">
+          ${istruttore.nome} ${istruttore.cognome} — ${SEDE.nome}
+        </div>
+      </div>
+    </div>
+  `;
+
+  return {
+    ok: true,
+    email: istruttore.email,
+    subject: `Promemoria impegno: ${nomeImpegno} — ${format(quando, 'd MMMM', { locale: it })}`,
+    html
+  };
+}
+
+/**
+ * Programma la mail di promemoria di un IMPEGNO all'istante esatto scelto
+ * (`promemoria_minuti`: 120/240/720/1440 minuti prima dell'inizio).
+ *
+ * Perché serve: con il solo cron giornaliero i preavvisi brevi non arrivavano mai
+ * (es. impegno alle 09:15 con "2 ore prima" → avviso alle 07:15, il cron gira alle
+ * 06:30: troppo presto; il giorno dopo è troppo tardi). Così invece parte al minuto.
+ *
+ * Se il preavviso è già scattato non fa nulla: ci pensa il cron (push + email
+ * insieme), così non si rischia di spedire due volte.
+ */
+export async function programmaPromemoriaImpegno(appointmentId: string) {
+  const supabase = createAdminClient();
+
+  const colonneBase = `
+      id, data, inizio, durata, note, promemoria_minuti,
+      clienti ( nome, cognome ),
+      istruttori ( nome, cognome, email )
+    `;
+
+  let { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`${colonneBase}, promemoria_email_id`)
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  let colonneNuove = true;
+  if (error && /promemoria_email_id/.test(error.message)) {
+    colonneNuove = false;
+    console.warn('Colonna promemoria_email_id assente: esegui la migrazione 20261113180000_promemoria_programmato.sql');
+    ({ data: apt, error } = await supabase
+      .from('appuntamenti')
+      .select(colonneBase)
+      .eq('id', appointmentId)
+      .maybeSingle());
+  }
+
+  if (error || !apt) return { success: false, error: 'Impegno non trovato' };
+
+  const riga = apt as unknown as RigaImpegnoEmail & {
+    promemoria_minuti?: number | null;
+    promemoria_email_id?: string | null;
+  };
+
+  const preavviso = Number(riga.promemoria_minuti);
+  if (!preavviso || Number.isNaN(preavviso)) {
+    return { success: true, saltato: true, motivo: 'nessun promemoria impostato' };
+  }
+  if (riga.promemoria_email_id) {
+    return { success: true, saltato: true, motivo: 'già programmato' };
+  }
+
+  const preparata = costruisciPromemoriaImpegno(riga);
+  if (!preparata.ok) return { success: false, error: preparata.error };
+
+  const inizio = new Date(riga.inizio || riga.data).getTime();
+  if (Number.isNaN(inizio)) return { success: false, error: 'Orario non valido' };
+  if (inizio <= Date.now()) return { success: true, saltato: true, motivo: 'impegno già iniziato' };
+
+  const quando = inizio - preavviso * 60 * 1000;
+  if (quando <= Date.now() + 60 * 1000) {
+    return { success: true, saltato: true, motivo: 'preavviso già scattato: lo gestisce il cron' };
+  }
+  if (quando - Date.now() > MASSIMO_PROGRAMMAZIONE_MS) {
+    return { success: false, error: 'Impegno troppo lontano per programmare la mail (max 30 giorni)' };
+  }
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) return { success: false, error: 'Configurazione email mancante (API Key)' };
+
+  const resend = new Resend(resendApiKey);
+  const { data: inviata, error: resendError } = await resend.emails.send({
+    from: SENDER,
+    to: preparata.email,
+    subject: preparata.subject,
+    html: preparata.html,
+    scheduledAt: new Date(quando).toISOString()
+  });
+
+  if (resendError) {
+    console.error('Resend Promemoria Impegno Error:', resendError);
+    return { success: false, error: resendError.message };
+  }
+
+  if (colonneNuove && inviata?.id) {
+    const { error: erroreSalvataggio } = await supabase
+      .from('appuntamenti')
+      .update({
+        promemoria_email_id: inviata.id,
+        promemoria_email_per: new Date(quando).toISOString()
+      })
+      .eq('id', appointmentId);
+
+    if (erroreSalvataggio) {
+      console.error('Promemoria impegno programmato ma non salvato:', erroreSalvataggio.message);
+    }
+  }
+
+  console.log('Promemoria impegno programmato per', new Date(quando).toISOString(), '→', preparata.email);
+  return { success: true, programmatoPer: new Date(quando).toISOString() };
+}
+
 /**
  * AVVISO DI GUIDA ANNULLATA al cliente.
  *

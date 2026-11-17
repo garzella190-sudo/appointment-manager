@@ -5,7 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { Resend } from 'resend';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { sendConfirmationEmailAction, programmaPromemoriaEmail, annullaPromemoriaProgrammato } from './notifications';
+import {
+  sendConfirmationEmailAction,
+  programmaPromemoriaEmail,
+  annullaPromemoriaProgrammato,
+  programmaPromemoriaImpegno
+} from './notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
 
 // Initialized lazily inside the action
@@ -241,6 +246,18 @@ export async function createAppointmentAction(payload: {
       }
     } catch (e) {
       console.error('Errore programmazione promemoria:', e);
+    }
+  }
+
+  // Promemoria di un IMPEGNO (⏰ 2/4/12 ore / 1 giorno prima): indipendente da
+  // `send_email` (non è una mail al cliente ma un avviso all'istruttore), quindi
+  // va programmato anche quando la casella "invia email" è spenta.
+  if (payload.is_impegno) {
+    try {
+      const esito = await programmaPromemoriaImpegno(appointment.id);
+      if (!esito.success) console.warn('Promemoria impegno non programmato:', esito.error);
+    } catch (e) {
+      console.error('Errore programmazione promemoria impegno:', e);
     }
   }
 
@@ -500,6 +517,14 @@ export async function updateAppointmentAction(id: string, payload: any) {
       const esitoPromemoria = await programmaPromemoriaEmail(id);
       if (!esitoPromemoria.success) {
         console.warn('Promemoria non programmato:', esitoPromemoria.error);
+      }
+
+      // Impegno con ⏰: stessa logica, con il preavviso scelto (2/4/12 ore/1 giorno)
+      if (payload.is_impegno) {
+        const esitoImpegno = await programmaPromemoriaImpegno(id);
+        if (!esitoImpegno.success) {
+          console.warn('Promemoria impegno non programmato:', esitoImpegno.error);
+        }
       }
     } catch (e) {
       console.error('Errore programmazione promemoria:', e);
