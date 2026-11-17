@@ -126,7 +126,7 @@ export async function GET(request: Request) {
    */
   const cerca = (conMarcatori: boolean) => {
     const colonne = conMarcatori
-      ? 'id, send_email, stato, inizio, promemoria_email_inviato_il, promemoria_email_id'
+      ? 'id, send_email, stato, inizio, promemoria_email_inviato_il, promemoria_email_id, clienti!inner ( email )'
       : 'id, send_email, stato, inizio';
 
     let query = supabase
@@ -138,8 +138,13 @@ export async function GET(request: Request) {
       .lte('inizio', limitePromemoria.toISOString());
 
     if (conMarcatori) {
-      // Nessuna mail programmata e nessuna già inviata = c'è un buco da coprire
-      query = query.is('promemoria_email_id', null).is('promemoria_email_inviato_il', null);
+      query = query
+        // Nessuna mail programmata e nessuna già inviata = c'è un buco da coprire
+        .is('promemoria_email_id', null)
+        .is('promemoria_email_inviato_il', null)
+        // Cliente senza indirizzo: non c'è nulla da spedire. Escluderlo qui evita di
+        // ritentare (e fallire) ogni minuto: 1440 tentativi al giorno per un dato mancante.
+        .not('clienti.email', 'is', null);
     }
 
     return query.order('inizio', { ascending: true }).limit(200);
