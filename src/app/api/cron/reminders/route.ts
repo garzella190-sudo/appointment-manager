@@ -118,19 +118,31 @@ export async function GET(request: Request) {
   );
   const orarioUtile = oraItaliana >= 6 && oraItaliana < 21;
 
+  /**
+   * Cerca SOLO le guide rimaste senza promemoria.
+   *
+   * Il filtro sta nella query e non nel codice: con il cron ogni minuto, scaricare
+   * ogni volta tutti gli appuntamenti per poi scartarli sarebbe traffico inutile.
+   */
   const cerca = (conMarcatori: boolean) => {
     const colonne = conMarcatori
       ? 'id, send_email, stato, inizio, promemoria_email_inviato_il, promemoria_email_id'
       : 'id, send_email, stato, inizio';
-    return supabase
+
+    let query = supabase
       .from('appuntamenti')
       .select(colonne)
       .eq('send_email', true)
       .neq('stato', 'annullato')
       .gte('inizio', minimoPreavviso.toISOString())
-      .lte('inizio', limitePromemoria.toISOString())
-      .order('inizio', { ascending: true })
-      .limit(200);
+      .lte('inizio', limitePromemoria.toISOString());
+
+    if (conMarcatori) {
+      // Nessuna mail programmata e nessuna già inviata = c'è un buco da coprire
+      query = query.is('promemoria_email_id', null).is('promemoria_email_inviato_il', null);
+    }
+
+    return query.order('inizio', { ascending: true }).limit(200);
   };
 
   let appointments: unknown[] = [];
