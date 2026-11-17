@@ -85,12 +85,19 @@ export async function GET(request: Request) {
   //
   // Il promemoria NON dipende più da questo cron: alla prenotazione viene
   // PROGRAMMATO su Resend per l'istante esatto "inizio guida − 24 ore".
-  // Qui si recuperano solo gli appuntamenti rimasti senza programmazione
-  // (guide inserite da versioni precedenti, o programmazione fallita) che
-  // iniziano entro 24 ore: per loro la mail parte subito.
+  // Qui si recuperano gli appuntamenti rimasti senza programmazione (guide inserite
+  // da versioni precedenti, programmazione fallita, oppure prenotate oltre i 30
+  // giorni consentiti da Resend): per quelli entro 24 ore la mail parte subito,
+  // per gli altri viene programmata normalmente.
   const adesso = new Date();
-  /** +24h: oltre questa distanza il promemoria non è ancora "di domani" */
-  const limitePromemoria = new Date(adesso.getTime() + ANTICIPO_PROMEMORIA_MS);
+  /**
+   * Finestra guardata: da 2 ore a 29 giorni.
+   * - entro 24 ore → `programmaPromemoriaEmail` invia subito;
+   * - oltre → programma per "inizio − 24h" (utile per le guide che al momento
+   *   della prenotazione erano troppo lontane per Resend: vengono agganciate
+   *   appena rientrano nei 30 giorni).
+   */
+  const limitePromemoria = new Date(adesso.getTime() + 29 * 24 * 60 * 60 * 1000);
   /**
    * Guida fra meno di 2 ore: il promemoria non serve (arriverebbe insieme alla mail
    * di conferma). Serve solo a non tempestare di mail chi prenota all'ultimo.
@@ -121,7 +128,8 @@ export async function GET(request: Request) {
       .neq('stato', 'annullato')
       .gte('inizio', minimoPreavviso.toISOString())
       .lte('inizio', limitePromemoria.toISOString())
-      .order('inizio', { ascending: true });
+      .order('inizio', { ascending: true })
+      .limit(200);
   };
 
   let appointments: unknown[] = [];
