@@ -539,6 +539,28 @@ async function diagnosticaPromemoria(
     guide
   };
 
+  // Iscrizioni push: quante, e per quali utenti. Senza iscrizioni nessuna notifica
+  // può partire, indipendentemente dal cron. (Letto col client admin: la tabella
+  // ha RLS e con la chiave pubblica risulterebbe vuota.)
+  try {
+    const { data: iscrizioni, error: erroreIscrizioni } = await supabase
+      .from('push_subscriptions')
+      .select('user_id, created_at');
+    risposta.push = erroreIscrizioni
+      ? { errore: erroreIscrizioni.message }
+      : {
+          iscrizioni: (iscrizioni || []).length,
+          utenti: [...new Set((iscrizioni || []).map((i) => (i as { user_id?: string }).user_id))],
+          ultima: (iscrizioni || [])
+            .map((i) => (i as { created_at?: string }).created_at)
+            .filter(Boolean)
+            .sort()
+            .pop() || null
+        };
+  } catch (e) {
+    risposta.push = { errore: e instanceof Error ? e.message : 'sconosciuto' };
+  }
+
   if (!resendApiKey) {
     risposta.prova = { esito: 'saltata', motivo: 'RESEND_API_KEY assente' };
     return risposta;
