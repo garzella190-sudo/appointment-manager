@@ -57,3 +57,4 @@ tmp/
 
 # chiavi temporanee di diagnostica
 .anon.txt
+.emailid.txt
