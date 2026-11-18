@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { Impegno, TipoImpegno } from '@/lib/database.types';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
+import { giornoMeseItalia } from '@/lib/oraItalia';
 import { format } from 'date-fns';
 
 export async function getTipiImpegnoAction() {
@@ -53,7 +54,8 @@ export async function createImpegnoAction(payload: {
 
   try {
     if (payload.istruttore_id) {
-      const dateFormatted = format(new Date(payload.data), 'dd/MM');
+      // Ora italiana anche qui: il server gira in UTC
+      const dateFormatted = giornoMeseItalia(payload.data);
       const timeFormatted = payload.ora_inizio.substring(0, 5);
       await notificaCambioCalendario({
         istruttoriCoinvolti: [payload.istruttore_id],
@@ -105,7 +107,8 @@ export async function updateImpegnoAction(id: string, payload: {
 
   try {
     if (payload.istruttore_id) {
-      const dateFormatted = format(new Date(payload.data), 'dd/MM');
+      // Ora italiana anche qui: il server gira in UTC
+      const dateFormatted = giornoMeseItalia(payload.data);
       const timeFormatted = payload.ora_inizio.substring(0, 5);
       await notificaCambioCalendario({
         istruttoriCoinvolti: [payload.istruttore_id],
@@ -147,7 +150,7 @@ export async function deleteImpegnoAction(id: string) {
 
   try {
     if (impegnoToDelete && impegnoToDelete.istruttore_id) {
-      const dateFormatted = format(new Date(impegnoToDelete.data), 'dd/MM');
+      const dateFormatted = giornoMeseItalia(impegnoToDelete.data);
       const timeFormatted = impegnoToDelete.ora_inizio.substring(0, 5);
       await notificaCambioCalendario({
         istruttoriCoinvolti: [impegnoToDelete.istruttore_id],

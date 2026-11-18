@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
+import { dataOraBreveItalia } from '@/lib/oraItalia';
 
 /**
  * WEBHOOK DI RESEND → serve a mandare la PUSH degli impegni all'istante esatto.
@@ -114,7 +113,8 @@ export async function POST(request: Request) {
   }
 
   const nomeImpegno = cliente?.cognome || 'Impegno';
-  const giorno = format(new Date(apt.inizio || apt.data), "EEE d MMM 'alle' HH:mm", { locale: it });
+  // Ora ITALIANA: il server gira in UTC e mostrerebbe un'ora sbagliata
+  const giorno = dataOraBreveItalia(apt.inizio || apt.data);
 
   try {
     const esito = await notificaCambioCalendario({

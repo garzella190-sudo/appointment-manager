@@ -10,6 +10,7 @@ import {
 import { notificaCambioCalendario } from '@/lib/pushHelper';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { dataBreveItalia, dataOraBreveItalia } from '@/lib/oraItalia';
 
 /** Riga di appuntamento arricchita con i dati del cliente (serve solo per i testi delle notifiche). */
 interface RigaAppuntamento {
@@ -28,13 +29,9 @@ function nomeCliente(riga: RigaAppuntamento | null | undefined): string {
   return `${cliente.cognome || ''} ${cliente.nome || ''}`.trim() || 'Guida';
 }
 
-/** "mer 4 giu alle 15:00" */
+/** "mer 4 giu alle 15:00" — sempre in ORA ITALIANA (il server gira in UTC) */
 function quando(dataISO: string): string {
-  try {
-    return `${format(new Date(dataISO), 'EEE d MMM', { locale: it })} alle ${format(new Date(dataISO), 'HH:mm')}`;
-  } catch {
-    return '';
-  }
+  return dataOraBreveItalia(dataISO);
 }
 
 /**
@@ -243,7 +240,7 @@ export async function notificaSessioneEsameAction(
 
   try {
     const giorno = sessione.data
-      ? format(new Date(sessione.data), 'EEE d MMM', { locale: it })
+      ? dataBreveItalia(sessione.data)
       : '';
     const ora = (sessione.ora_inizio || '').slice(0, 5);
 

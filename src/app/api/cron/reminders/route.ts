@@ -6,8 +6,7 @@ import {
   sendReminderImpegnoEmailAction
 } from '@/actions/notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
-import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
+import { dataOraBreveItalia } from '@/lib/oraItalia';
 import { Resend } from 'resend';
 
 /**
@@ -305,7 +304,7 @@ async function inviaPromemoriaImpegni(
     const istruttore = Array.isArray(riga.istruttori) ? riga.istruttori[0] : riga.istruttori;
     const ufficio = Array.isArray(riga.clienti) ? riga.clienti[0] : riga.clienti;
     const nomeImpegno = ufficio?.cognome || 'Impegno';
-    const giorno = format(new Date(riga.inizio || riga.data), "EEE d MMM 'alle' HH:mm", { locale: it });
+    const giorno = dataOraBreveItalia(riga.inizio || riga.data);
 
     // ── PRENOTAZIONE ATOMICA (push + email insieme) ─────────────────────────
     // Si scrive il marcatore *prima* di avvisare, con un UPDATE condizionato:
@@ -407,7 +406,7 @@ async function spingiPushImpegno(
   const istruttore = Array.isArray(apt.istruttori) ? apt.istruttori[0] : apt.istruttori;
   const nomeImpegno = cliente?.cognome || 'Impegno';
   const quando = new Date(apt.inizio || apt.data);
-  const giorno = format(quando, "EEE d MMM 'alle' HH:mm", { locale: it });
+  const giorno = dataOraBreveItalia(quando);
 
   const esito = await notificaCambioCalendario({
     istruttoriCoinvolti: [apt.istruttore_id],

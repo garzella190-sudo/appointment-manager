@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/utils/supabase/admin';
 import { Resend } from 'resend';
+import { dataItaliaISO, dataLungaItalia, dataOraLungaItalia } from '@/lib/oraItalia';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
@@ -210,7 +211,8 @@ export async function sendConfirmationEmailAction(appointmentId: string, isModif
   const clientName = `${cliente.nome}`;
   const instructorName = istruttore ? `${istruttore.nome} ${istruttore.cognome}` : 'Non assegnato';
   const vehicleName = veicolo ? `${veicolo.nome} (${veicolo.targa})` : 'Non assegnato';
-  const dateStr = apt.data.split('T')[0];
+  // Data ITALIANA: split('T')[0] prendeva la data UTC (una guida alle 00:30 finiva nel giorno prima)
+  const dateStr = dataItaliaISO(apt.data);
   const timeStr = getItalyTimeStr(apt.inizio);
 
   // Allegato .ics + tasto "Aggiungi al calendario" (Google) + link per gli altri calendari.
@@ -364,7 +366,8 @@ export async function sendReminderEmailAction(appointmentId: string) {
   const clientName = `${cliente.nome}`;
   const instructorName = istruttore ? `${istruttore.nome} ${istruttore.cognome}` : 'Non assegnato';
   const vehicleName = veicolo ? `${veicolo.nome} (${veicolo.targa})` : 'Non assegnato';
-  const dateStr = apt.data.split('T')[0];
+  // Data ITALIANA: split('T')[0] prendeva la data UTC (una guida alle 00:30 finiva nel giorno prima)
+  const dateStr = dataItaliaISO(apt.data);
   const timeStr = getItalyTimeStr(apt.inizio);
 
   // Promemoria: stesso tasto "Aggiungi al calendario" (chi non l'ha aggiunta prima, la aggiunge ora)
@@ -478,7 +481,8 @@ function costruisciPromemoriaCliente(apt: AppuntamentoEmail):
 
   const instructorName = istruttore ? `${istruttore.nome} ${istruttore.cognome}` : 'Non assegnato';
   const vehicleName = veicolo ? `${veicolo.nome} (${veicolo.targa})` : 'Non assegnato';
-  const dateStr = apt.data.split('T')[0];
+  // Data ITALIANA: split('T')[0] prendeva la data UTC (una guida alle 00:30 finiva nel giorno prima)
+  const dateStr = dataItaliaISO(apt.data);
   const timeStr = getItalyTimeStr(apt.inizio || apt.data);
 
   // Promemoria: stesso tasto "Aggiungi al calendario" (chi non l'ha aggiunta prima, la aggiunge ora)
@@ -714,7 +718,8 @@ export async function sendReminderImpegnoEmailAction(appointmentId: string) {
   if (!istruttore?.email) return { success: false, error: 'Email istruttore mancante' };
 
   const nomeImpegno = cliente?.cognome || 'Impegno';
-  const giorno = format(new Date(apt.inizio || apt.data), "EEEE d MMMM 'alle' HH:mm", { locale: it });
+  // Ora ITALIANA: il server gira in UTC (altrimenti 21:15 diventava 20:15)
+  const giorno = dataOraLungaItalia(apt.inizio || apt.data);
 
   try {
     const resendApiKey = process.env.RESEND_API_KEY;
@@ -724,7 +729,7 @@ export async function sendReminderImpegnoEmailAction(appointmentId: string) {
     const { error: resendError } = await resend.emails.send({
       from: SENDER,
       to: istruttore.email,
-      subject: `Promemoria impegno: ${nomeImpegno} — ${format(new Date(apt.inizio || apt.data), 'd MMMM', { locale: it })}`,
+      subject: `Promemoria impegno: ${nomeImpegno} — ${dataLungaItalia(apt.inizio || apt.data)}`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
           <div style="background: #ffffff; border-radius: 24px; padding: 40px; border: 1px solid #f3f4f6; text-align: center;">
@@ -786,7 +791,8 @@ function costruisciPromemoriaImpegno(riga: RigaImpegnoEmail):
 
   const nomeImpegno = cliente?.cognome || 'Impegno';
   const quando = new Date(riga.inizio || riga.data);
-  const giorno = format(quando, "EEEE d MMMM 'alle' HH:mm", { locale: it });
+  // Ora ITALIANA (server in UTC)
+  const giorno = dataOraLungaItalia(quando);
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
@@ -808,7 +814,7 @@ function costruisciPromemoriaImpegno(riga: RigaImpegnoEmail):
   return {
     ok: true,
     email: istruttore.email,
-    subject: `Promemoria impegno: ${nomeImpegno} — ${format(quando, 'd MMMM', { locale: it })}`,
+    subject: `Promemoria impegno: ${nomeImpegno} — ${dataLungaItalia(quando)}`,
     html
   };
 }
@@ -1011,7 +1017,7 @@ export async function sendCancellationEmailAction(appointmentData: {
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) return { success: false, error: 'Configurazione email mancante (API Key)' };
 
-    const dateStr = appointmentData.data.split('T')[0];
+    const dateStr = dataItaliaISO(appointmentData.data);
     const timeStr = getItalyTimeStr(appointmentData.data);
     const giorno = format(parseISO(dateStr), 'd MMMM', { locale: it });
 
