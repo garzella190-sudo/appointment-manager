@@ -435,11 +435,13 @@ export async function updateAppointmentAction(id: string, payload: any) {
     return ta === tb;
   };
 
-  // Impegno spostato in data/ora: il promemoria già inviato va riarmato, altrimenti
-  // quello nuovo non arriverebbe più (il marcatore resta valorizzato).
+  // Appuntamento spostato in data/ora: i promemoria già partiti non valgono più per
+  // il nuovo orario, quindi i marcatori vanno riarmati — altrimenti il promemoria
+  // della nuova data non arriverebbe mai.
   const orarioCambiato = Boolean(primaDellaModifica?.inizio) && !stessoIstante(primaDellaModifica?.inizio, startISO);
-  if (orarioCambiato && payload.is_impegno) {
-    rigaAggiornata.promemoria_inviato_il = null;
+  if (orarioCambiato) {
+    rigaAggiornata.promemoria_email_inviato_il = null;
+    if (payload.is_impegno) rigaAggiornata.promemoria_inviato_il = null;
   }
 
   let aggiornamento = await supabase
@@ -450,9 +452,14 @@ export async function updateAppointmentAction(id: string, payload: any) {
     .single();
 
   // Migrazione promemoria non applicata: si aggiorna senza le colonne nuove
-  if (aggiornamento.error && /promemoria_minuti|promemoria_inviato_il/.test(aggiornamento.error.message)) {
-    console.warn('Colonne promemoria assenti: esegui la migrazione 20261110140000_promemoria.sql');
-    const { promemoria_minuti, promemoria_inviato_il, ...senzaPromemoria } = rigaAggiornata;
+  if (aggiornamento.error && /promemoria_minuti|promemoria_inviato_il|promemoria_email_/.test(aggiornamento.error.message)) {
+    console.warn('Colonne promemoria assenti: esegui la migrazione 20261113180000_promemoria_programmato.sql');
+    const {
+      promemoria_minuti,
+      promemoria_inviato_il,
+      promemoria_email_inviato_il,
+      ...senzaPromemoria
+    } = rigaAggiornata;
     aggiornamento = await supabase
       .from('appuntamenti')
       .update(senzaPromemoria)

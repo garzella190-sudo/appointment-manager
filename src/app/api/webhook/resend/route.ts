@@ -84,10 +84,20 @@ export async function POST(request: Request) {
   }
   if (!apt) return NextResponse.json({ ok: true, ignorato: 'nessun appuntamento collegato' });
 
-  // Solo gli IMPEGNI mandano la push: il promemoria delle guide è per il cliente.
-  // Il tipo si riconosce dal cliente fittizio UFFICIO.
+  // ── PROMEMORIA DI UNA GUIDA → si marca soltanto ───────────────────────────
+  // La mail è già arrivata al cliente: non c'è push da mandare, ma il marcatore
+  // `promemoria_email_inviato_il` va scritto. Senza, il sistema non sa che il
+  // promemoria è stato consegnato e può rispedirlo (è la causa delle due mail
+  // identiche ricevute da un cliente il 17 novembre).
   const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
-  if (cliente?.nome !== 'UFFICIO') return NextResponse.json({ ok: true, ignorato: 'non è un impegno' });
+
+  if (cliente?.nome !== 'UFFICIO') {
+    await supabase
+      .from('appuntamenti')
+      .update({ promemoria_email_inviato_il: new Date().toISOString() })
+      .eq('id', apt.id);
+    return NextResponse.json({ ok: true, marchiato: 'promemoria guida consegnato' });
+  }
 
   // RISPETTO DEL "MAI": se il promemoria dell'impegno è disattivato non si manda
   // nessuna push. L'unica eccezione è la mail di PROVA generata dal pulsante

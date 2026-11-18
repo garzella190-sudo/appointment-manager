@@ -597,29 +597,70 @@ export async function programmaPromemoriaEmail(appointmentId: string) {
     return { success: false, error: 'Guida troppo lontana per programmare la mail (max 30 giorni)' };
   }
 
+  /**
+   * INVIO IMMEDIATO → PRENOTAZIONE ATOMICA.
+   *
+   * Era qui il difetto che ha mandato due volte il promemoria a un cliente: fra il
+   * controllo "non ancora inviato" e l'invio, un altro giro (salvataggio della guida
+   * o recupero manuale) poteva infilarsi e spedire anche lui. Ora il marcatore si
+   * scrive PRIMA di spedire, con un update condizionato: chi arriva secondo salta.
+   */
+  if (mandareSubito) {
+    const marca = new Date().toISOString();
+
+    if (colonneNuove) {
+      const { data: prenotato, error: errorePrenotazione } = await supabase
+        .from('appuntamenti')
+        .update({ promemoria_email_inviato_il: marca })
+        .eq('id', appointmentId)
+        .is('promemoria_email_inviato_il', null)
+        .select('id');
+
+      if (errorePrenotazione) {
+        return { success: false, error: `Impossibile marcare il promemoria: ${errorePrenotazione.message}` };
+      }
+      if (!prenotato || prenotato.length === 0) {
+        return { success: true, saltato: true, motivo: 'già inviato da un altro giro' };
+      }
+    }
+
+    const { error: erroreInvio } = await resend.emails.send({
+      from: SENDER,
+      to: preparata.email,
+      subject: preparata.subject,
+      html: preparata.html,
+      attachments: preparata.attachments
+    });
+
+    if (erroreInvio) {
+      console.error('Resend Promemoria Error:', erroreInvio);
+      // L'invio non è riuscito: si libera il marcatore così un giro successivo riprova
+      if (colonneNuove) {
+        await supabase
+          .from('appuntamenti')
+          .update({ promemoria_email_inviato_il: null })
+          .eq('id', appointmentId)
+          .eq('promemoria_email_inviato_il', marca);
+      }
+      return { success: false, error: `Errore Resend Promemoria: ${erroreInvio.message}` };
+    }
+
+    console.log('Promemoria inviato subito (guida entro 24 ore):', preparata.email);
+    return { success: true, subito: true };
+  }
+
   const { data: inviata, error: resendError } = await resend.emails.send({
     from: SENDER,
     to: preparata.email,
     subject: preparata.subject,
     html: preparata.html,
     attachments: preparata.attachments,
-    ...(mandareSubito ? {} : { scheduledAt: new Date(quando).toISOString() })
+    scheduledAt: new Date(quando).toISOString()
   });
 
   if (resendError) {
     console.error('Resend Promemoria Error:', resendError);
     return { success: false, error: `Errore Resend Promemoria: ${resendError.message}` };
-  }
-
-  if (mandareSubito) {
-    if (colonneNuove) {
-      await supabase
-        .from('appuntamenti')
-        .update({ promemoria_email_inviato_il: new Date().toISOString() })
-        .eq('id', appointmentId);
-    }
-    console.log('Promemoria inviato subito (guida entro 24 ore):', preparata.email);
-    return { success: true, subito: true };
   }
 
   if (colonneNuove && inviata?.id) {
