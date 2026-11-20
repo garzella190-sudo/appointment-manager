@@ -58,3 +58,7 @@ tmp/
 # chiavi temporanee di diagnostica
 .anon.txt
 .emailid.txt
+
+# tabelle dieta (lavori una tantum, non fanno parte dell'app)
+tabelle_dieta/
+scambia_righe_tabelle.py
