@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import {
   programmaPromemoriaEmail,
   programmaPromemoriaImpegno,
+  riallineaPromemoriaInCoda,
   sendReminderImpegnoEmailAction
 } from '@/actions/notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
@@ -92,6 +93,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, errore: 'non autorizzato' }, { status: 401 });
     }
     return NextResponse.json(await spingiPushImpegno(supabase, spingi));
+  }
+
+  // ── RIALLINEAMENTO DEI PROMEMORIA IN CODA (?riallinea=1) ──────────────────
+  // Sistema i promemoria programmati su un orario sbagliato: crea la mail nuova
+  // all'orario corretto e solo dopo annulla la vecchia. Non invia nulla sul momento.
+  // Con &prova=1 si limita a ELENCARE cosa sistemerebbe, senza toccare nulla.
+  if (new URL(request.url).searchParams.get('riallinea') === '1') {
+    const parametri = new URL(request.url).searchParams;
+    return NextResponse.json(
+      await riallineaPromemoriaInCodaTutti(supabase, parametri.get('prova') === '1')
+    );
   }
 
   // ── 1) RETE DI SICUREZZA per i promemoria ai clienti ──────────────────────
@@ -431,6 +443,99 @@ async function spingiPushImpegno(
     destinatari: esito.destinatari,
     dispositivi: esito.dispositivi,
     mailInviata: false
+  };
+}
+
+/**
+ * RIALLINEAMENTO DI TUTTI I PROMEMORIA IN CODA (?riallinea=1).
+ *
+ * Confronta l'orario in cui ogni promemoria è programmato con quello che dovrebbe
+ * essere (24 ore prima per le guide, preavviso scelto per gli impegni) e sistema
+ * quelli sbagliati: nuova mail all'orario giusto, poi annullo della vecchia.
+ *
+ * Con `soloProva = true` non tocca niente: elenca soltanto cosa farebbe.
+ * Non invia mai nulla sul momento: se il momento giusto è passato, lascia stare.
+ */
+async function riallineaPromemoriaInCodaTutti(
+  supabase: ReturnType<typeof createAdminClient>,
+  soloProva: boolean
+) {
+  const adesso = new Date();
+  const oggi = adesso.toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from('appuntamenti')
+    .select(`
+      id, inizio, promemoria_minuti, promemoria_email_per, promemoria_email_id,
+      clienti ( nome, cognome )
+    `)
+    .neq('stato', 'annullato')
+    .gte('data_solo', oggi)
+    .gt('inizio', adesso.toISOString())
+    .is('promemoria_email_inviato_il', null)
+    .limit(500);
+
+  if (error) return { success: false, errore: error.message };
+
+  type Riga = {
+    id: string;
+    inizio: string | null;
+    promemoria_minuti?: number | null;
+    promemoria_email_per?: string | null;
+    promemoria_email_id?: string | null;
+    clienti?: { nome?: string | null; cognome?: string | null } | { nome?: string | null; cognome?: string | null }[] | null;
+  };
+
+  const righe = (data || []) as unknown as Riga[];
+  const elenco: Record<string, unknown>[] = [];
+  let sistemati = 0;
+
+  for (const riga of righe) {
+    const cliente = Array.isArray(riga.clienti) ? riga.clienti[0] : riga.clienti;
+    const eImpegno = cliente?.nome === 'UFFICIO';
+    const inizio = new Date(riga.inizio || '').getTime();
+    if (Number.isNaN(inizio)) continue;
+
+    const atteso = eImpegno
+      ? (riga.promemoria_minuti ? inizio - Number(riga.promemoria_minuti) * 60 * 1000 : null)
+      : inizio - ANTICIPO_PROMEMORIA_MS;
+
+    // Nessun promemoria previsto per questa riga
+    if (atteso === null) continue;
+
+    const inCoda = riga.promemoria_email_per ? new Date(riga.promemoria_email_per).getTime() : null;
+    const allineato = inCoda !== null && Math.abs(inCoda - atteso) < 60 * 1000;
+    if (allineato) continue;
+
+    const voce: Record<string, unknown> = {
+      id: riga.id,
+      tipo: eImpegno ? 'impegno' : 'guida',
+      riferimento: cliente ? `${cliente.cognome || ''} ${cliente.nome || ''}`.trim() : '',
+      inizio: new Date(inizio).toISOString(),
+      inCoda: inCoda ? new Date(inCoda).toISOString() : null,
+      corretto: new Date(atteso).toISOString(),
+      caso: inCoda === null ? 'mancante' : 'disallineato',
+      momentoGiaPassato: atteso <= adesso.getTime()
+    };
+
+    if (!soloProva && !voce.momentoGiaPassato) {
+      const esito = await riallineaPromemoriaInCoda(riga.id);
+      voce.esito = esito.success ? ((esito as { saltato?: boolean }).saltato ? 'saltato' : 'sistemato') : 'errore';
+      if ('error' in esito && esito.error) voce.errore = esito.error;
+      if (voce.esito === 'sistemato') sistemati++;
+    }
+
+    elenco.push(voce);
+  }
+
+  return {
+    success: true,
+    modalitaProva: soloProva,
+    adesso: adesso.toISOString(),
+    esaminate: righe.length,
+    daSistemare: elenco.length,
+    sistemati,
+    dettaglio: elenco
   };
 }
 

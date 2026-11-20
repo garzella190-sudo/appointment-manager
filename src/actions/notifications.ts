@@ -1034,6 +1034,126 @@ export async function riprogrammaPromemoriaAppuntamento(appointmentId: string) {
 }
 
 /**
+ * RIALLINEAMENTO DI UN PROMEMORIA IN CODA (riparazione).
+ *
+ * Serve per i promemoria rimasti programmati su un orario sbagliato (guide spostate
+ * prima che lo spostamento riprogrammasse la mail). NON invia niente adesso:
+ * programma la mail nuova all'orario corretto e SOLO DOPO annulla quella vecchia,
+ * così se qualcosa va storto la vecchia resta valida.
+ *
+ * Se il momento giusto è già passato non fa nulla: nessuna raffica di mail, ci pensa
+ * il flusso normale.
+ */
+export async function riallineaPromemoriaInCoda(appointmentId: string) {
+  const supabase = createAdminClient();
+
+  const { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`
+      id, data, inizio, durata, note, send_email, promemoria_minuti,
+      promemoria_email_per, promemoria_email_id,
+      clienti ( nome, cognome, email ),
+      istruttori ( nome, cognome, email ),
+      veicoli ( nome, targa )
+    `)
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  if (error || !apt) return { success: false, error: 'appuntamento non trovato' };
+
+  const inizio = new Date(apt.inizio || apt.data).getTime();
+  if (Number.isNaN(inizio)) return { success: false, error: 'orario non valido' };
+
+  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
+  const eImpegno = cliente?.nome === 'UFFICIO';
+
+  const atteso = eImpegno
+    ? (apt.promemoria_minuti ? inizio - Number(apt.promemoria_minuti) * 60 * 1000 : null)
+    : inizio - ANTICIPO_PROMEMORIA_MS;
+
+  if (atteso === null) return { success: true, saltato: true, motivo: 'nessun promemoria previsto' };
+
+  const adesso = Date.now();
+  if (atteso <= adesso + 60 * 1000) {
+    return { success: true, saltato: true, motivo: 'momento già passato: non si invia ora' };
+  }
+  if (atteso - adesso > MASSIMO_PROGRAMMAZIONE_MS) {
+    return { success: false, error: 'oltre i 30 giorni consentiti da Resend' };
+  }
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) return { success: false, error: 'Configurazione email mancante (API Key)' };
+
+  const resend = new Resend(resendApiKey);
+  const quandoISO = new Date(atteso).toISOString();
+
+  // 1) prima la nuova: se fallisce, la vecchia resta dov'è
+  let nuovaId: string | undefined;
+  let erroreNuova: { message: string } | null = null;
+
+  if (eImpegno) {
+    // Promemoria di un impegno: nessun allegato .ics
+    const preparata = costruisciPromemoriaImpegno(apt as unknown as RigaImpegnoEmail);
+    if (!preparata.ok) return { success: true, saltato: true, motivo: 'destinatario senza email' };
+
+    const esito = await resend.emails.send({
+      from: SENDER,
+      to: preparata.email,
+      subject: preparata.subject,
+      html: preparata.html,
+      scheduledAt: quandoISO
+    });
+    nuovaId = esito.data?.id;
+    erroreNuova = esito.error;
+  } else {
+    // Promemoria di una guida: con l'allegato .ics
+    const preparata = costruisciPromemoriaCliente(apt as unknown as AppuntamentoEmail);
+    if (!preparata.ok) return { success: true, saltato: true, motivo: 'cliente senza email' };
+
+    const esito = await resend.emails.send({
+      from: SENDER,
+      to: preparata.email,
+      subject: preparata.subject,
+      html: preparata.html,
+      attachments: preparata.attachments,
+      scheduledAt: quandoISO
+    });
+    nuovaId = esito.data?.id;
+    erroreNuova = esito.error;
+  }
+
+  if (erroreNuova) {
+    console.error('Riallineamento promemoria: errore Resend', erroreNuova);
+    return { success: false, error: erroreNuova.message };
+  }
+
+  // 2) poi si annulla la vecchia (se era già partita non si può: pazienza)
+  const idVecchio = (apt as { promemoria_email_id?: string | null }).promemoria_email_id || null;
+  if (idVecchio) {
+    try {
+      await resend.emails.cancel(idVecchio);
+    } catch {
+      /* già spedita */
+    }
+  }
+
+  // 3) si salva la nuova
+  const { error: erroreSalvataggio } = await supabase
+    .from('appuntamenti')
+    .update({
+      promemoria_email_id: nuovaId || null,
+      promemoria_email_per: new Date(atteso).toISOString()
+    })
+    .eq('id', appointmentId);
+
+  if (erroreSalvataggio) {
+    console.error('Riallineamento promemoria: non salvato in tabella', erroreSalvataggio.message);
+  }
+
+  return { success: true, programmatoPer: new Date(atteso).toISOString() };
+}
+
+/**
  * PROVA DELLA PUSH DI UN IMPEGNO (pulsante "Prova push" nel form, solo admin).
  *
  * Programma la mail dell'impegno fra N minuti (default 3). Quando Resend la spedisce
