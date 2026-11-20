@@ -1067,6 +1067,11 @@ export async function riallineaPromemoriaInCoda(appointmentId: string) {
   const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
   const eImpegno = cliente?.nome === 'UFFICIO';
 
+  // Guida con "invia email" disattivato: non va programmato niente
+  if (!eImpegno && !apt.send_email) {
+    return { success: true, saltato: true, motivo: 'email disattivata per questa guida' };
+  }
+
   const atteso = eImpegno
     ? (apt.promemoria_minuti ? inizio - Number(apt.promemoria_minuti) * 60 * 1000 : null)
     : inizio - ANTICIPO_PROMEMORIA_MS;
@@ -1078,7 +1083,9 @@ export async function riallineaPromemoriaInCoda(appointmentId: string) {
     return { success: true, saltato: true, motivo: 'momento già passato: non si invia ora' };
   }
   if (atteso - adesso > MASSIMO_PROGRAMMAZIONE_MS) {
-    return { success: false, error: 'oltre i 30 giorni consentiti da Resend' };
+    // Oltre i 30 giorni Resend non accetta la programmazione: la aggancerà il cron
+    // giornaliero quando la guida rientra nel limite.
+    return { success: true, saltato: true, motivo: 'oltre i 30 giorni: la prende il cron più avanti' };
   }
 
   const resendApiKey = process.env.RESEND_API_KEY;

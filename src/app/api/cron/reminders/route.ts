@@ -466,7 +466,7 @@ async function riallineaPromemoriaInCodaTutti(
   const { data, error } = await supabase
     .from('appuntamenti')
     .select(`
-      id, inizio, promemoria_minuti, promemoria_email_per, promemoria_email_id,
+      id, inizio, send_email, promemoria_minuti, promemoria_email_per, promemoria_email_id,
       clienti ( nome, cognome )
     `)
     .neq('stato', 'annullato')
@@ -480,6 +480,7 @@ async function riallineaPromemoriaInCodaTutti(
   type Riga = {
     id: string;
     inizio: string | null;
+    send_email?: boolean | null;
     promemoria_minuti?: number | null;
     promemoria_email_per?: string | null;
     promemoria_email_id?: string | null;
@@ -502,6 +503,9 @@ async function riallineaPromemoriaInCodaTutti(
 
     // Nessun promemoria previsto per questa riga
     if (atteso === null) continue;
+
+    // Guida con "invia email" disattivato: non c'è nessuna mail da programmare
+    if (!eImpegno && !riga.send_email) continue;
 
     const inCoda = riga.promemoria_email_per ? new Date(riga.promemoria_email_per).getTime() : null;
     const allineato = inCoda !== null && Math.abs(inCoda - atteso) < 60 * 1000;
