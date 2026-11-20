@@ -967,6 +967,73 @@ export async function programmaPromemoriaImpegno(appointmentId: string) {
 }
 
 /**
+ * RIPROGRAMMAZIONE DEL PROMEMORIA DOPO UNO SPOSTAMENTO.
+ *
+ * Il trascinamento nel calendario (e lo spostamento di una seduta d'esame) aggiorna
+ * gli appuntamenti con un update diretto sul database, senza passare da
+ * `updateAppointmentAction`: senza questa funzione il promemoria restava programmato
+ * per il VECCHIO orario e per quello nuovo non ne partiva nessuno.
+ *
+ * IDEMPOTENTE: se la mail in coda è già all'orario giusto non tocca niente (non
+ * consuma quota). Altrimenti annulla quella vecchia, riarma i marcatori e ne
+ * programma una nuova con le regole solite: 24 ore prima per le guide, preavviso
+ * scelto (2/4/12 ore, 1 giorno) per gli impegni.
+ */
+export async function riprogrammaPromemoriaAppuntamento(appointmentId: string) {
+  const supabase = createAdminClient();
+
+  const { data: apt, error } = await supabase
+    .from('appuntamenti')
+    .select(`
+      id, inizio, data, send_email, promemoria_minuti,
+      promemoria_email_per, promemoria_email_id, promemoria_email_inviato_il,
+      clienti ( nome )
+    `)
+    .eq('id', appointmentId)
+    .maybeSingle();
+
+  if (error) {
+    // Colonne della programmazione non presenti: non c'è nulla da riprogrammare
+    if (/promemoria_/.test(error.message)) return { success: true, saltato: true };
+    return { success: false, error: error.message };
+  }
+  if (!apt) return { success: false, error: 'appuntamento non trovato' };
+
+  const inizio = new Date(apt.inizio || apt.data).getTime();
+  if (Number.isNaN(inizio)) return { success: false, error: 'orario non valido' };
+  if (inizio <= Date.now()) return { success: true, saltato: true, motivo: 'già iniziato' };
+
+  const cliente = Array.isArray(apt.clienti) ? apt.clienti[0] : apt.clienti;
+  const eImpegno = cliente?.nome === 'UFFICIO';
+
+  const atteso = eImpegno
+    ? (apt.promemoria_minuti ? inizio - Number(apt.promemoria_minuti) * 60 * 1000 : null)
+    : inizio - ANTICIPO_PROMEMORIA_MS;
+
+  const inCoda = apt.promemoria_email_per ? new Date(apt.promemoria_email_per).getTime() : null;
+
+  // Già in coda all'orario giusto: niente da fare
+  if (atteso !== null && inCoda !== null && Math.abs(inCoda - atteso) < 60 * 1000) {
+    return { success: true, saltato: true, motivo: 'già programmato per il nuovo orario' };
+  }
+
+  // Spostata: il promemoria vecchio non vale più
+  await annullaPromemoriaProgrammato(appointmentId);
+
+  await supabase
+    .from('appuntamenti')
+    .update({
+      promemoria_email_inviato_il: null,
+      ...(eImpegno ? { promemoria_inviato_il: null } : {})
+    })
+    .eq('id', appointmentId);
+
+  return eImpegno
+    ? programmaPromemoriaImpegno(appointmentId)
+    : programmaPromemoriaEmail(appointmentId);
+}
+
+/**
  * PROVA DELLA PUSH DI UN IMPEGNO (pulsante "Prova push" nel form, solo admin).
  *
  * Programma la mail dell'impegno fra N minuti (default 3). Quando Resend la spedisce

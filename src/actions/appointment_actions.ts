@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache';
 import {
   sendCancellationEmailAction,
   annullaPromemoriaProgrammato,
-  provaPromemoriaImpegno
+  provaPromemoriaImpegno,
+  riprogrammaPromemoriaAppuntamento
 } from './notifications';
 import { notificaCambioCalendario } from '@/lib/pushHelper';
 import { format } from 'date-fns';
@@ -217,6 +218,22 @@ export async function notificaSpostamentoAction(
     });
   } catch (e) {
     console.error('Push error (spostamento):', e);
+  }
+
+  // PROMEMORIA: lo spostamento è stato scritto direttamente sul database, quindi la
+  // mail in coda è ancora quella del vecchio orario. Qui si riallinea: annulla la
+  // vecchia e ne programma una nuova (o non fa nulla se era già corretta).
+  for (const riga of righe) {
+    if (!riga.id) continue;
+    try {
+      const esito = await riprogrammaPromemoriaAppuntamento(riga.id);
+      if (!esito.success) {
+        const dettaglio = 'error' in esito ? esito.error : 'motivo non specificato';
+        console.warn('Promemoria non riprogrammato dopo lo spostamento:', riga.id, dettaglio);
+      }
+    } catch (e) {
+      console.error('Errore riprogrammazione promemoria dopo spostamento:', e);
+    }
   }
 
   return { success: true };
